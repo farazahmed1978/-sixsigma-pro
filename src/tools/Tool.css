@@ -1,0 +1,75 @@
+/* Shared tool styles - applies to all tool components */
+
+.tool-container { padding: 1.5rem 2rem; max-width: 1200px; }
+.tool-section { margin-bottom: 1.5rem; }
+.tool-section-title { font-family: var(--font-display); font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.85rem; }
+
+.tool-input-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 1.25rem; margin-bottom: 1.25rem;
+}
+.tool-output-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); overflow: hidden;
+}
+
+/* CSV upload */
+.csv-drop { border: 2px dashed var(--border); border-radius: var(--radius); padding: 1.5rem; text-align: center; cursor: pointer; transition: all var(--transition); background: var(--input-bg); margin-bottom: 0.75rem; }
+.csv-drop:hover { border-color: var(--accent); background: var(--accent-dim); }
+.csv-drop p { font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 0.25rem; }
+.csv-drop span { font-size: 0.78rem; color: var(--text-muted); }
+
+/* Textarea */
+.tool-textarea { width: 100%; padding: 0.65rem 0.85rem; background: var(--input-bg); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text-primary); font-family: var(--font-mono); font-size: 0.85rem; resize: vertical; outline: none; }
+.tool-textarea:focus { border-color: var(--accent); }
+
+/* Result value */
+.result-value { font-family: var(--font-mono); font-size: 1.2rem; font-weight: 600; color: var(--text-primary); }
+.result-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.2rem; }
+
+/* Control limit lines in charts */
+.ucl-label { fill: var(--red); font-size: 11px; }
+.lcl-label { fill: var(--red); font-size: 11px; }
+.cl-label  { fill: var(--green); font-size: 11px; }
+
+/* Custom recharts tooltip */
+.custom-tooltip {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 0.65rem 0.9rem;
+  font-size: 0.85rem; box-shadow: var(--shadow);
+}
+.custom-tooltip .label { font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem; }
+.custom-tooltip .value { color: var(--text-secondary); }
+
+/* Specification input row */
+.spec-row { display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap; }
+.spec-row .form-group { flex: 1; min-width: 100px; }
+
+/* FMEA-specific */
+.fmea-table { width: 100%; }
+.severity-high { color: var(--red); font-weight: 700; }
+.severity-mid  { color: var(--yellow); font-weight: 700; }
+.severity-low  { color: var(--green); font-weight: 700; }
+
+/* Fishbone */
+.fishbone-cause-input { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.4rem; }
+.fishbone-cause-input input { flex: 1; }
+
+/* VSM */
+.vsm-step { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.85rem 1rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.75rem; }
+.vsm-step-name { font-weight: 600; font-size: 0.9rem; flex: 1; color: var(--text-primary); }
+
+/* Print */
+@media print {
+  .tool-input-card, .csv-drop, .no-print { display: none !important; }
+  .tool-output-card { border: 1px solid #ddd; }
+}
+
+/* Worksheet data banner */
+.ws-banner {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem; padding: 0.85rem 1.1rem;
+  background: var(--accent-dim); border: 1px solid rgba(0,102,255,0.2);
+  border-radius: var(--radius); margin-bottom: 1.25rem; flex-wrap: wrap;
+}
+.ws-banner span { font-size: 0.88rem; font-weight: 600; color: var(--accent-light); }

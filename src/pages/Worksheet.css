@@ -1,0 +1,81 @@
+.worksheet-page { max-width: 1300px; margin: 0 auto; padding: 2rem; }
+
+.worksheet-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  margin-bottom: 2rem; gap: 1rem; flex-wrap: wrap;
+}
+.worksheet-header h1 { font-family: var(--font-display); font-size: 1.8rem; font-weight: 700; margin-bottom: 0.3rem; }
+.worksheet-header p { color: var(--text-secondary); font-size: 0.95rem; }
+
+.worksheet-meta { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.ws-badge { padding: 0.3rem 0.75rem; background: var(--bg-3); border-radius: 999px; font-size: 0.78rem; color: var(--text-secondary); border: 1px solid var(--border); }
+
+.worksheet-body { display: grid; grid-template-columns: 1fr 320px; gap: 1.5rem; align-items: start; }
+@media (max-width: 1000px) { .worksheet-body { grid-template-columns: 1fr; } }
+
+.ws-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.5rem; }
+
+.ws-hint { font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 0.75rem; line-height: 1.55; }
+
+.ws-textarea {
+  width: 100%; padding: 0.75rem; background: var(--input-bg);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  color: var(--text-primary); font-family: var(--font-mono); font-size: 0.85rem;
+  resize: vertical; outline: none; line-height: 1.5;
+}
+.ws-textarea:focus { border-color: var(--accent); }
+
+.ws-format-tip {
+  margin-top: 1.25rem; padding: 1rem; background: var(--bg-2);
+  border-radius: var(--radius); font-size: 0.85rem; color: var(--text-secondary); line-height: 1.6;
+}
+.ws-format-tip strong { color: var(--text-primary); }
+.ws-example {
+  margin-top: 0.5rem; padding: 0.75rem; background: var(--bg-3);
+  border-radius: 6px; font-family: var(--font-mono); font-size: 0.82rem;
+  color: var(--accent-light); white-space: pre;
+}
+
+.ws-table-wrapper { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); }
+.ws-table { min-width: 500px; }
+.ws-table th { position: relative; }
+.col-type {
+  display: inline-block; margin-left: 6px; padding: 1px 5px;
+  background: var(--accent-dim); color: var(--accent-light);
+  border-radius: 3px; font-size: 0.65rem; font-weight: 700;
+}
+.row-num { color: var(--text-muted); font-family: var(--font-mono); font-size: 0.78rem; width: 40px; }
+
+/* Sidebar */
+.ws-sidebar { display: flex; flex-direction: column; gap: 1rem; }
+
+.ws-columns-card { padding: 1.25rem; }
+.ws-col-item { padding: 0.75rem 0; border-bottom: 1px solid var(--border); }
+.ws-col-item:last-child { border-bottom: none; padding-bottom: 0; }
+.ws-col-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.3rem; }
+.ws-col-name { font-weight: 600; font-size: 0.9rem; color: var(--text-primary); }
+.ws-col-type { font-size: 0.7rem; font-weight: 700; padding: 2px 7px; border-radius: 999px; text-transform: uppercase; }
+.ws-col-type.numeric { background: var(--green-dim); color: var(--green); }
+.ws-col-type.text { background: var(--orange-dim); color: var(--orange); }
+.ws-col-stats { display: flex; gap: 0.75rem; flex-wrap: wrap; font-size: 0.75rem; color: var(--text-muted); font-family: var(--font-mono); }
+
+.ws-tools-card { padding: 1.25rem; }
+.ws-tools-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+.ws-tool-btn {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.6rem 0.75rem; background: var(--bg-2);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  color: var(--text-secondary); font-size: 0.82rem; font-weight: 500;
+  transition: all var(--transition); text-decoration: none;
+}
+.ws-tool-btn:hover { background: var(--accent-dim); border-color: var(--accent); color: var(--accent-light); }
+.ws-tool-btn.disabled { opacity: 0.4; pointer-events: none; }
+
+@media (max-width: 768px) {
+  .worksheet-page { padding: 1rem; }
+  .worksheet-header { flex-direction: column; }
+  .worksheet-header h1 { font-size: 1.4rem; }
+  .worksheet-body { grid-template-columns: 1fr; }
+  .ws-tools-grid { grid-template-columns: 1fr 1fr; }
+  .worksheet-meta { flex-wrap: wrap; }
+}
