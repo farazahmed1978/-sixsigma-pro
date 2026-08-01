@@ -193,7 +193,36 @@ export function interpretRMAnova({ F, p, dfCond, dfError, etaSq, condMeans }, co
     `(F(${dfCond},${dfError})=${F.toFixed(3)}, p=${p.toFixed(4)}), with a ${sizeWord} effect size (η²=${etaSq.toFixed(3)}). Condition means: ${means}. ` +
     `At least one condition's average differs from the others — run the post-hoc comparison to see exactly which pairs differ, and check Mauchly's test since repeated measures data must meet the sphericity assumption.`;
 }
+export function interpretTwoWayAnova(r, factorAName, factorBName, outcomeVar) {
+  const sigA = r.pa < 0.05, sigB = r.pb < 0.05, sigAB = r.pab < 0.05;
+  const parts = [];
 
+  parts.push(
+    sigA
+      ? `${factorAName} has a statistically significant effect on ${outcomeVar} (F(${r.dfA},${r.dfE})=${r.Fa.toFixed(3)}, p=${r.pa.toFixed(4)}).`
+      : `${factorAName} does not show a statistically significant effect on ${outcomeVar} (F(${r.dfA},${r.dfE})=${r.Fa.toFixed(3)}, p=${r.pa.toFixed(4)}).`
+  );
+  parts.push(
+    sigB
+      ? `${factorBName} has a statistically significant effect on ${outcomeVar} (F(${r.dfB},${r.dfE})=${r.Fb.toFixed(3)}, p=${r.pb.toFixed(4)}).`
+      : `${factorBName} does not show a statistically significant effect on ${outcomeVar} (F(${r.dfB},${r.dfE})=${r.Fb.toFixed(3)}, p=${r.pb.toFixed(4)}).`
+  );
+
+  if (sigAB) {
+    parts.push(
+      `The interaction between ${factorAName} and ${factorBName} is also statistically significant (F(${r.dfAB},${r.dfE})=${r.Fab.toFixed(3)}, p=${r.pab.toFixed(4)}) — ` +
+      `this means the effect of one factor depends on the level of the other, so the individual ${factorAName} and ${factorBName} results above should be interpreted with caution ` +
+      `(look at the cell means / interaction plot rather than treating each factor's effect as constant across all levels of the other).`
+    );
+  } else {
+    parts.push(
+      `The interaction between ${factorAName} and ${factorBName} is not statistically significant (F(${r.dfAB},${r.dfE})=${r.Fab.toFixed(3)}, p=${r.pab.toFixed(4)}) — ` +
+      `the two factors appear to act independently on ${outcomeVar}.`
+    );
+  }
+
+  return parts.join(' ');
+}
 export function interpretCorrelationMatrix({ cols, mat }) {
   const pairs = [];
   for (let i = 0; i < cols.length; i++) {
