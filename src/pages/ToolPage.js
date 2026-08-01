@@ -185,7 +185,20 @@ export default function ToolPage({ tool, children }) {
       {/* Tool Header */}
       <div className="tool-header">
         <div className="tool-header-left">
-          <Link to="/" className="breadcrumb">← Dashboard</Link>
+          <Link to="/" className="breadcrumb" style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+            padding: '0.4rem 0.85rem',
+            marginBottom: '0.5rem',
+            borderRadius: '999px',
+            border: '1px solid var(--border)',
+            background: 'var(--surface)',
+            color: 'var(--text-secondary)',
+            fontSize: '0.85rem',
+            fontWeight: 600,
+            textDecoration: 'none',
+          }}>← Back to Dashboard</Link>
           <div className="tool-header-title">
             <span className="tool-header-icon">{meta.icon}</span>
             <div>
