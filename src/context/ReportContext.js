@@ -1,43 +1,109 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 
-const ReportContext = createContext();
+const ProjectsContext = createContext();
+const STORAGE_KEY = 'sixsigmapro_projects';
 
-export function ReportProvider({ children }) {
-  const [items, setItems] = useState([]); // [{ id, title, toolId, timestamp, statsSummary, interpretation, chartImage, includeRawData, rawData }]
+export const PHASES = ['Define', 'Measure', 'Analyze', 'Improve', 'Control'];
 
-  const addReportItem = useCallback((item) => {
-    const id = `${item.toolId}-${Date.now()}`;
-    setItems(prev => [...prev, { id, includeRawData: false, ...item }]);
+function emptyPhases() {
+  return PHASES.reduce((acc, p) => ({ ...acc, [p]: { notes: '', itemIds: [] } }), {});
+}
+
+function loadProjects() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    // Guard against older/malformed records missing a phase key.
+    return parsed.map(p => ({ ...p, phases: { ...emptyPhases(), ...p.phases } }));
+  } catch {
+    return [];
+  }
+}
+
+export function ProjectsProvider({ children }) {
+  const [projects, setProjects] = useState(loadProjects);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
+    } catch (e) {
+      console.warn('Projects could not be saved to localStorage:', e);
+    }
+  }, [projects]);
+
+  const createProject = useCallback((data) => {
+    const id = `proj-${Date.now()}`;
+    const project = {
+      id,
+      name: (data.name || '').trim() || 'Untitled Project',
+      goal: data.goal || '',
+      owner: data.owner || '',
+      champion: data.champion || '',
+      createdAt: new Date().toISOString(),
+      phases: emptyPhases(),
+    };
+    setProjects(prev => [...prev, project]);
     return id;
   }, []);
 
-  const removeReportItem = useCallback((id) => {
-    setItems(prev => prev.filter(i => i.id !== id));
+  const updateProject = useCallback((id, updates) => {
+    setProjects(prev => prev.map(p => (p.id === id ? { ...p, ...updates } : p)));
   }, []);
 
-  const toggleIncludeRawData = useCallback((id) => {
-    setItems(prev => prev.map(i => i.id === id ? { ...i, includeRawData: !i.includeRawData } : i));
+  const deleteProject = useCallback((id) => {
+    setProjects(prev => prev.filter(p => p.id !== id));
   }, []);
 
-  const reorderItems = useCallback((fromIndex, toIndex) => {
-    setItems(prev => {
-      const updated = [...prev];
-      const [moved] = updated.splice(fromIndex, 1);
-      updated.splice(toIndex, 0, moved);
-      return updated;
-    });
+  // An item lives in at most one phase per project — assigning it to a new
+  // phase removes it from any other phase in that same project first.
+  const assignItemToPhase = useCallback((projectId, phase, itemId) => {
+    setProjects(prev => prev.map(p => {
+      if (p.id !== projectId) return p;
+      const phases = {};
+      PHASES.forEach(ph => {
+        phases[ph] = { ...p.phases[ph], itemIds: p.phases[ph].itemIds.filter(i => i !== itemId) };
+      });
+      phases[phase] = { ...phases[phase], itemIds: [...phases[phase].itemIds, itemId] };
+      return { ...p, phases };
+    }));
   }, []);
 
-  const clearReport = useCallback(() => setItems([]), []);
+  const removeItemFromProject = useCallback((projectId, itemId) => {
+    setProjects(prev => prev.map(p => {
+      if (p.id !== projectId) return p;
+      const phases = {};
+      PHASES.forEach(ph => {
+        phases[ph] = { ...p.phases[ph], itemIds: p.phases[ph].itemIds.filter(i => i !== itemId) };
+      });
+      return { ...p, phases };
+    }));
+  }, []);
+
+  const updatePhaseNotes = useCallback((projectId, phase, notes) => {
+    setProjects(prev => prev.map(p => (
+      p.id === projectId
+        ? { ...p, phases: { ...p.phases, [phase]: { ...p.phases[phase], notes } } }
+        : p
+    )));
+  }, []);
+
+  const getProject = useCallback((id) => projects.find(p => p.id === id), [projects]);
 
   return (
-    <ReportContext.Provider value={{
-      items, addReportItem, removeReportItem, toggleIncludeRawData, reorderItems, clearReport,
-      hasItems: items.length > 0,
+    <ProjectsContext.Provider value={{
+      projects,
+      createProject,
+      updateProject,
+      deleteProject,
+      assignItemToPhase,
+      removeItemFromProject,
+      updatePhaseNotes,
+      getProject,
     }}>
       {children}
-    </ReportContext.Provider>
+    </ProjectsContext.Provider>
   );
 }
 
-export const useReport = () => useContext(ReportContext);
+export const useProjects = () => useContext(ProjectsContext);
