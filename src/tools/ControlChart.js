@@ -9,46 +9,93 @@ import './Tool.css';
 
 // Standard I-MR constants (subgroup size n=2 for moving range)
 const D2 = 1.128;   // used to estimate sigma from mRbar
-const D4 = 3.267;   // moving range UCL multiplier
-const D3 = 0;       // moving range LCL multiplier (0 for n=2)
+const D4_IMR = 3.267;   // moving range UCL multiplier
+const D3_IMR = 0;       // moving range LCL multiplier (0 for n=2)
+
+// Standard X-bar & R control chart constants (Montgomery, "Introduction to Statistical
+// Quality Control" — the standard published table for subgroup sizes n=2 through n=10).
+// A2 scales R-bar into X-bar chart limits; D3/D4 scale R-bar into R-chart limits.
+const XBAR_R_CONSTANTS = {
+  2: { A2: 1.880, D3: 0,     D4: 3.267 },
+  3: { A2: 1.023, D3: 0,     D4: 2.574 },
+  4: { A2: 0.729, D3: 0,     D4: 2.282 },
+  5: { A2: 0.577, D3: 0,     D4: 2.114 },
+  6: { A2: 0.483, D3: 0,     D4: 2.004 },
+  7: { A2: 0.419, D3: 0.076, D4: 1.924 },
+  8: { A2: 0.373, D3: 0.136, D4: 1.864 },
+  9: { A2: 0.337, D3: 0.184, D4: 1.816 },
+  10: { A2: 0.308, D3: 0.223, D4: 1.777 },
+};
 
 function calcStats(values) {
   const n = values.length;
   const mean = values.reduce((a, b) => a + b, 0) / n;
 
-  // Moving ranges between consecutive points
   const movingRanges = [];
   for (let i = 1; i < n; i++) movingRanges.push(Math.abs(values[i] - values[i - 1]));
   const mrBar = movingRanges.reduce((a, b) => a + b, 0) / movingRanges.length;
 
-  // Sigma estimated from moving range (standard I-MR method), not raw sample std dev.
-  // This avoids inflating control limits when the data itself contains special-cause variation.
   const sigma = mrBar / D2;
 
   const ucl = mean + 3 * sigma;
   const lcl = mean - 3 * sigma;
-  const mrUcl = D4 * mrBar;
-  const mrLcl = D3 * mrBar;
+  const mrUcl = D4_IMR * mrBar;
+  const mrLcl = D3_IMR * mrBar;
 
   return { mean, sigma, mrBar, ucl, lcl, mrUcl, mrLcl, n, movingRanges };
 }
 
-// Western Electric Rules (applied to the Individuals chart)
-// Rule 1: any single point beyond 3-sigma (Zone A)
-// Rule 2: 2 of 3 consecutive points beyond 2-sigma, same side
-// Rule 3: 4 of 5 consecutive points beyond 1-sigma, same side
-// Rule 4: 8 consecutive points on the same side of the centerline
+// Groups raw (value, subgroupId) rows into ordered subgroups, computes X-bar (subgroup mean)
+// and R (subgroup range) per subgroup, then derives X-bar/R chart control limits.
+// Requires every subgroup to have the same size — mixed subgroup sizes aren't supported
+// by the standard A2/D3/D4 constant table used here.
+function calcXbarRStats(rows) {
+  const bySubgroup = new Map();
+  rows.forEach(r => {
+    if (!bySubgroup.has(r.subgroup)) bySubgroup.set(r.subgroup, []);
+    bySubgroup.get(r.subgroup).push(r.value);
+  });
+
+  const subgroups = [...bySubgroup.entries()].map(([id, values]) => ({ id, values }));
+  const sizes = new Set(subgroups.map(s => s.values.length));
+  if (sizes.size > 1) {
+    throw new Error(`Subgroups must all be the same size — found sizes: ${[...sizes].join(', ')}. X-bar & R requires a constant subgroup size.`);
+  }
+  const n = subgroups[0]?.values.length || 0;
+  if (n < 2 || n > 10) {
+    throw new Error(`Subgroup size must be between 2 and 10 (found ${n}) — that's the standard range X-bar & R control constants are published for.`);
+  }
+
+  const { A2, D3, D4 } = XBAR_R_CONSTANTS[n];
+
+  const subgroupStats = subgroups.map(s => {
+    const xbar = s.values.reduce((a, b) => a + b, 0) / s.values.length;
+    const r = Math.max(...s.values) - Math.min(...s.values);
+    return { id: s.id, xbar, r, values: s.values };
+  });
+
+  const xbarBar = subgroupStats.reduce((a, s) => a + s.xbar, 0) / subgroupStats.length;
+  const rBar = subgroupStats.reduce((a, s) => a + s.r, 0) / subgroupStats.length;
+
+  const xbarUcl = xbarBar + A2 * rBar;
+  const xbarLcl = xbarBar - A2 * rBar;
+  const rUcl = D4 * rBar;
+  const rLcl = D3 * rBar;
+
+  return { subgroupStats, xbarBar, rBar, xbarUcl, xbarLcl, rUcl, rLcl, n, k: subgroupStats.length, A2, D3, D4 };
+}
+
+// Western Electric Rules (applied to the Individuals chart, or the X-bar chart in X-bar/R mode)
 function applyWesternElectricRules(values, mean, sigma) {
   const n = values.length;
   const flags = values.map(() => []);
-  const zone = (v) => (v - mean) / sigma; // signed z-score relative to mean
+  const zone = (v) => (v - mean) / sigma;
 
   for (let i = 0; i < n; i++) {
     const z = zone(values[i]);
     if (Math.abs(z) > 3) flags[i].push('Rule 1: beyond 3\u03C3 (special cause)');
   }
 
-  // Rule 2: 2 of 3 consecutive beyond 2-sigma, same side
   for (let i = 2; i < n; i++) {
     const window = [i - 2, i - 1, i];
     const beyond2Pos = window.filter(idx => zone(values[idx]) > 2).length;
@@ -57,7 +104,6 @@ function applyWesternElectricRules(values, mean, sigma) {
     if (beyond2Neg >= 2) flags[i].push('Rule 2: 2 of 3 points beyond 2\u03C3 (low side)');
   }
 
-  // Rule 3: 4 of 5 consecutive beyond 1-sigma, same side
   for (let i = 4; i < n; i++) {
     const window = [i - 4, i - 3, i - 2, i - 1, i];
     const beyond1Pos = window.filter(idx => zone(values[idx]) > 1).length;
@@ -66,14 +112,12 @@ function applyWesternElectricRules(values, mean, sigma) {
     if (beyond1Neg >= 4) flags[i].push('Rule 3: 4 of 5 points beyond 1\u03C3 (low side)');
   }
 
-  // Rule 4: 8 consecutive points on same side of centerline
   for (let i = 7; i < n; i++) {
     const window = [];
     for (let k = i - 7; k <= i; k++) window.push(k);
     const allPos = window.every(idx => values[idx] > mean);
     const allNeg = window.every(idx => values[idx] < mean);
-    if (allPos) flags[i].push('Rule 4: 8 consecutive points above centerline');
-    if (allNeg) flags[i].push('Rule 4: 8 consecutive points below centerline');
+    if (allPos) flags[i].push('Rule 4: 8 consecutive points above centerline');if (allNeg) flags[i].push('Rule 4: 8 consecutive points below centerline');
   }
 
   return flags;
@@ -83,15 +127,26 @@ export default function ControlChart() {
   const { columns, getColumnData, getNumericColumns, hasData } = useWorksheet();
   const { addReportItem } = useReport();
   const chartWrapperRef = useRef(null);
+
+  const [chartType, setChartType] = useState('imr'); // 'imr' | 'xbarR'
+
   const [data, setData] = useState(null);
   const [cols, setCols] = useState([]);
   const [valueCol, setValueCol] = useState('');
+  const [subgroupCol, setSubgroupCol] = useState('');
   const [chartData, setChartData] = useState(null);
   const [mrChartData, setMrChartData] = useState(null);
   const [stats, setStats] = useState(null);
+
+  const [xbarChartData, setXbarChartData] = useState(null);
+  const [rChartData, setRChartData] = useState(null);
+  const [xbarRStats, setXbarRStats] = useState(null);
+  const [xbarRError, setXbarRError] = useState('');
+
   const [addedToReport, setAddedToReport] = useState(false);
 
   const numericWsCols = getNumericColumns();
+  const allWsCols = columns || [];
 
   const handleData = useCallback((rows, fields) => {
     setData(rows);
@@ -106,12 +161,16 @@ export default function ControlChart() {
     setData(rows);
     setCols([colName]);
     setValueCol(colName);
-    setChartData(null);
-    setMrChartData(null);
-    setStats(null);
+    resetOutputs();
   };
 
-  const analyze = useCallback(() => {
+  const resetOutputs = () => {
+    setChartData(null); setMrChartData(null); setStats(null);
+    setXbarChartData(null); setRChartData(null); setXbarRStats(null); setXbarRError('');
+    setAddedToReport(false);
+  };
+
+  const analyzeIMR = useCallback(() => {
     if (!data || !valueCol) return;
     setAddedToReport(false);
     const values = data.map(r => +r[valueCol]).filter(v => !isNaN(v));
@@ -123,74 +182,102 @@ export default function ControlChart() {
     const cd = data.map((r, i) => {
       const v = +r[valueCol];
       const flags = ruleFlags[i] || [];
-      return {
-        label: r.label || `${i + 1}`,
-        value: v,
-        ucl: s.ucl,
-        lcl: s.lcl,
-        mean: s.mean,
-        outOfControl: flags.length > 0,
-        flags,
-      };
+      return { label: r.label || `${i + 1}`, value: v, ucl: s.ucl, lcl: s.lcl, mean: s.mean, outOfControl: flags.length > 0, flags };
     });
     setChartData(cd);
 
-    // Moving range chart data (one fewer point than the individuals chart)
     const mrd = s.movingRanges.map((mr, i) => ({
-      label: `${i + 2}`, // moving range i corresponds to points i and i+1 (1-indexed)
-      mr,
-      mrUcl: s.mrUcl,
-      mrLcl: s.mrLcl,
-      mrBar: s.mrBar,
+      label: `${i + 2}`,
+      mr, mrUcl: s.mrUcl, mrLcl: s.mrLcl, mrBar: s.mrBar,
       outOfControl: mr > s.mrUcl || mr < s.mrLcl,
     }));
     setMrChartData(mrd);
   }, [data, valueCol]);
 
-  const violationCount = chartData ? chartData.filter(d => d.outOfControl).length : 0;
+  const analyzeXbarR = useCallback(() => {
+    if (!data || !valueCol || !subgroupCol) return;
+    setAddedToReport(false);
+    setXbarRError('');
+    try {
+      const rows = data.map(r => ({ value: +r[valueCol], subgroup: r[subgroupCol] })).filter(r => !isNaN(r.value) && r.subgroup !== undefined && r.subgroup !== '');
+      const s = calcXbarRStats(rows);
+      setXbarRStats(s);
+
+      // Sigma for X-bar chart Western Electric rules, estimated the standard way: sigma = Rbar / d2(n).
+      const D2_TABLE = { 2: 1.128, 3: 1.693, 4: 2.059, 5: 2.326, 6: 2.534, 7: 2.704, 8: 2.847, 9: 2.970, 10: 3.078 };
+      const sigmaXbar = (s.rBar / D2_TABLE[s.n]) / Math.sqrt(s.n);
+      const xbarFlags = applyWesternElectricRules(s.subgroupStats.map(sg => sg.xbar), s.xbarBar, sigmaXbar);
+
+      const xcd = s.subgroupStats.map((sg, i) => ({
+        label: `${sg.id}`, value: sg.xbar, ucl: s.xbarUcl, lcl: s.xbarLcl, mean: s.xbarBar,
+        outOfControl: (xbarFlags[i] || []).length > 0, flags: xbarFlags[i] || [],
+      }));
+      setXbarChartData(xcd);
+
+      const rcd = s.subgroupStats.map(sg => ({
+        label: `${sg.id}`, r: sg.r, rUcl: s.rUcl, rLcl: s.rLcl, rBar: s.rBar,
+        outOfControl: sg.r > s.rUcl || sg.r < s.rLcl,
+      }));
+      setRChartData(rcd);
+    } catch (e) {
+      setXbarRError(e.message);
+    }
+  }, [data, valueCol, subgroupCol]);
+
+  const violationCount = chartType === 'imr'
+    ? (chartData ? chartData.filter(d => d.outOfControl).length : 0)
+    : (xbarChartData ? xbarChartData.filter(d => d.outOfControl).length + (rChartData ? rChartData.filter(d => d.outOfControl).length : 0) : 0);
 
   const handleAddToReport = useCallback(async () => {
-    if (!chartWrapperRef.current || !stats || !chartData) return;
-
-    // Capture the chart area as an image for the printed report
+    if (!chartWrapperRef.current) return;
     const canvas = await html2canvas(chartWrapperRef.current, { backgroundColor: null, scale: 2 });
     const chartImage = canvas.toDataURL('image/png');
 
-    // Tally which Western Electric rules fired, for the interpretation text
-    const ruleBreakdown = { rule1: 0, rule2: 0, rule3: 0, rule4: 0 };
-    chartData.forEach(d => {
-      (d.flags || []).forEach(f => {
+    if (chartType === 'imr') {
+      if (!stats || !chartData) return;
+      const ruleBreakdown = { rule1: 0, rule2: 0, rule3: 0, rule4: 0 };
+      chartData.forEach(d => (d.flags || []).forEach(f => {
         if (f.startsWith('Rule 1')) ruleBreakdown.rule1++;
         else if (f.startsWith('Rule 2')) ruleBreakdown.rule2++;
         else if (f.startsWith('Rule 3')) ruleBreakdown.rule3++;
         else if (f.startsWith('Rule 4')) ruleBreakdown.rule4++;
+      }));
+      const interpretation = interpretControlChart({ violationCount, totalPoints: chartData.length, ruleBreakdown });
+
+      addReportItem({
+        title: `I-MR Control Chart — ${valueCol}`,
+        toolId: 'control-chart',
+        timestamp: new Date().toISOString(),
+        chartImage,
+        statsSummary: {
+          'Mean': stats.mean.toFixed(4), 'UCL': stats.ucl.toFixed(4), 'LCL': stats.lcl.toFixed(4),
+          'Sigma (from MR)': stats.sigma.toFixed(4), 'MR-bar': stats.mrBar.toFixed(4), 'n': stats.n, 'Violations': violationCount,
+        },
+        interpretation,
+        rawData: chartData.map(d => ({ label: d.label, value: d.value })),
       });
-    });
+    } else {
+      if (!xbarRStats || !xbarChartData) return;
+      const interpretation = violationCount > 0
+        ? `${violationCount} point(s) across the X-bar and R charts triggered a Western Electric rule — investigate for special cause variation before treating the process as stable.`
+        : `No Western Electric rule violations on either the X-bar or R chart — the process mean and within-subgroup variation both appear to be in statistical control (subgroup size n=${xbarRStats.n}).`;
 
-    const interpretation = interpretControlChart({
-      violationCount, totalPoints: chartData.length, ruleBreakdown,
-    });
-
-    addReportItem({
-      title: `I-MR Control Chart — ${valueCol}`,
-      toolId: 'control-chart',
-      timestamp: new Date().toISOString(),
-      chartImage,
-      statsSummary: {
-        'Mean': stats.mean.toFixed(4),
-        'UCL': stats.ucl.toFixed(4),
-        'LCL': stats.lcl.toFixed(4),
-        'Sigma (from MR)': stats.sigma.toFixed(4),
-        'MR-bar': stats.mrBar.toFixed(4),
-        'n': stats.n,
-        'Violations': violationCount,
-      },
-      interpretation,
-      rawData: chartData.map(d => ({ label: d.label, value: d.value })),
-    });
-
-    setAddedToReport(true);
-  }, [stats, chartData, valueCol, violationCount, addReportItem]);
+      addReportItem({
+        title: `X-bar & R Control Chart — ${valueCol} (subgroup: ${subgroupCol})`,
+        toolId: 'control-chart',
+        timestamp: new Date().toISOString(),
+        chartImage,
+        statsSummary: {
+          'X-bar-bar': xbarRStats.xbarBar.toFixed(4), 'R-bar': xbarRStats.rBar.toFixed(4),
+          'X-bar UCL': xbarRStats.xbarUcl.toFixed(4), 'X-bar LCL': xbarRStats.xbarLcl.toFixed(4),
+          'R UCL': xbarRStats.rUcl.toFixed(4), 'R LCL': xbarRStats.rLcl.toFixed(4),
+          'Subgroup size (n)': xbarRStats.n, 'Subgroups (k)': xbarRStats.k, 'Violations': violationCount,
+        },
+        interpretation,
+        rawData: xbarRStats.subgroupStats.map(sg => ({ subgroup: sg.id, xbar: sg.xbar.toFixed(4), range: sg.r.toFixed(4) })),
+      });
+    }setAddedToReport(true);
+  }, [chartType, stats, chartData, xbarRStats, xbarChartData, valueCol, subgroupCol, violationCount, addReportItem]);
 
   return (
     <div style={{ padding: '1.5rem' }}>
@@ -209,7 +296,15 @@ export default function ControlChart() {
       )}
 
       <div className="card" style={{ marginBottom: '1.5rem' }}>
-        <h3 className="section-title" style={{ marginBottom: '1rem' }}>Individuals &amp; Moving Range (I-MR) Chart</h3>
+        <h3 className="section-title" style={{ marginBottom: '0.75rem' }}>Control Chart</h3>
+
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+          <button className={chartType === 'imr' ? 'btn-primary' : 'btn-secondary'} style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
+            onClick={() => { setChartType('imr'); resetOutputs(); }}>Individuals &amp; Moving Range (I-MR)</button>
+          <button className={chartType === 'xbarR' ? 'btn-primary' : 'btn-secondary'} style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
+            onClick={() => { setChartType('xbarR'); resetOutputs(); }}>X-bar &amp; R</button>
+        </div>
+
         {!hasData && <CSVUploader onData={handleData} />}
         {cols.length > 0 && (
           <div className="form-grid" style={{ marginBottom: '0.75rem' }}>
@@ -219,27 +314,47 @@ export default function ControlChart() {
                 {cols.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
+            {chartType === 'xbarR' && (
+              <div className="form-group">
+                <label>Subgroup Column (groups rows into subgroups of equal size, e.g. "subgroup")</label>
+                <select value={subgroupCol} onChange={e => setSubgroupCol(e.target.value)}>
+                  <option value="">— select —</option>
+                  {(hasData ? allWsCols.map(c => c.name) : cols).map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            )}
           </div>
         )}
-        <button className="btn-primary" onClick={analyze} disabled={!data || !valueCol}>Generate Charts</button>
+        <button className="btn-primary" onClick={chartType === 'imr' ? analyzeIMR : analyzeXbarR} disabled={!data || !valueCol || (chartType === 'xbarR' && !subgroupCol)}>
+          Generate Charts
+        </button>
+        {xbarRError && <div className="alert alert-danger" style={{ marginTop: '0.75rem' }}>⚠️ {xbarRError}</div>}
       </div>
 
-      {stats && (
+      {chartType === 'imr' && stats && (
         <div className="stat-grid">
           {[
-            ['Mean', stats.mean.toFixed(4)],
-            ['UCL', stats.ucl.toFixed(4)],
-            ['LCL', stats.lcl.toFixed(4)],
-            ['Sigma (from MR)', stats.sigma.toFixed(4)],
-            ['MR-bar', stats.mrBar.toFixed(4)],
-            ['n', stats.n],
+            ['Mean', stats.mean.toFixed(4)], ['UCL', stats.ucl.toFixed(4)], ['LCL', stats.lcl.toFixed(4)],
+            ['Sigma (from MR)', stats.sigma.toFixed(4)], ['MR-bar', stats.mrBar.toFixed(4)], ['n', stats.n],
           ].map(([l, v]) => (
             <div key={l} className="stat-card"><div className="stat-value" style={{ fontSize: '1.1rem', fontFamily: 'var(--font-mono)' }}>{v}</div><div className="stat-label">{l}</div></div>
           ))}
         </div>
       )}
 
-      {chartData && (
+      {chartType === 'xbarR' && xbarRStats && (
+        <div className="stat-grid">
+          {[
+            ['X-bar-bar', xbarRStats.xbarBar.toFixed(4)], ['R-bar', xbarRStats.rBar.toFixed(4)],
+            ['X-bar UCL', xbarRStats.xbarUcl.toFixed(4)], ['X-bar LCL', xbarRStats.xbarLcl.toFixed(4)],
+            ['R UCL', xbarRStats.rUcl.toFixed(4)], ['Subgroup n / k', `${xbarRStats.n} / ${xbarRStats.k}`],
+          ].map(([l, v]) => (
+            <div key={l} className="stat-card"><div className="stat-value" style={{ fontSize: '1.1rem', fontFamily: 'var(--font-mono)' }}>{v}</div><div className="stat-label">{l}</div></div>
+          ))}
+        </div>
+      )}
+
+      {chartType === 'imr' && chartData && (
         <div className="chart-wrapper">
           <div ref={chartWrapperRef}>
           <h4 style={{ margin: '1rem 0 0.5rem' }}>Individuals Chart</h4>
@@ -251,9 +366,7 @@ export default function ControlChart() {
               <Tooltip
                 contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px' }}
                 formatter={(val, name, props) => {
-                  if (props.payload.flags && props.payload.flags.length) {
-                    return [`${val} — ${props.payload.flags.join('; ')}`, 'Value'];
-                  }
+                  if (props.payload.flags && props.payload.flags.length) return [`${val} — ${props.payload.flags.join('; ')}`, 'Value'];
                   return [val, 'Value'];
                 }}
               />
@@ -282,15 +395,11 @@ export default function ControlChart() {
               }} />
             </LineChart>
           </ResponsiveContainer>
-          </div>
-
-          {violationCount > 0 ? (
+          </div>{violationCount > 0 ? (
             <div className="alert alert-danger">
               ⚠ {violationCount} point(s) triggered a Western Electric rule — investigate for special cause variation.
               <ul style={{ marginTop: '0.5rem', paddingLeft: '1.2rem', fontSize: '0.85rem' }}>
-                {chartData.filter(d => d.outOfControl).map((d, i) => (
-                  <li key={i}>{d.label}: {d.flags.join('; ')}</li>
-                ))}
+                {chartData.filter(d => d.outOfControl).map((d, i) => (<li key={i}>{d.label}: {d.flags.join('; ')}</li>))}
               </ul>
             </div>
           ) : (
@@ -298,9 +407,62 @@ export default function ControlChart() {
           )}
           <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
             <button className="btn-secondary no-print" onClick={() => window.print()}>🖨️ Print</button>
-            <button className="btn-primary no-print" onClick={handleAddToReport}>
-              {addedToReport ? '✓ Added to Report' : '📄 Add to Report'}
-            </button>
+            <button className="btn-primary no-print" onClick={handleAddToReport}>{addedToReport ? '✓ Added to Report' : '📄 Add to Report'}</button>
+          </div>
+        </div>
+      )}
+
+      {chartType === 'xbarR' && xbarChartData && (
+        <div className="chart-wrapper">
+          <div ref={chartWrapperRef}>
+          <h4 style={{ margin: '1rem 0 0.5rem' }}>X-bar Chart (Subgroup Means)</h4>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={xbarChartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+              <XAxis dataKey="label" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
+              <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
+              <Tooltip
+                contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px' }}
+                formatter={(val, name, props) => {
+                  if (props.payload.flags && props.payload.flags.length) return [`${val} — ${props.payload.flags.join('; ')}`, 'X-bar'];
+                  return [val, 'X-bar'];
+                }}
+              />
+              <ReferenceLine y={xbarRStats.xbarUcl} stroke="var(--red)" strokeDasharray="4 4" label={{ value: 'UCL', fill: 'var(--red)', fontSize: 11 }} />
+              <ReferenceLine y={xbarRStats.xbarBar} stroke="var(--green)" strokeDasharray="4 4" label={{ value: 'X-bar-bar', fill: 'var(--green)', fontSize: 11 }} />
+              <ReferenceLine y={xbarRStats.xbarLcl} stroke="var(--red)" strokeDasharray="4 4" label={{ value: 'LCL', fill: 'var(--red)', fontSize: 11 }} />
+              <Line type="monotone" dataKey="value" stroke="var(--accent)" strokeWidth={2} dot={(props) => {
+                const { cx, cy, payload } = props;
+                return <circle key={cx} cx={cx} cy={cy} r={4} fill={payload.outOfControl ? 'var(--red)' : 'var(--accent)'} />;
+              }} />
+            </LineChart>
+          </ResponsiveContainer>
+
+          <h4 style={{ margin: '1.5rem 0 0.5rem' }}>R Chart (Subgroup Ranges)</h4>
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={rChartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+              <XAxis dataKey="label" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
+              <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
+              <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px' }} />
+              <ReferenceLine y={xbarRStats.rUcl} stroke="var(--red)" strokeDasharray="4 4" label={{ value: 'UCL', fill: 'var(--red)', fontSize: 11 }} />
+              <ReferenceLine y={xbarRStats.rBar} stroke="var(--green)" strokeDasharray="4 4" label={{ value: 'R-bar', fill: 'var(--green)', fontSize: 11 }} />
+              <Line type="monotone" dataKey="r" stroke="var(--accent)" strokeWidth={2} dot={(props) => {
+                const { cx, cy, payload } = props;
+                return <circle key={cx} cx={cx} cy={cy} r={4} fill={payload.outOfControl ? 'var(--red)' : 'var(--accent)'} />;
+              }} />
+            </LineChart>
+          </ResponsiveContainer>
+          </div>
+
+          {violationCount > 0 ? (
+            <div className="alert alert-danger">⚠ {violationCount} point(s) across the X-bar and R charts triggered a Western Electric rule — investigate for special cause variation.</div>
+          ) : (
+            <div className="alert alert-success">✓ No Western Electric rule violations — the process mean and within-subgroup variation both appear stable.</div>
+          )}
+          <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+            <button className="btn-secondary no-print" onClick={() => window.print()}>🖨️ Print</button>
+            <button className="btn-primary no-print" onClick={handleAddToReport}>{addedToReport ? '✓ Added to Report' : '📄 Add to Report'}</button>
           </div>
         </div>
       )}
