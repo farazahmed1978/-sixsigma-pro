@@ -32,6 +32,56 @@ export function WorksheetProvider({ children }) {
     setRowCount(prev => Math.max(prev, data.length));
   }, []);
 
+  // ── Grid editing — cell-level updates and structural changes (add/remove
+  // rows and columns, rename), used by the editable Data Grid tab. Everything
+  // is addressed by index rather than name, since names can change mid-edit. ──
+
+  const updateCell = useCallback((colIndex, rowIndex, value) => {
+    setColumns(prev => prev.map((c, i) => {
+      if (i !== colIndex) return c;
+      const data = [...c.data];
+      while (data.length <= rowIndex) data.push('');
+      data[rowIndex] = value;
+      return { ...c, data };
+    }));
+    setRowCount(prev => Math.max(prev, rowIndex + 1));
+  }, []);
+
+  const renameColumn = useCallback((colIndex, newName) => {
+    setColumns(prev => prev.map((c, i) => (i === colIndex ? { ...c, name: newName } : c)));
+  }, []);
+
+  const deleteColumn = useCallback((colIndex) => {
+    setColumns(prev => prev.filter((_, i) => i !== colIndex));
+  }, []);
+
+  const addBlankColumn = useCallback(() => {
+    setColumns(prev => {
+      const name = `Column${prev.length + 1}`;
+      const data = new Array(rowCount).fill('');
+      return [...prev, { name, data }];
+    });
+  }, [rowCount]);
+
+  const addBlankRow = useCallback(() => {
+    setColumns(prev => prev.map(c => ({ ...c, data: [...c.data, ''] })));
+    setRowCount(prev => prev + 1);
+  }, []);
+
+  const deleteRow = useCallback((rowIndex) => {
+    setColumns(prev => prev.map(c => ({ ...c, data: c.data.filter((_, i) => i !== rowIndex) })));
+    setRowCount(prev => Math.max(0, prev - 1));
+  }, []);
+
+  // Starts a completely empty, typeable grid — like opening a new blank sheet in
+  // Minitab/jamovi — rather than requiring a file to be imported first.
+  const startBlankSheet = useCallback((numCols = 5, numRows = 15) => {
+    const cols = Array.from({ length: numCols }, (_, i) => ({ name: `Column${i + 1}`, data: new Array(numRows).fill('') }));
+    setColumns(cols);
+    setFileName('New Worksheet');
+    setRowCount(numRows);
+  }, []);
+
   const getNumericColumns = () => columns.filter(c =>
     c.data.some(v => !isNaN(parseFloat(v)) && v !== '' && v !== null)
   );
@@ -54,6 +104,7 @@ export function WorksheetProvider({ children }) {
     <WorksheetContext.Provider value={{
       columns, fileName, rowCount,
       loadData, clearData, addColumn,
+      updateCell, renameColumn, deleteColumn, addBlankColumn, addBlankRow, deleteRow, startBlankSheet,
       getNumericColumns, getCategoricalColumns,
       getColumnData, getRawColumnData,
       hasData: columns.length > 0
