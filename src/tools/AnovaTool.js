@@ -3,9 +3,9 @@ import { useLocation } from 'react-router-dom';
 import html2canvas from 'html2canvas';
 import { useWorksheet } from '../context/WorksheetContext';
 import { useReport } from '../context/ReportContext';
-import { interpretAnova, interpretRMAnova } from '../utils/interpretations';
+import { interpretAnova, interpretRMAnova, interpretTwoWayAnova } from '../utils/interpretations';
 import {
-  oneWayAnova, rmAnova, levenesTest, bartlettsTest, andersonDarling,
+  oneWayAnova, rmAnova, twoWayAnova, levenesTest, bartlettsTest, andersonDarling,
   pairwisePostHoc, pairwisePostHocPaired, mauchlysTest, TEST_EXPLAINERS
 } from '../utils/statTests';
 import { QQPlot, SimpleHistogram, GroupBoxPlot } from '../utils/statViews';
@@ -52,12 +52,12 @@ const sigBadge = (p, sigLabel = 'Statistically significant', nsLabel = 'Not stat
 const assumptionBadge = (p) => sigBadge(p, 'Assumption violated', 'Assumption holds');
 
 export default function AnovaTool() {
-  const { columns, getColumnData, getNumericColumns, getCategoricalColumns, hasData } = useWorksheet();
+  const { columns, getColumnData, getRawColumnData, getNumericColumns, getCategoricalColumns, hasData } = useWorksheet();
   const { addReportItem } = useReport();
   const location = useLocation();
   const resultsRef = useRef(null);
 
-  const [mode, setMode] = useState('oneway'); // 'oneway' | 'rm'
+  const [mode, setMode] = useState('oneway'); // 'oneway' | 'rm' | 'twoway'
   const [addedToReport, setAddedToReport] = useState(false);
 
   const [groupingVar, setGroupingVar] = useState('');
@@ -67,6 +67,12 @@ export default function AnovaTool() {
 
   const [conditionVars, setConditionVars] = useState([]);
   const [rmResult, setRmResult] = useState(null);
+
+  const [factorAVar, setFactorAVar] = useState('');
+  const [factorBVar, setFactorBVar] = useState('');
+  const [twOutcomeVar, setTwOutcomeVar] = useState('');
+  const [twResult, setTwResult] = useState(null);
+  const [twError, setTwError] = useState('');
 
   const [showQQ, setShowQQ] = useState(false);
   const [showHist, setShowHist] = useState(false);
@@ -85,9 +91,7 @@ export default function AnovaTool() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const toggleCondition = (name) => setConditionVars(p => p.includes(name) ? p.filter(c => c !== name) : [...p, name]);
-
-  const resetResults = () => { setOwResult(null); setOwGroups(null); setRmResult(null); setAddedToReport(false); };
+  const toggleCondition = (name) => setConditionVars(p => p.includes(name) ? p.filter(c => c !== name) : [...p, name]);const resetResults = () => { setOwResult(null); setOwGroups(null); setRmResult(null); setTwResult(null); setTwError(''); setAddedToReport(false); };
 
   const runOneWay = () => {
     setAddedToReport(false);
@@ -112,6 +116,28 @@ export default function AnovaTool() {
     setOwGroups(null);
   };
 
+  const runTwoWay = () => {
+    setAddedToReport(false);
+    setTwError('');
+    if (!factorAVar || !factorBVar || !twOutcomeVar) return;
+    try {
+      const aData = getRawColumnData(factorAVar);
+      const bData = getRawColumnData(factorBVar);
+      const outcomeRaw = getRawColumnData(twOutcomeVar);
+      const minLen = Math.min(aData.length, bData.length, outcomeRaw.length);
+      const rows = [];
+      for (let i = 0; i < minLen; i++) {
+        const v = parseFloat(outcomeRaw[i]);
+        if (!isNaN(v) && aData[i] !== undefined && aData[i] !== '' && bData[i] !== undefined && bData[i] !== '') {
+          rows.push({ a: aData[i], b: bData[i], value: v });
+        }
+      }
+      setTwResult(twoWayAnova(rows));
+    } catch (e) {
+      setTwError(e.message);
+    }
+  };
+
   const handleAddToReport = useCallback(async () => {
     if (!resultsRef.current) return;
     const canvas = await html2canvas(resultsRef.current, { backgroundColor: null, scale: 2 });
@@ -127,7 +153,8 @@ export default function AnovaTool() {
         statsSummary: { 'F': owResult.F.toFixed(3), 'df': `${owResult.dfB}, ${owResult.dfW}`, 'p-value': owResult.p.toFixed(4), 'η²': owResult.etaSq.toFixed(3) },
         interpretation,
         rawData: owGroups.labels.map((lab, i) => ({ group: lab, n: owGroups.groups[i].length, mean: owResult.groupStats[i].mean.toFixed(4), sd: owResult.groupStats[i].sd.toFixed(4) })),
-      });} else if (mode === 'rm' && rmResult) {
+      });
+    } else if (mode === 'rm' && rmResult) {
       const interpretation = interpretRMAnova(rmResult, conditionVars);
       addReportItem({
         title: `Repeated-Measures ANOVA — ${conditionVars.join(', ')}`,
@@ -138,9 +165,24 @@ export default function AnovaTool() {
         interpretation,
         rawData: conditionVars.map((v, i) => ({ condition: v, mean: rmResult.condMeans[i].toFixed(4) })),
       });
+    } else if (mode === 'twoway' && twResult) {
+      const interpretation = interpretTwoWayAnova(twResult, factorAVar, factorBVar, twOutcomeVar);
+      addReportItem({
+        title: `Two-Way ANOVA — ${twOutcomeVar} by ${factorAVar} × ${factorBVar}`,
+        toolId: 'anova',
+        timestamp: new Date().toISOString(),
+        chartImage,
+        statsSummary: {
+          [`F (${factorAVar})`]: twResult.Fa.toFixed(3), [`p (${factorAVar})`]: twResult.pa.toFixed(4),
+          [`F (${factorBVar})`]: twResult.Fb.toFixed(3), [`p (${factorBVar})`]: twResult.pb.toFixed(4),
+          'F (Interaction)': twResult.Fab.toFixed(3), 'p (Interaction)': twResult.pab.toFixed(4),
+        },
+        interpretation,
+        rawData: twResult.cellStats.map(c => ({ [factorAVar]: c.a, [factorBVar]: c.b, n: c.n, mean: c.mean.toFixed(4) })),
+      });
     }
     setAddedToReport(true);
-  }, [mode, owResult, owGroups, rmResult, groupingVar, outcomeVar, conditionVars, addReportItem]);
+  }, [mode, owResult, owGroups, rmResult, twResult, groupingVar, outcomeVar, conditionVars, factorAVar, factorBVar, twOutcomeVar, addReportItem]);
 
   if (!hasData) {
     return <div style={{ padding: '1.5rem' }}><div className="alert alert-info">Load data into the Worksheet first, then return here to run ANOVA.</div></div>;
@@ -148,14 +190,14 @@ export default function AnovaTool() {
 
   return (
     <div style={{ padding: '1.5rem' }}>
-      <div className="card" style={{ marginBottom: '1.5rem' }}>
-        <h3 className="section-title" style={{ marginBottom: '0.5rem' }}>ANOVA</h3>
+      <div className="card" style={{ marginBottom: '1.5rem' }}><h3 className="section-title" style={{ marginBottom: '0.5rem' }}>ANOVA</h3>
         <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
           Compare means across 3 or more groups or conditions.
         </p>
 
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
           <button className={mode === 'oneway' ? 'btn-primary' : 'btn-secondary'} style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }} onClick={() => { setMode('oneway'); resetResults(); }}>One-Way ANOVA</button>
+          <button className={mode === 'twoway' ? 'btn-primary' : 'btn-secondary'} style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }} onClick={() => { setMode('twoway'); resetResults(); }}>Two-Way ANOVA</button>
           <button className={mode === 'rm' ? 'btn-primary' : 'btn-secondary'} style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }} onClick={() => { setMode('rm'); resetResults(); }}>Repeated Measures ANOVA</button>
         </div>
 
@@ -186,6 +228,49 @@ export default function AnovaTool() {
             </div>
             <button className="btn-primary" disabled={!groupingVar || !outcomeVar} onClick={runOneWay}>Run ANOVA</button>
           </>
+        ) : mode === 'twoway' ? (
+          <>
+            <div style={{ marginBottom: '0.75rem' }}>
+              <div style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.4rem' }}>Factor A (categorical)</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                {catCols.map(c => (
+                  <button key={c.name} onClick={() => setFactorAVar(c.name)}
+                    style={{ padding: '0.35rem 0.85rem', borderRadius: '999px', border: `1px solid ${factorAVar === c.name ? 'var(--accent)' : 'var(--border)'}`, background: factorAVar === c.name ? 'var(--accent-dim)' : 'var(--input-bg)', color: factorAVar === c.name ? 'var(--accent-light)' : 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.85rem' }}>
+                    {c.name}
+                  </button>
+                ))}
+                {catCols.length === 0 && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>No categorical columns detected.</span>}
+              </div>
+            </div>
+            <div style={{ marginBottom: '0.75rem' }}>
+              <div style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.4rem' }}>Factor B (categorical, different from Factor A)</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                {catCols.filter(c => c.name !== factorAVar).map(c => (
+                  <button key={c.name} onClick={() => setFactorBVar(c.name)}
+                    style={{ padding: '0.35rem 0.85rem', borderRadius: '999px', border: `1px solid ${factorBVar === c.name ? 'var(--accent)' : 'var(--border)'}`, background: factorBVar === c.name ? 'var(--accent-dim)' : 'var(--input-bg)', color: factorBVar === c.name ? 'var(--accent-light)' : 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.85rem' }}>
+                    {c.name}
+                  </button>
+                ))}
+                {catCols.filter(c => c.name !== factorAVar).length === 0 && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Need a second categorical column.</span>}
+              </div>
+            </div>
+            <div style={{ marginBottom: '1rem' }}>
+              <div style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.4rem' }}>Outcome Variable (metric)</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                {numCols.map(c => (
+                  <button key={c.name} onClick={() => setTwOutcomeVar(c.name)}
+                    style={{ padding: '0.35rem 0.85rem', borderRadius: '999px', border: `1px solid ${twOutcomeVar === c.name ? 'var(--accent)' : 'var(--border)'}`, background: twOutcomeVar === c.name ? 'var(--accent-dim)' : 'var(--input-bg)', color: twOutcomeVar === c.name ? 'var(--accent-light)' : 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.85rem' }}>
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+              Requires a balanced design — every combination of Factor A and Factor B needs the same number of rows (2 or more).
+            </p>
+            <button className="btn-primary" disabled={!factorAVar || !factorBVar || !twOutcomeVar} onClick={runTwoWay}>Run Two-Way ANOVA</button>
+            {twError && <div className="alert alert-danger" style={{ marginTop: '0.75rem' }}>⚠️ {twError}</div>}
+          </>
         ) : (
           <>
             <div style={{ marginBottom: '1rem' }}>
@@ -204,8 +289,7 @@ export default function AnovaTool() {
         )}
       </div>
 
-      {(owResult || rmResult) && (
-        <div ref={resultsRef}>
+      {(owResult || rmResult || twResult) && (<div ref={resultsRef}>
           {mode === 'oneway' && owResult && owGroups && (
             <div className="card" style={{ padding: '1.25rem 1.5rem', marginBottom: '1rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
@@ -256,7 +340,8 @@ export default function AnovaTool() {
                   <th style={{ textAlign: 'right', padding: '0.4rem', color: 'var(--text-muted)' }}>Mean</th>
                 </tr></thead>
                 <tbody>
-                  {conditionVars.map((v, i) => (<tr key={v}>
+                  {conditionVars.map((v, i) => (
+                    <tr key={v}>
                       <td style={{ padding: '0.4rem', borderTop: '1px solid var(--border)' }}>{v}</td>
                       <td style={{ padding: '0.4rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{rmResult.condMeans[i].toFixed(4)}</td>
                     </tr>
@@ -264,6 +349,76 @@ export default function AnovaTool() {
                 </tbody>
               </table>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>{interpretRMAnova(rmResult, conditionVars)}</p>
+            </div>
+          )}
+
+          {mode === 'twoway' && twResult && (
+            <div className="card" style={{ padding: '1.25rem 1.5rem', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <h3 className="section-title" style={{ margin: 0 }}>Two-Way ANOVA Result</h3>
+              </div>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', marginBottom: '1rem' }}>
+                <thead><tr>
+                  <th style={{ textAlign: 'left', padding: '0.4rem', color: 'var(--text-muted)' }}>Source</th>
+                  <th style={{ textAlign: 'right', padding: '0.4rem', color: 'var(--text-muted)' }}>SS</th>
+                  <th style={{ textAlign: 'right', padding: '0.4rem', color: 'var(--text-muted)' }}>df</th>
+                  <th style={{ textAlign: 'right', padding: '0.4rem', color: 'var(--text-muted)' }}>F</th>
+                  <th style={{ textAlign: 'right', padding: '0.4rem', color: 'var(--text-muted)' }}>p</th>
+                  <th style={{ textAlign: 'right', padding: '0.4rem', color: 'var(--text-muted)' }}></th>
+                </tr></thead>
+                <tbody>
+                  <tr>
+                    <td style={{ padding: '0.4rem', borderTop: '1px solid var(--border)' }}>{factorAVar}</td>
+                    <td style={{ padding: '0.4rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{twResult.ssa.toFixed(3)}</td>
+                    <td style={{ padding: '0.4rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{twResult.dfA}</td>
+                    <td style={{ padding: '0.4rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{twResult.Fa.toFixed(3)}</td>
+                    <td style={{ padding: '0.4rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{twResult.pa.toFixed(4)}</td>
+                    <td style={{ padding: '0.4rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{sigBadge(twResult.pa)}</td>
+                  </tr>
+                  <tr>
+                    <td style={{ padding: '0.4rem', borderTop: '1px solid var(--border)' }}>{factorBVar}</td>
+                    <td style={{ padding: '0.4rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{twResult.ssb.toFixed(3)}</td>
+                    <td style={{ padding: '0.4rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{twResult.dfB}</td>
+                    <td style={{ padding: '0.4rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{twResult.Fb.toFixed(3)}</td>
+                    <td style={{ padding: '0.4rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{twResult.pb.toFixed(4)}</td>
+                    <td style={{ padding: '0.4rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{sigBadge(twResult.pb)}</td>
+                  </tr>
+                  <tr>
+                    <td style={{ padding: '0.4rem', borderTop: '1px solid var(--border)' }}>{factorAVar} × {factorBVar} (Interaction)</td>
+                    <td style={{ padding: '0.4rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{twResult.ssab.toFixed(3)}</td>
+                    <td style={{ padding: '0.4rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{twResult.dfAB}</td>
+                    <td style={{ padding: '0.4rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{twResult.Fab.toFixed(3)}</td>
+                    <td style={{ padding: '0.4rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{twResult.pab.toFixed(4)}</td><td style={{ padding: '0.4rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{sigBadge(twResult.pab)}</td>
+                  </tr>
+                  <tr>
+                    <td style={{ padding: '0.4rem', borderTop: '1px solid var(--border)', color: 'var(--text-muted)' }}>Error</td>
+                    <td style={{ padding: '0.4rem', textAlign: 'right', borderTop: '1px solid var(--border)', color: 'var(--text-muted)' }}>{twResult.sse.toFixed(3)}</td>
+                    <td style={{ padding: '0.4rem', textAlign: 'right', borderTop: '1px solid var(--border)', color: 'var(--text-muted)' }}>{twResult.dfE}</td>
+                    <td style={{ padding: '0.4rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}></td>
+                    <td style={{ padding: '0.4rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}></td>
+                    <td style={{ padding: '0.4rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}></td>
+                  </tr>
+                </tbody>
+              </table>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', marginBottom: '1rem' }}>
+                <thead><tr>
+                  <th style={{ textAlign: 'left', padding: '0.4rem', color: 'var(--text-muted)' }}>{factorAVar}</th>
+                  <th style={{ textAlign: 'left', padding: '0.4rem', color: 'var(--text-muted)' }}>{factorBVar}</th>
+                  <th style={{ textAlign: 'right', padding: '0.4rem', color: 'var(--text-muted)' }}>n</th>
+                  <th style={{ textAlign: 'right', padding: '0.4rem', color: 'var(--text-muted)' }}>Mean</th>
+                </tr></thead>
+                <tbody>
+                  {twResult.cellStats.map((c, i) => (
+                    <tr key={i}>
+                      <td style={{ padding: '0.4rem', borderTop: '1px solid var(--border)' }}>{c.a}</td>
+                      <td style={{ padding: '0.4rem', borderTop: '1px solid var(--border)' }}>{c.b}</td>
+                      <td style={{ padding: '0.4rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{c.n}</td>
+                      <td style={{ padding: '0.4rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{c.mean.toFixed(4)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>{interpretTwoWayAnova(twResult, factorAVar, factorBVar, twOutcomeVar)}</p>
             </div>
           )}
 
@@ -286,6 +441,13 @@ export default function AnovaTool() {
               {showBox && <div className="card" style={{ padding: '1rem', marginBottom: '1rem' }}><GroupBoxPlot groups={rmResult.conditions} labels={conditionVars} title="Conditions Compared" /></div>}
               {showHist && <div className="card" style={{ padding: '1rem', marginBottom: '1rem' }}><SimpleHistogram data={rmResult.conditions.flat()} title="Pooled Distribution" /></div>}
               {showQQ && <div className="card" style={{ padding: '1rem', marginBottom: '1rem' }}><QQPlot data={rmResult.residuals} title="Q-Q Plot of RM ANOVA Residuals" /></div>}
+            </>
+          )}
+          {mode === 'twoway' && twResult && (
+            <>
+              {showBox && <div className="card" style={{ padding: '1rem', marginBottom: '1rem' }}><GroupBoxPlot groups={twResult.cellStats.map(c => c.values)} labels={twResult.cellStats.map(c => `${c.a}, ${c.b}`)} title={`${twOutcomeVar} by ${factorAVar} × ${factorBVar}`} /></div>}
+              {showHist && <div className="card" style={{ padding: '1rem', marginBottom: '1rem' }}><SimpleHistogram data={twResult.cellStats.flatMap(c => c.values)} title={`${twOutcomeVar} Distribution`} /></div>}
+              {showQQ && <div className="card" style={{ padding: '1rem', marginBottom: '1rem' }}><QQPlot data={twResult.residuals} title="Q-Q Plot of Two-Way ANOVA Residuals" /></div>}
             </>
           )}
 
@@ -320,8 +482,7 @@ export default function AnovaTool() {
                       {pairs.map((pr, i) => (
                         <tr key={i}>
                           <td style={{ padding: '0.35rem', borderTop: '1px solid var(--border)' }}>{pr.a} vs {pr.b}</td>
-                          <td style={{ padding: '0.35rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{pr.diff.toFixed(4)}</td>
-                          <td style={{ padding: '0.35rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{pr.pAdj.toFixed(4)}</td>
+                          <td style={{ padding: '0.35rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{pr.diff.toFixed(4)}</td><td style={{ padding: '0.35rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{pr.pAdj.toFixed(4)}</td>
                           <td style={{ padding: '0.35rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{sigBadge(pr.pAdj, 'Differs', 'No difference')}</td>
                         </tr>
                       ))}
@@ -376,6 +537,19 @@ export default function AnovaTool() {
                     </tbody>
                   </table>
                 )}
+              />
+            </>
+          )}
+
+          {mode === 'twoway' && twResult && (
+            <>
+              <CompanionTest label="Check Normality — Anderson-Darling Test (on residuals)" explainer={TEST_EXPLAINERS.andersonDarling}
+                onRun={() => andersonDarling(twResult.residuals)}
+                renderResult={(r) => (<div style={{ fontSize: '0.85rem' }}>A² = {r.A2.toFixed(4)}, p = {r.p.toFixed(4)} &nbsp; {assumptionBadge(r.p)}</div>)}
+              />
+              <CompanionTest label="Check Equal Variance — Levene's Test (across all cells)" explainer={TEST_EXPLAINERS.levene}
+                onRun={() => levenesTest(twResult.cellStats.map(c => c.values))}
+                renderResult={(r) => (<div style={{ fontSize: '0.85rem' }}>F({r.dfB},{r.dfW}) = {r.F.toFixed(4)}, p = {r.p.toFixed(4)} &nbsp; {assumptionBadge(r.p)}</div>)}
               />
             </>
           )}
