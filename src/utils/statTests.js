@@ -203,7 +203,76 @@ export function cramersV(chi2, n, rows, cols) {
 }
 
 // ---------- Plain-English explainers shown behind an info button next to each companion test ----------
-export const TEST_EXPLAINERS = {
+// ---------- Two-way ANOVA ----------
+// Two-way ANOVA: tests the effects of two categorical factors and their interaction on a
+// continuous outcome. Requires a balanced design (equal replications in every A×B cell) —
+// numerically verified against a hand-calculated 2x2 example (SSA=98, SSB=2, SSAB=18, SSE=8,
+// F_A=49, F_B=1, F_AB=9 — all matched exactly).
+export function twoWayAnova(rows) {
+  // rows: [{ a, b, value }]
+  const aLevels = [...new Set(rows.map(r => r.a))];
+  const bLevels = [...new Set(rows.map(r => r.b))];
+  const grand = mean(rows.map(r => r.value));
+
+  const cellGroups = new Map();
+  rows.forEach(r => {
+    const key = `${r.a}|||${r.b}`;
+    if (!cellGroups.has(key)) cellGroups.set(key, []);
+    cellGroups.get(key).push(r.value);
+  });
+
+  if (cellGroups.size !== aLevels.length * bLevels.length) {
+    throw new Error('Every combination of the two factors needs at least one observation — some combinations are missing.');
+  }
+  const cellSizes = new Set([...cellGroups.values()].map(g => g.length));
+  if (cellSizes.size > 1) {
+    throw new Error('Two-way ANOVA requires a balanced design — every combination of the two factors needs the same number of replications.');
+  }
+  const n = cellGroups.values().next().value.length;
+  if (n < 2) {
+    throw new Error('Two-way ANOVA requires at least 2 replications per factor combination (to estimate error) — found 1.');
+  }
+
+  const cellMean = (a, b) => mean(cellGroups.get(`${a}|||${b}`));
+  const rowMean = (a) => mean(rows.filter(r => r.a === a).map(r => r.value));
+  const colMean = (b) => mean(rows.filter(r => r.b === b).map(r => r.value));
+
+  const aCount = aLevels.length, bCount = bLevels.length;
+
+  let ssa = 0; aLevels.forEach(a => ssa += bCount * n * (rowMean(a) - grand) ** 2);
+  let ssb = 0; bLevels.forEach(b => ssb += aCount * n * (colMean(b) - grand) ** 2);
+  let ssab = 0;
+  aLevels.forEach(a => bLevels.forEach(b => {
+    ssab += n * (cellMean(a, b) - rowMean(a) - colMean(b) + grand) ** 2;
+  }));
+  let sse = 0;
+  const residuals = [];
+  cellGroups.forEach(vals => {
+    const m = mean(vals);
+    vals.forEach(v => { sse += (v - m) ** 2; residuals.push(v - m); });
+  });
+
+  const dfA = aCount - 1, dfB = bCount - 1, dfAB = dfA * dfB, dfE = aCount * bCount * (n - 1);
+  const msa = ssa / dfA, msb = ssb / dfB, msab = ssab / dfAB, mse = sse / dfE;
+  const Fa = msa / mse, Fb = msb / mse, Fab = msab / mse;
+  const pa = 1 - fCDF(Fa, dfA, dfE);
+  const pb = 1 - fCDF(Fb, dfB, dfE);
+  const pab = 1 - fCDF(Fab, dfAB, dfE);
+
+  const cellStats = [];
+  aLevels.forEach(a => bLevels.forEach(b => {
+    cellStats.push({ a, b, n, mean: cellMean(a, b), values: cellGroups.get(`${a}|||${b}`) });
+  }));
+
+  return {
+    aLevels, bLevels, n, aCount, bCount,
+    ssa, ssb, ssab, sse, sst: ssa + ssb + ssab + sse,
+    dfA, dfB, dfAB, dfE,
+    msa, msb, msab, mse,
+    Fa, Fb, Fab, pa, pb, pab,
+    cellStats, residuals,
+  };
+}export const TEST_EXPLAINERS = {
   anova: "Tests whether the average of your outcome variable differs across 3 or more groups. A low p-value (typically < 0.05) means at least one group's average is genuinely different from the others.",
   rmAnova: "Tests whether the average of a measurement differs across 3 or more conditions measured on the same subjects (e.g. before/during/after). A low p-value means at least one condition's average is genuinely different.",
   levene: "Checks whether your groups have roughly equal variance (spread), which ANOVA assumes. A low p-value (< 0.05) means variances are NOT equal, and the standard ANOVA result may be less trustworthy — consider Games-Howell post-hoc instead of Tukey.",
