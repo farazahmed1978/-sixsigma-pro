@@ -102,9 +102,7 @@ function applyWesternElectricRules(values, mean, sigma) {
     const beyond2Neg = window.filter(idx => zone(values[idx]) < -2).length;
     if (beyond2Pos >= 2) flags[i].push('Rule 2: 2 of 3 points beyond 2\u03C3 (high side)');
     if (beyond2Neg >= 2) flags[i].push('Rule 2: 2 of 3 points beyond 2\u03C3 (low side)');
-  }
-
-  for (let i = 4; i < n; i++) {
+  }for (let i = 4; i < n; i++) {
     const window = [i - 4, i - 3, i - 2, i - 1, i];
     const beyond1Pos = window.filter(idx => zone(values[idx]) > 1).length;
     const beyond1Neg = window.filter(idx => zone(values[idx]) < -1).length;
@@ -117,7 +115,8 @@ function applyWesternElectricRules(values, mean, sigma) {
     for (let k = i - 7; k <= i; k++) window.push(k);
     const allPos = window.every(idx => values[idx] > mean);
     const allNeg = window.every(idx => values[idx] < mean);
-    if (allPos) flags[i].push('Rule 4: 8 consecutive points above centerline');if (allNeg) flags[i].push('Rule 4: 8 consecutive points below centerline');
+    if (allPos) flags[i].push('Rule 4: 8 consecutive points above centerline');
+    if (allNeg) flags[i].push('Rule 4: 8 consecutive points below centerline');
   }
 
   return flags;
@@ -195,11 +194,23 @@ export default function ControlChart() {
   }, [data, valueCol]);
 
   const analyzeXbarR = useCallback(() => {
-    if (!data || !valueCol || !subgroupCol) return;
+    if (!valueCol || !subgroupCol) return;
     setAddedToReport(false);
     setXbarRError('');
     try {
-      const rows = data.map(r => ({ value: +r[valueCol], subgroup: r[subgroupCol] })).filter(r => !isNaN(r.value) && r.subgroup !== undefined && r.subgroup !== '');
+      // When Worksheet data is loaded, pull BOTH columns directly by index — the single-column
+      // loadFromWorksheet flow (built for I-MR) can't supply a second column for grouping.
+      // Otherwise (manual CSV upload for this tool specifically), both columns already live
+      // together in `data` from CSVUploader's parsed rows.
+      let rows;
+      if (hasData) {
+        const values = getColumnData(valueCol).map(Number);
+        const subgroupVals = getColumnData(subgroupCol);
+        rows = values.map((v, i) => ({ value: v, subgroup: subgroupVals[i] }));
+      } else {
+        rows = (data || []).map(r => ({ value: +r[valueCol], subgroup: r[subgroupCol] }));
+      }
+      rows = rows.filter(r => !isNaN(r.value) && r.subgroup !== undefined && r.subgroup !== '');
       const s = calcXbarRStats(rows);
       setXbarRStats(s);
 
@@ -214,8 +225,7 @@ export default function ControlChart() {
       }));
       setXbarChartData(xcd);
 
-      const rcd = s.subgroupStats.map(sg => ({
-        label: `${sg.id}`, r: sg.r, rUcl: s.rUcl, rLcl: s.rLcl, rBar: s.rBar,
+      const rcd = s.subgroupStats.map(sg => ({label: `${sg.id}`, r: sg.r, rUcl: s.rUcl, rLcl: s.rLcl, rBar: s.rBar,
         outOfControl: sg.r > s.rUcl || sg.r < s.rLcl,
       }));
       setRChartData(rcd);
@@ -276,7 +286,8 @@ export default function ControlChart() {
         interpretation,
         rawData: xbarRStats.subgroupStats.map(sg => ({ subgroup: sg.id, xbar: sg.xbar.toFixed(4), range: sg.r.toFixed(4) })),
       });
-    }setAddedToReport(true);
+    }
+    setAddedToReport(true);
   }, [chartType, stats, chartData, xbarRStats, xbarChartData, valueCol, subgroupCol, violationCount, addReportItem]);
 
   return (
@@ -306,7 +317,29 @@ export default function ControlChart() {
         </div>
 
         {!hasData && <CSVUploader onData={handleData} />}
-        {cols.length > 0 && (
+
+        {/* X-bar & R + Worksheet data: both columns picked directly, no pre-load needed */}
+        {hasData && chartType === 'xbarR' && (
+          <div className="form-grid" style={{ marginBottom: '0.75rem' }}>
+            <div className="form-group">
+              <label>Value Column</label>
+              <select value={valueCol} onChange={e => setValueCol(e.target.value)}>
+                <option value="">— select —</option>
+                {numericWsCols.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Subgroup Column (groups rows into subgroups of equal size, e.g. "subgroup")</label>
+              <select value={subgroupCol} onChange={e => setSubgroupCol(e.target.value)}>
+                <option value="">— select —</option>
+                {allWsCols.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+              </select>
+            </div>
+          </div>
+        )}
+
+        {/* I-MR, or X-bar & R without worksheet data (manual CSV upload for this tool) */}
+        {(!hasData || chartType === 'imr') && cols.length > 0 && (
           <div className="form-grid" style={{ marginBottom: '0.75rem' }}>
             <div className="form-group">
               <label>Value Column</label>
@@ -319,13 +352,21 @@ export default function ControlChart() {
                 <label>Subgroup Column (groups rows into subgroups of equal size, e.g. "subgroup")</label>
                 <select value={subgroupCol} onChange={e => setSubgroupCol(e.target.value)}>
                   <option value="">— select —</option>
-                  {(hasData ? allWsCols.map(c => c.name) : cols).map(c => <option key={c} value={c}>{c}</option>)}
+                  {cols.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
-              </div>
-            )}
+              </div>)}
           </div>
         )}
-        <button className="btn-primary" onClick={chartType === 'imr' ? analyzeIMR : analyzeXbarR} disabled={!data || !valueCol || (chartType === 'xbarR' && !subgroupCol)}>
+
+        <button
+          className="btn-primary"
+          onClick={chartType === 'imr' ? analyzeIMR : analyzeXbarR}
+          disabled={
+            chartType === 'imr'
+              ? (!data || !valueCol)
+              : (!valueCol || !subgroupCol || (!hasData && !data))
+          }
+        >
           Generate Charts
         </button>
         {xbarRError && <div className="alert alert-danger" style={{ marginTop: '0.75rem' }}>⚠️ {xbarRError}</div>}
@@ -395,7 +436,9 @@ export default function ControlChart() {
               }} />
             </LineChart>
           </ResponsiveContainer>
-          </div>{violationCount > 0 ? (
+          </div>
+
+          {violationCount > 0 ? (
             <div className="alert alert-danger">
               ⚠ {violationCount} point(s) triggered a Western Electric rule — investigate for special cause variation.
               <ul style={{ marginTop: '0.5rem', paddingLeft: '1.2rem', fontSize: '0.85rem' }}>
@@ -410,9 +453,7 @@ export default function ControlChart() {
             <button className="btn-primary no-print" onClick={handleAddToReport}>{addedToReport ? '✓ Added to Report' : '📄 Add to Report'}</button>
           </div>
         </div>
-      )}
-
-      {chartType === 'xbarR' && xbarChartData && (
+      )}{chartType === 'xbarR' && xbarChartData && (
         <div className="chart-wrapper">
           <div ref={chartWrapperRef}>
           <h4 style={{ margin: '1rem 0 0.5rem' }}>X-bar Chart (Subgroup Means)</h4>
