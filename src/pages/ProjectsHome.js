@@ -1,166 +1,129 @@
 import React, { useState } from 'react';
-import { useParams, Link, Navigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useProjects, PHASES } from '../context/ProjectsContext';
-import { useReport } from '../context/ReportContext';
 import './ProjectWorkspace.css';
 
-// Mirrors the phase assigned to each tool in App.js's toolMeta — used only to
-// suggest a default phase when assigning an item; the user can move it.
-const TOOL_PHASE = {
-  'control-chart': 'Control',
-  'run-chart': 'Control',
-  'capability': 'Measure',
-  'histogram': 'Analyze',
-  'pareto': 'Analyze',
-  'scatter': 'Analyze',
-  'boxplot': 'Analyze',
-  'fishbone': 'Analyze',
-  'fmea': 'Improve',
-  'msa': 'Measure',
-  'gage-rr': 'Measure',
-  'vsm': 'Improve',
-  'descriptive': 'Measure',
-  'multivari': 'Analyze',
-  'correlation': 'Analyze',
-  'regression': 'Analyze',
-  'anova': 'Analyze',
-  'sigma-calculator': 'Measure',
-  'sample-size-calculator': 'Measure',
-  'power-calculator': 'Measure',
-};
+function projectProgress(project) {
+  const done = PHASES.filter(ph => project.phases[ph].itemIds.length > 0).length;
+  return Math.round((done / PHASES.length) * 100);
+}
 
-const PHASE_COLOR = {
-  Define: 'var(--yellow)',
-  Measure: 'var(--green)',
-  Analyze: 'var(--orange)',
-  Improve: 'var(--purple)',
-  Control: 'var(--cyan)',
-};
+function currentPhase(project) {
+  // First phase (in DMAIC order) that has nothing assigned yet is "where they are".
+  const next = PHASES.find(ph => project.phases[ph].itemIds.length === 0);
+  return next || 'Complete';
+}
 
-export default function ProjectDetail() {
-  const { id } = useParams();
-  const { getProject, updateProject, assignItemToPhase, removeItemFromProject, updatePhaseNotes } = useProjects();
-  const { items } = useReport();
-  const [editingHeader, setEditingHeader] = useState(false);
+export default function ProjectsHome() {
+  const { projects, createProject, deleteProject } = useProjects();
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ name: '', goal: '', owner: '', champion: '' });
 
-  const project = getProject(id);
-
-  if (!project) {
-    return <Navigate to="/projects" replace />;
-  }
-
-  const assignedIds = new Set(PHASES.flatMap(ph => project.phases[ph].itemIds));
-  const unassignedItems = items.filter(item => !assignedIds.has(item.id));
-
-  const itemById = (itemId) => items.find(i => i.id === itemId);
+  const handleCreate = () => {
+    if (!form.name.trim()) return;
+    createProject(form);
+    setForm({ name: '', goal: '', owner: '', champion: '' });
+    setShowForm(false);
+  };
 
   return (
     <div className="pw-page">
-      <Link to="/projects" className="pw-back-link">← All Projects</Link>
-
-      <div className="card pw-header-card">
-        {editingHeader ? (
-          <div className="form-grid">
-            <div className="form-group">
-              <label>Project Name</label>
-              <input type="text" value={project.name} onChange={e => updateProject(project.id, { name: e.target.value })} />
-            </div>
-            <div className="form-group">
-              <label>Goal</label>
-              <input type="text" value={project.goal} onChange={e => updateProject(project.id, { goal: e.target.value })} />
-            </div>
-            <div className="form-group">
-              <label>Project Owner</label>
-              <input type="text" value={project.owner} onChange={e => updateProject(project.id, { owner: e.target.value })} />
-            </div>
-            <div className="form-group">
-              <label>Champion / Sponsor</label>
-              <input type="text" value={project.champion} onChange={e => updateProject(project.id, { champion: e.target.value })} />
-            </div>
-          </div>
-        ) : (
-          <div className="pw-header-display">
-            <div>
-              <h1>{project.name}</h1>
-              {project.goal && <p className="pw-project-goal">{project.goal}</p>}
-              <div className="pw-header-meta-row">
-                {project.owner && <span>Owner: <strong>{project.owner}</strong></span>}
-                {project.champion && <span>Champion: <strong>{project.champion}</strong></span>}
-              </div>
-            </div>
-          </div>
-        )}
-        <button className="btn-secondary" style={{ marginTop: '0.75rem' }} onClick={() => setEditingHeader(e => !e)}>
-          {editingHeader ? 'Done' : 'Edit Details'}
+      <div className="pw-header">
+        <div>
+          <h1>Project Workspace</h1>
+          <p>Group your analyses into DMAIC projects — Charter, Measure, Analyze, Improve, Control, all in one place.</p>
+        </div>
+        <button className="btn-primary" onClick={() => setShowForm(s => !s)}>
+          {showForm ? 'Cancel' : '+ New Project'}
         </button>
       </div>
 
-      {unassignedItems.length > 0 && (
-        <div className="card pw-unassigned-card">
-          <h3 className="section-title">Unassigned Report Items</h3>
-          <p className="pw-hint">These exist in your Report Builder but aren't placed in this project's DMAIC story yet. Assign each to a phase below.</p>
-          <div className="pw-unassigned-list">
-            {unassignedItems.map(item => (
-              <div key={item.id} className="pw-unassigned-item">
-                <span>{item.title}</span>
-                <select
-                  defaultValue=""
-                  onChange={e => {
-                    if (e.target.value) assignItemToPhase(project.id, e.target.value, item.id);
-                  }}
-                >
-                  <option value="" disabled>Add to phase…</option>
-                  {PHASES.map(ph => (
-                    <option key={ph} value={ph}>
-                      {ph}{TOOL_PHASE[item.toolId] === ph ? ' (suggested)' : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ))}
+      {showForm && (
+        <div className="card pw-new-form">
+          <div className="form-grid">
+            <div className="form-group">
+              <label>Project Name</label>
+              <input
+                type="text"
+                value={form.name}
+                onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
+                placeholder="e.g. Reduce Customer Complaint Rate"
+                autoFocus
+              />
+            </div>
+            <div className="form-group">
+              <label>Goal</label>
+              <input
+                type="text"
+                value={form.goal}
+                onChange={e => setForm(p => ({ ...p, goal: e.target.value }))}
+                placeholder="e.g. Reduce defects from 4.5% to under 2%"
+              />
+            </div>
+            <div className="form-group">
+              <label>Project Owner</label>
+              <input
+                type="text"
+                value={form.owner}
+                onChange={e => setForm(p => ({ ...p, owner: e.target.value }))}
+              />
+            </div>
+            <div className="form-group">
+              <label>Champion / Sponsor</label>
+              <input
+                type="text"
+                value={form.champion}
+                onChange={e => setForm(p => ({ ...p, champion: e.target.value }))}
+              />
+            </div>
           </div>
+          <button className="btn-primary" style={{ marginTop: '1rem' }} onClick={handleCreate}>
+            Create Project
+          </button>
         </div>
       )}
 
-      <div className="pw-phase-board">
-        {PHASES.map(phase => (
-          <div key={phase} className="pw-phase-col" style={{ '--phase-color': PHASE_COLOR[phase] }}>
-            <div className="pw-phase-col-header">
-              <span className="cat-dot" style={{ background: PHASE_COLOR[phase] }} />
-              {phase}
-              <span className="pw-phase-count">{project.phases[phase].itemIds.length}</span>
-            </div>
-
-            {project.phases[phase].itemIds.length === 0 ? (
-              <div className="pw-phase-empty">No items yet</div>
-            ) : (
-              project.phases[phase].itemIds.map(itemId => {
-                const item = itemById(itemId);
-                if (!item) return null;
-                return (
-                  <div key={itemId} className="pw-phase-item">
-                    <span>{item.title}</span>
-                    <button
-                      className="pw-remove-btn"
-                      title="Remove from project"
-                      onClick={() => removeItemFromProject(project.id, itemId)}
-                    >
-                      ×
-                    </button>
-                  </div>
-                );
-              })
-            )}
-
-            <textarea
-              className="pw-phase-notes"
-              placeholder={`${phase} notes…`}
-              value={project.phases[phase].notes}
-              onChange={e => updatePhaseNotes(project.id, phase, e.target.value)}
-            />
-          </div>
-        ))}
-      </div>
+      {projects.length === 0 && !showForm ? (
+        <div className="empty-state">
+          <div className="empty-state-icon">🗂️</div>
+          <h3>No Projects Yet</h3>
+          <p>Create a project to start organizing your analyses into a DMAIC story.</p>
+        </div>
+      ) : (
+        <div className="pw-project-grid">
+          {projects.map(project => {
+            const progress = projectProgress(project);
+            const phase = currentPhase(project);
+            return (
+              <div key={project.id} className="card pw-project-card">
+                <div className="pw-project-card-top">
+                  <h3>{project.name}</h3>
+                  <button
+                    className="pw-delete-btn"
+                    title="Delete project"
+                    onClick={() => {
+                      if (window.confirm(`Delete "${project.name}"? This won't delete the underlying report items.`)) {
+                        deleteProject(project.id);
+                      }
+                    }}
+                  >
+                    🗑️
+                  </button>
+                </div>
+                {project.goal && <p className="pw-project-goal">{project.goal}</p>}
+                <div className="pw-progress-track">
+                  <div className="pw-progress-fill" style={{ width: `${progress}%` }} />
+                </div>
+                <div className="pw-project-meta">
+                  <span className="badge">{phase === 'Complete' ? '✓ Complete' : `${phase} Phase`}</span>
+                  <span className="pw-progress-label">{progress}% populated</span>
+                </div>
+                <Link to={`/projects/${project.id}`} className="btn-secondary pw-open-btn">Open →</Link>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
