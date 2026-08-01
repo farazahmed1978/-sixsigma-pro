@@ -1,109 +1,119 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 
-const ProjectsContext = createContext();
-const STORAGE_KEY = 'sixsigmapro_projects';
+const ReportContext = createContext();
+const STORAGE_KEY = 'sixsigmapro_report_items';
+const MAX_IMAGE_WIDTH = 1000;   // px — chart snapshots are captured at scale:2, far larger than needed for storage
+const IMAGE_QUALITY = 0.72;     // JPEG quality — typically cuts base64 size 70-90% vs the original PNG
 
-export const PHASES = ['Define', 'Measure', 'Analyze', 'Improve', 'Control'];
-
-function emptyPhases() {
-  return PHASES.reduce((acc, p) => ({ ...acc, [p]: { notes: '', itemIds: [] } }), {});
-}
-
-function loadProjects() {
+function loadItems() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    // Guard against older/malformed records missing a phase key.
-    return parsed.map(p => ({ ...p, phases: { ...emptyPhases(), ...p.phases } }));
+    return raw ? JSON.parse(raw) : [];
   } catch {
     return [];
   }
 }
 
-export function ProjectsProvider({ children }) {
-  const [projects, setProjects] = useState(loadProjects);
+// Downscales + re-encodes a captured chart (PNG data URL from html2canvas) as a
+// compressed JPEG before it's ever stored, so a project full of chart snapshots
+// doesn't fill up localStorage's ~5-10MB quota.
+function compressImage(dataUrl) {
+  return new Promise((resolve) => {
+    if (!dataUrl) { resolve(dataUrl); return; }
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, MAX_IMAGE_WIDTH / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext('2d');
+      // JPEG has no alpha channel — flatten onto white first or transparent chart
+      // backgrounds turn black.
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', IMAGE_QUALITY));
+    };
+    img.onerror = () => resolve(dataUrl); // fall back to the original rather than lose it
+    img.src = dataUrl;
+  });
+}
+
+function trySave(items) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// If storage is still over quota even after compression (e.g. a project with many
+// items), strip the chart image from the oldest items first and retry — this keeps
+// the stats and interpretation (the data that actually matters) instead of just
+// failing the save silently and staying broken on every future change.
+function saveWithFallback(items, setWarning) {
+  if (trySave(items)) { setWarning(null); return; }
+
+  const attempt = items.map(i => ({ ...i }));
+  let strippedCount = 0;
+  for (let i = 0; i < attempt.length; i++) {
+    if (attempt[i].chartImage) {
+      attempt[i].chartImage = null;
+      strippedCount++;
+      if (trySave(attempt)) {
+        setWarning(`Storage was nearly full — removed the saved chart image from ${strippedCount} older report item${strippedCount > 1 ? 's' : ''} to keep everything else. Stats and interpretations are unaffected.`);
+        return;
+      }
+    }
+  }
+  setWarning('Report items could not be saved to browser storage — they will be lost on reload. Try removing some older items.');
+}
+
+export function ReportProvider({ children }) {
+  // [{ id, title, toolId, timestamp, statsSummary, interpretation, chartImage, includeRawData, rawData }]
+  const [items, setItems] = useState(loadItems);
+  const [storageWarning, setStorageWarning] = useState(null);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
-    } catch (e) {
-      console.warn('Projects could not be saved to localStorage:', e);
-    }
-  }, [projects]);
+    saveWithFallback(items, setStorageWarning);
+  }, [items]);
 
-  const createProject = useCallback((data) => {
-    const id = `proj-${Date.now()}`;
-    const project = {
-      id,
-      name: (data.name || '').trim() || 'Untitled Project',
-      goal: data.goal || '',
-      owner: data.owner || '',
-      champion: data.champion || '',
-      createdAt: new Date().toISOString(),
-      phases: emptyPhases(),
-    };
-    setProjects(prev => [...prev, project]);
+  const addReportItem = useCallback(async (item) => {
+    const id = `${item.toolId}-${Date.now()}`;
+    const compressedImage = await compressImage(item.chartImage);
+    setItems(prev => [...prev, { id, includeRawData: false, ...item, chartImage: compressedImage }]);
     return id;
   }, []);
 
-  const updateProject = useCallback((id, updates) => {
-    setProjects(prev => prev.map(p => (p.id === id ? { ...p, ...updates } : p)));
+  const removeReportItem = useCallback((id) => {
+    setItems(prev => prev.filter(i => i.id !== id));
   }, []);
 
-  const deleteProject = useCallback((id) => {
-    setProjects(prev => prev.filter(p => p.id !== id));
+  const toggleIncludeRawData = useCallback((id) => {
+    setItems(prev => prev.map(i => i.id === id ? { ...i, includeRawData: !i.includeRawData } : i));
   }, []);
 
-  // An item lives in at most one phase per project — assigning it to a new
-  // phase removes it from any other phase in that same project first.
-  const assignItemToPhase = useCallback((projectId, phase, itemId) => {
-    setProjects(prev => prev.map(p => {
-      if (p.id !== projectId) return p;
-      const phases = {};
-      PHASES.forEach(ph => {
-        phases[ph] = { ...p.phases[ph], itemIds: p.phases[ph].itemIds.filter(i => i !== itemId) };
-      });
-      phases[phase] = { ...phases[phase], itemIds: [...phases[phase].itemIds, itemId] };
-      return { ...p, phases };
-    }));
+  const reorderItems = useCallback((fromIndex, toIndex) => {
+    setItems(prev => {
+      const updated = [...prev];
+      const [moved] = updated.splice(fromIndex, 1);
+      updated.splice(toIndex, 0, moved);
+      return updated;
+    });
   }, []);
 
-  const removeItemFromProject = useCallback((projectId, itemId) => {
-    setProjects(prev => prev.map(p => {
-      if (p.id !== projectId) return p;
-      const phases = {};
-      PHASES.forEach(ph => {
-        phases[ph] = { ...p.phases[ph], itemIds: p.phases[ph].itemIds.filter(i => i !== itemId) };
-      });
-      return { ...p, phases };
-    }));
-  }, []);
-
-  const updatePhaseNotes = useCallback((projectId, phase, notes) => {
-    setProjects(prev => prev.map(p => (
-      p.id === projectId
-        ? { ...p, phases: { ...p.phases, [phase]: { ...p.phases[phase], notes } } }
-        : p
-    )));
-  }, []);
-
-  const getProject = useCallback((id) => projects.find(p => p.id === id), [projects]);
+  const clearReport = useCallback(() => setItems([]), []);
 
   return (
-    <ProjectsContext.Provider value={{
-      projects,
-      createProject,
-      updateProject,
-      deleteProject,
-      assignItemToPhase,
-      removeItemFromProject,
-      updatePhaseNotes,
-      getProject,
+    <ReportContext.Provider value={{
+      items, addReportItem, removeReportItem, toggleIncludeRawData, reorderItems, clearReport,
+      hasItems: items.length > 0,
+      storageWarning, dismissStorageWarning: () => setStorageWarning(null),
     }}>
       {children}
-    </ProjectsContext.Provider>
+    </ReportContext.Provider>
   );
 }
 
-export const useProjects = () => useContext(ProjectsContext);
+export const useReport = () => useContext(ReportContext);
