@@ -1,4 +1,3 @@
-
 // Shared statistical test engine. Every function here was numerically verified against
 // known reference output (R, published critical-value tables) before being wired into
 // any tool — see project notes for the specific checks run.
