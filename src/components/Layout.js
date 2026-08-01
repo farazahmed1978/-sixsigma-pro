@@ -8,6 +8,8 @@ const NAV = [
     section: 'Workspace',
     items: [
       { id: 'worksheet', name: 'Data Worksheet', icon: '🗂️', path: '/worksheet' },
+      { id: 'projects', name: 'Project Workspace', icon: '📁', path: '/projects' },
+      { id: 'dashboard', name: 'Classic Dashboard', icon: '🏠', path: '/dashboard' },
     ]
   },
   {
@@ -45,6 +47,7 @@ const NAV = [
       { id: 'multivari', name: 'Multi-Vari Chart', icon: '🔀', path: '/tool/multivari' },
       { id: 'correlation', name: 'Correlation Matrix', icon: '🔗', path: '/tool/correlation' },
       { id: 'regression', name: 'Regression', icon: '📐', path: '/tool/regression' },
+      { id: 'anova', name: 'ANOVA', icon: '📶', path: '/tool/anova' },
     ]
   },
   {
@@ -126,6 +129,7 @@ export default function Layout({ children }) {
         <nav className="topbar-nav">
           <Link to="/" className={location.pathname === '/' ? 'active' : ''}>Home</Link>
           <Link to="/worksheet" className={isActive('/worksheet') ? 'active' : ''}>Worksheet</Link>
+          <Link to="/projects" className={isActive('/projects') ? 'active' : ''}>Projects</Link>
           <Link to="/hypothesis" className={isActive('/hypothesis') ? 'active' : ''}>Hypothesis Tests</Link>
           <Link to="/templates" className={isActive('/templates') ? 'active' : ''}>Templates</Link>
           <Link to="/resources" className={isActive('/resources') ? 'active' : ''}>Resources</Link>
