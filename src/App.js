@@ -3,10 +3,14 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { WorksheetProvider } from './context/WorksheetContext';
 import { ReportProvider } from './context/ReportContext';
+import { ProjectsProvider } from './context/ProjectsContext';
 import Layout from './components/Layout';
 
 // Pages
 import Dashboard from './pages/Dashboard';
+import GuidedHome from './pages/GuidedHome';
+import ProjectsHome from './pages/ProjectsHome';
+import ProjectDetail from './pages/ProjectDetail';
 import Worksheet from './pages/Worksheet';
 import Resources from './pages/Resources';
 import About from './pages/About';
@@ -38,6 +42,7 @@ import DescriptiveStats from './tools/DescriptiveStats';
 import MultiVariChart from './tools/MultiVariChart';
 import CorrelationMatrix from './tools/CorrelationMatrix';
 import RegressionTool from './tools/RegressionTool';
+import AnovaTool from './tools/AnovaTool';
 
 // Bucket 3 — calculators
 import SigmaCalculator from './tools/SigmaCalculator';
@@ -63,6 +68,7 @@ const toolMeta = {
   'multivari': { title: 'Multi-Vari Chart', phase: 'Analyze', component: <MultiVariChart /> },
   'correlation': { title: 'Correlation Matrix', phase: 'Analyze', component: <CorrelationMatrix /> },
   'regression': { title: 'Regression Analysis', phase: 'Analyze', component: <RegressionTool /> },
+  'anova': { title: 'ANOVA', phase: 'Analyze', component: <AnovaTool /> },
   'sigma-calculator': { title: 'Sigma Level / DPMO Calculator', phase: 'Measure', component: <SigmaCalculator /> },
   'sample-size-calculator': { title: 'Sample Size Calculator', phase: 'Measure', component: <SampleSizeCalculator /> },
   'power-calculator': { title: 'Power / Sample Size Calculator', phase: 'Measure', component: <PowerCalculator /> },
@@ -72,31 +78,34 @@ function ToolRoute({ toolId }) {
   const meta = toolMeta[toolId];
   if (!meta) return <div style={{ padding: '2rem' }}>Tool not found.</div>;
   return <ToolPage tool={toolId}>{meta.component}</ToolPage>;
-}
-
-export default function App() {
+}export default function App() {
   return (
     <ThemeProvider>
       <WorksheetProvider>
         <ReportProvider>
-          <Router>
-            <Layout>
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/worksheet" element={<Worksheet />} />
-                <Route path="/resources" element={<Resources />} />
-                <Route path="/about" element={<About />} />
-                <Route path="/pricing" element={<Pricing />} />
-                <Route path="/hypothesis" element={<HypothesisTesting />} />
-                <Route path="/doe" element={<DOEPage />} />
-                <Route path="/templates" element={<Templates />} />
-                <Route path="/report" element={<ReportBuilder />} />
-                {Object.keys(toolMeta).map(id => (
-                  <Route key={id} path={`/tool/${id}`} element={<ToolRoute toolId={id} />} />
-                ))}
-              </Routes>
-            </Layout>
-          </Router>
+          <ProjectsProvider>
+            <Router>
+              <Layout>
+                <Routes>
+                  <Route path="/" element={<GuidedHome />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/worksheet" element={<Worksheet />} />
+                  <Route path="/resources" element={<Resources />} />
+                  <Route path="/about" element={<About />} />
+                  <Route path="/pricing" element={<Pricing />} />
+                  <Route path="/hypothesis" element={<HypothesisTesting />} />
+                  <Route path="/doe" element={<DOEPage />} />
+                  <Route path="/templates" element={<Templates />} />
+                  <Route path="/report" element={<ReportBuilder />} />
+                  <Route path="/projects" element={<ProjectsHome />} />
+                  <Route path="/projects/:id" element={<ProjectDetail />} />
+                  {Object.keys(toolMeta).map(id => (
+                    <Route key={id} path={`/tool/${id}`} element={<ToolRoute toolId={id} />} />
+                  ))}
+                </Routes>
+              </Layout>
+            </Router>
+          </ProjectsProvider>
         </ReportProvider>
       </WorksheetProvider>
     </ThemeProvider>
