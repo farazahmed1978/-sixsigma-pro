@@ -15,10 +15,102 @@ const QUICK_TOOLS = [
   { name: 'Hypothesis Tests', path: '/hypothesis', icon: '🧪' },
 ];
 
+const GRID_ROW_CAP = 200; // editable rows shown at once — large CSVs should still be imported, not hand-typed
+
+function DataGrid() {
+  const {
+    columns, rowCount, hasData,
+    updateCell, renameColumn, deleteColumn, addBlankColumn, addBlankRow, deleteRow,
+  } = useWorksheet();
+
+  const isNumeric = (col) => col.data.filter(v => v !== '').every(v => !isNaN(parseFloat(v)));
+  const visibleRows = Math.min(rowCount, GRID_ROW_CAP);
+
+  const cellInputStyle = {
+    width: '100%', minWidth: '70px', border: '1px solid transparent', background: 'transparent',
+    color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: '0.85rem', padding: '0.3rem 0.4rem',
+    borderRadius: '4px', outline: 'none',
+  };
+  const headerInputStyle = {
+    border: 'none', background: 'transparent', color: 'inherit', fontWeight: 600, fontSize: '0.85rem',
+    outline: 'none', width: '100%', minWidth: '60px', padding: '0.15rem 0.25rem', borderRadius: '4px',
+  };
+  const deleteBtnStyle = {
+    background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.9rem',
+    lineHeight: 1, padding: '0 0.2rem', flexShrink: 0,
+  };
+  const addBtnStyle = {
+    background: 'var(--input-bg, transparent)', border: '1px dashed var(--border)', borderRadius: '6px',
+    color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.8rem', padding: '0.35rem 0.75rem',
+  };
+
+  if (!hasData) return null;
+
+  return (
+    <div className="ws-table-wrapper">
+      <table className="data-table ws-table">
+        <thead>
+          <tr>
+            <th style={{ width: 36 }}>#</th>
+            {columns.map((c, colIndex) => (
+              <th key={colIndex}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <input
+                    style={headerInputStyle}
+                    value={c.name}
+                    onChange={e => renameColumn(colIndex, e.target.value)}
+                    onFocus={e => e.target.style.border = '1px solid var(--accent)'}
+                    onBlur={e => e.target.style.border = 'none'}
+                  />
+                  <span className="col-type">{isNumeric(c) ? 'NUM' : 'TEXT'}</span>
+                  <button style={deleteBtnStyle} title="Delete column" onClick={() => deleteColumn(colIndex)}>×</button>
+                </div>
+              </th>
+            ))}
+            <th style={{ verticalAlign: 'middle' }}>
+              <button style={addBtnStyle} onClick={addBlankColumn} title="Add column">+ Column</button>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {Array.from({ length: visibleRows }).map((_, rowIndex) => (
+            <tr key={rowIndex}>
+              <td className="row-num" style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', whiteSpace: 'nowrap' }}>
+                {rowIndex + 1}
+                <button style={{ ...deleteBtnStyle, fontSize: '0.75rem' }} title="Delete row" onClick={() => deleteRow(rowIndex)}>×</button>
+              </td>
+              {columns.map((c, colIndex) => (
+                <td key={colIndex}>
+                  <input
+                    style={cellInputStyle}
+                    value={c.data[rowIndex] ?? ''}
+                    onChange={e => updateCell(colIndex, rowIndex, e.target.value)}
+                    onFocus={e => e.target.style.border = '1px solid var(--accent)'}
+                    onBlur={e => e.target.style.border = '1px solid transparent'}
+                  />
+                </td>
+              ))}
+              <td />
+            </tr>
+          ))}
+          <tr>
+            <td colSpan={columns.length + 2} style={{ padding: '0.5rem' }}>
+              <button style={addBtnStyle} onClick={addBlankRow}>+ Row</button>
+              {rowCount > GRID_ROW_CAP && (
+                <span style={{ marginLeft: '0.75rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>Showing first {GRID_ROW_CAP} of {rowCount} rows — import large datasets via CSV rather than editing them all by hand here.
+                </span>
+              )}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default function Worksheet() {
-  const { columns, fileName, rowCount, loadData, clearData, addColumn, hasData } = useWorksheet();
+  const { columns, fileName, rowCount, loadData, clearData, addColumn, startBlankSheet, hasData } = useWorksheet();
   const [dragOver, setDragOver] = useState(false);
-  const [editMode, setEditMode] = useState(false);
   const [newColName, setNewColName] = useState('');
   const [newColData, setNewColData] = useState('');
   const [pasteText, setPasteText] = useState('');
@@ -73,7 +165,10 @@ export default function Worksheet() {
     setActiveTab('data');
   };
 
-  const isNumeric = (col) => col.data.filter(v => v !== '').every(v => !isNaN(parseFloat(v)));
+  const handleStartBlank = () => {
+    startBlankSheet();
+    setActiveTab('data');
+  };
 
   return (
     <div className="worksheet-page">
@@ -82,14 +177,18 @@ export default function Worksheet() {
           <h1>Data Worksheet</h1>
           <p>Enter your data once — it's available in every analysis tool automatically.</p>
         </div>
-        {hasData && (
-          <div className="worksheet-meta">
-            <span className="ws-badge">{fileName}</span>
-            <span className="ws-badge">{rowCount} rows</span>
-            <span className="ws-badge">{columns.length} columns</span>
-            <button className="btn-ghost" onClick={clearData}>✕ Clear</button>
-          </div>
-        )}
+        <div className="worksheet-meta">
+          {hasData ? (
+            <>
+              <span className="ws-badge">{fileName}</span>
+              <span className="ws-badge">{rowCount} rows</span>
+              <span className="ws-badge">{columns.length} columns</span>
+              <button className="btn-ghost" onClick={clearData}>✕ Clear</button>
+            </>
+          ) : (
+            <button className="btn-primary" onClick={handleStartBlank}>🗒️ Start Blank Grid</button>
+          )}
+        </div>
       </div>
 
       <div className="worksheet-body">
@@ -97,13 +196,12 @@ export default function Worksheet() {
         <div className="ws-panel">
           <div className="tab-bar">
             {['import', 'paste', 'manual'].map(t => (
-              <button key={t} className={`tab-btn ${activeTab === t ? 'active' : ''}`} onClick={() => setActiveTab(t)}>
-                {t === 'import' ? '📁 Import CSV' : t === 'paste' ? '📋 Paste Data' : '✏️ Manual Entry'}
+              <button key={t} className={`tab-btn ${activeTab === t ? 'active' : ''}`} onClick={() => setActiveTab(t)}>{t === 'import' ? '📁 Import CSV' : t === 'paste' ? '📋 Paste Data' : '✏️ Add Column'}
               </button>
             ))}
             {hasData && (
               <button className={`tab-btn ${activeTab === 'data' ? 'active' : ''}`} onClick={() => setActiveTab('data')}>
-                📊 View Data
+                📊 Data Grid
               </button>
             )}
           </div>
@@ -128,6 +226,12 @@ export default function Worksheet() {
                 Numbers and text are both supported. Example:
                 <pre className="ws-example">Part,Measurement,Operator{'\n'}A,12.3,Op1{'\n'}A,12.1,Op1{'\n'}B,15.4,Op2</pre>
               </div>
+              <div style={{ marginTop: '1rem', textAlign: 'center' }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>— or —</span>
+                <div style={{ marginTop: '0.5rem' }}>
+                  <button className="btn-secondary" onClick={handleStartBlank}>🗒️ Start a Blank Grid Instead</button>
+                </div>
+              </div>
             </div>
           )}
 
@@ -149,7 +253,11 @@ export default function Worksheet() {
 
           {activeTab === 'manual' && (
             <div>
-              <p className="ws-hint">Add a column manually. Enter one value per line.</p>
+              <p className="ws-hint">
+                Add one column at a time by pasting or typing values below — or, for a real spreadsheet-style
+                grid you can type directly into cell by cell, use <strong>Start Blank Grid</strong> above and
+                edit it in the <strong>Data Grid</strong> tab.
+              </p>
               <div className="form-group" style={{ marginBottom: '0.75rem' }}>
                 <label>Column Name</label>
                 <input type="text" value={newColName} onChange={e => setNewColName(e.target.value)} placeholder="e.g. Measurement, Defects, Group" />
@@ -164,40 +272,10 @@ export default function Worksheet() {
             </div>
           )}
 
-          {activeTab === 'data' && hasData && (
-            <div className="ws-table-wrapper">
-              <table className="data-table ws-table">
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    {columns.map(c => (
-                      <th key={c.name}>
-                        {c.name}
-                        <span className="col-type">{isNumeric(c) ? 'NUM' : 'TEXT'}</span>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {Array.from({ length: Math.min(rowCount, 100) }).map((_, i) => (
-                    <tr key={i}>
-                      <td className="row-num">{i + 1}</td>
-                      {columns.map(c => <td key={c.name}>{c.data[i] ?? ''}</td>)}
-                    </tr>
-                  ))}
-                  {rowCount > 100 && (
-                    <tr><td colSpan={columns.length + 1} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '0.75rem' }}>
-                      Showing first 100 of {rowCount} rows
-                    </td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
+          {activeTab === 'data' && hasData && <DataGrid />}
         </div>
 
-        {/* Right: column summary + quick launch */}
-        <div className="ws-sidebar">
+        {/* Right: column summary + quick launch */}<div className="ws-sidebar">
           {hasData && (
             <div className="card ws-columns-card">
               <h3 className="section-title" style={{ marginBottom: '1rem' }}>Columns</h3>
