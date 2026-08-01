@@ -15,6 +15,7 @@ const NAV = [
     color: 'var(--yellow)',
     items: [
       { id: 'templates', name: 'Project Templates', icon: '📋', path: '/templates' },
+      { id: 'report', name: 'Report Builder', icon: '📄', path: '/report' },
     ]
   },
   {
@@ -27,6 +28,9 @@ const NAV = [
       { id: 'histogram', name: 'Histogram', icon: '📊', path: '/tool/histogram' },
       { id: 'msa', name: 'MSA / Gage R&R', icon: '📏', path: '/tool/msa' },
       { id: 'descriptive', name: 'Descriptive Stats', icon: '🔢', path: '/tool/descriptive' },
+      { id: 'sigma-calculator', name: 'Sigma Level / DPMO', icon: '🎚️', path: '/tool/sigma-calculator' },
+      { id: 'sample-size-calculator', name: 'Sample Size Calculator', icon: '🧮', path: '/tool/sample-size-calculator' },
+      { id: 'power-calculator', name: 'Power Calculator', icon: '⚡', path: '/tool/power-calculator' },
     ]
   },
   {
@@ -71,21 +75,36 @@ const NAV = [
 export default function Layout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth <= 768 : false);
   const [collapsed, setCollapsed] = useState({});
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
 
   useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const toggleSection = (section) => setCollapsed(p => ({ ...p, [section]: !p[section] }));
   const isActive = (path) => location.pathname === path || location.pathname.startsWith(path + '/');
+
+  // Desktop: toggle the sidebar's collapsed/expanded state.
+  // Mobile: toggle the slide-in overlay instead — these must NOT both fire from one click,
+  // or the full-screen mobile overlay renders on desktop and blocks the page.
+  const handleMenuClick = () => {
+    if (isMobile) setMobileOpen(prev => !prev);
+    else setSidebarOpen(prev => !prev);
+  };
 
   return (
     <div className={`layout ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'} theme-${theme}`}>
       {/* Topbar */}
       <header className="topbar">
         <div className="topbar-left">
-          <button className="menu-btn" onClick={() => { setSidebarOpen(!sidebarOpen); setMobileOpen(!mobileOpen); }}>
+          <button className="menu-btn" onClick={handleMenuClick}>
             <span /><span /><span />
           </button>
           <Link to="/" className="logo">
@@ -149,7 +168,7 @@ export default function Layout({ children }) {
         </div>
       </aside>
 
-      {mobileOpen && <div className="overlay" onClick={() => setMobileOpen(false)} />}
+      {isMobile && mobileOpen && <div className="overlay" onClick={() => setMobileOpen(false)} />}
 
       <main className="main-content">
         {children}
