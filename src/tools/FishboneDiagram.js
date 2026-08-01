@@ -1,4 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
+import html2canvas from 'html2canvas';
+import { useReport } from '../context/ReportContext';
+import { interpretFishbone } from '../utils/interpretations';
 import './Tool.css';
 
 const categories6M = ['Man', 'Machine', 'Method', 'Material', 'Measurement', 'Mother Nature'];
@@ -21,6 +24,9 @@ const initCauses = {
 };
 
 export default function FishboneDiagram() {
+  const { addReportItem } = useReport();
+  const diagramWrapperRef = useRef(null);
+  const [addedToReport, setAddedToReport] = useState(false);
   const [problem, setProblem] = useState('High Defect Rate in Product Assembly');
   const [causes, setCauses] = useState(initCauses);
   const [newCause, setNewCause] = useState({});
@@ -38,6 +44,34 @@ export default function FishboneDiagram() {
 
   const totalCauses = Object.values(causes).reduce((s, a) => s + a.length, 0);
 
+  const handleAddToReport = useCallback(async () => {
+    if (!diagramWrapperRef.current) return;
+
+    const canvas = await html2canvas(diagramWrapperRef.current, { backgroundColor: null, scale: 2 });
+    const chartImage = canvas.toDataURL('image/png');
+
+    const interpretation = interpretFishbone({ problem, causes });
+
+    const statsSummary = {};
+    categories6M.forEach(cat => { statsSummary[cat] = (causes[cat] || []).length; });
+
+    const rawData = [];
+    categories6M.forEach(cat => (causes[cat] || []).forEach(c => rawData.push({ category: cat, cause: c })));
+
+    addReportItem({
+      title: `Fishbone Diagram — ${problem}`,
+      toolId: 'fishbone',
+      timestamp: new Date().toISOString(),
+      chartImage,
+      statsSummary,
+      interpretation,
+      rawData,
+    });
+
+    setAddedToReport(true);
+    setTimeout(() => setAddedToReport(false), 2500);
+  }, [problem, causes, addReportItem]);
+
   return (
     <div className="tool-container tool-full">
       {/* Problem statement */}
@@ -50,76 +84,81 @@ export default function FishboneDiagram() {
           onChange={e => setProblem(e.target.value)}
           placeholder="Enter the problem or effect being analyzed..."
         />
-        <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>
-          Total causes identified: <strong style={{ color: 'var(--cyan)' }}>{totalCauses}</strong>
+        <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>Total causes identified: <strong style={{ color: 'var(--cyan)' }}>{totalCauses}</strong></span>
+          <button className="btn btn-primary" onClick={handleAddToReport}>
+            {addedToReport ? '✓ Added to Report' : '📄 Add to Report'}
+          </button>
         </div>
       </div>
 
-      {/* SVG Fishbone */}
-      <div className="chart-wrapper" style={{ padding: '28px 20px' }}>
-        <div className="chart-title">Ishikawa (Fishbone) Diagram — {problem}</div>
-        <div style={{ overflowX: 'auto' }}>
-          <svg viewBox="0 0 900 440" style={{ width: '100%', minWidth: 600, height: 'auto', display: 'block' }}>
-            {/* Spine */}
-            <line x1="80" y1="220" x2="820" y2="220" stroke="var(--text-secondary)" strokeWidth="3" />
-            {/* Fish head (arrow) */}
-            <polygon points="820,210 850,220 820,230" fill="var(--cyan)" />
-            {/* Effect box */}
-            <rect x="855" y="195" width="40" height="50" rx="6" fill="none" />
+      <div ref={diagramWrapperRef}>
+        {/* SVG Fishbone */}
+        <div className="chart-wrapper" style={{ padding: '28px 20px' }}>
+          <div className="chart-title">Ishikawa (Fishbone) Diagram — {problem}</div>
+          <div style={{ overflowX: 'auto' }}>
+            <svg viewBox="0 0 900 440" style={{ width: '100%', minWidth: 600, height: 'auto', display: 'block' }}>
+              {/* Spine */}
+              <line x1="80" y1="220" x2="820" y2="220" stroke="var(--text-secondary)" strokeWidth="3" />
+              {/* Fish head (arrow) */}
+              <polygon points="820,210 850,220 820,230" fill="var(--cyan)" />
+              {/* Effect box */}
+              <rect x="855" y="195" width="40" height="50" rx="6" fill="none" />
 
-            {/* Problem box */}
-            <rect x="720" y="178" width="180" height="84" rx="10" fill="var(--navy-3)" stroke="var(--cyan)" strokeWidth="2" />
-            <foreignObject x="722" y="180" width="176" height="80">
-              <div xmlns="http://www.w3.org/1999/xhtml" style={{ color: 'var(--cyan)', fontSize: 11, fontWeight: 700, padding: '4px 8px', lineHeight: 1.4, wordBreak: 'break-word', display: 'flex', alignItems: 'center', height: '100%', fontFamily: 'Syne, sans-serif' }}>
-                {problem}
-              </div>
-            </foreignObject>
+              {/* Problem box */}
+              <rect x="720" y="178" width="180" height="84" rx="10" fill="var(--navy-3)" stroke="var(--cyan)" strokeWidth="2" />
+              <foreignObject x="722" y="180" width="176" height="80">
+                <div xmlns="http://www.w3.org/1999/xhtml" style={{ color: 'var(--cyan)', fontSize: 11, fontWeight: 700, padding: '4px 8px', lineHeight: 1.4, wordBreak: 'break-word', display: 'flex', alignItems: 'center', height: '100%', fontFamily: 'Syne, sans-serif' }}>
+                  {problem}
+                </div>
+              </foreignObject>
 
-            {/* Top bones: Man, Machine, Method (left to right) */}
-            {[
-              { cat: 'Man', bx: 120, by: 80 },
-              { cat: 'Machine', bx: 320, by: 80 },
-              { cat: 'Method', bx: 520, by: 80 },
-            ].map(({ cat, bx, by }) => {
-              const spineX = bx + 70;
-              const color = categoryColors[cat];
-              return (
-                <g key={cat}>
-                  <line x1={bx} y1={by + 30} x2={spineX} y2="220" stroke={color} strokeWidth="2" />
-                  <rect x={bx - 40} y={by} width={120} height={32} rx={8} fill={color} fillOpacity={0.2} stroke={color} strokeWidth={1.5} />
-                  <text x={bx + 20} y={by + 20} textAnchor="middle" fill={color} fontSize="12" fontWeight="700" fontFamily="Syne, sans-serif">{cat}</text>
-                  {(causes[cat] || []).map((c, i) => (
-                    <g key={i}>
-                      <line x1={bx + 20} y1={by + 30} x2={bx + 20} y2={by + 32 + i * 20} stroke={color} strokeWidth={1} strokeDasharray="3 2" opacity="0.5" />
-                      <text x={bx + 20} y={by + 47 + i * 20} textAnchor="middle" fill="var(--text-secondary)" fontSize="10" fontFamily="DM Sans, sans-serif">{c.length > 16 ? c.slice(0, 14) + '…' : c}</text>
-                    </g>
-                  ))}
-                </g>
-              );
-            })}
+              {/* Top bones: Man, Machine, Method (left to right) */}
+              {[
+                { cat: 'Man', bx: 120, by: 80 },
+                { cat: 'Machine', bx: 320, by: 80 },
+                { cat: 'Method', bx: 520, by: 80 },
+              ].map(({ cat, bx, by }) => {
+                const spineX = bx + 70;
+                const color = categoryColors[cat];
+                return (
+                  <g key={cat}>
+                    <line x1={bx} y1={by + 30} x2={spineX} y2="220" stroke={color} strokeWidth="2" />
+                    <rect x={bx - 40} y={by} width={120} height={32} rx={8} fill={color} fillOpacity={0.2} stroke={color} strokeWidth={1.5} />
+                    <text x={bx + 20} y={by + 20} textAnchor="middle" fill={color} fontSize="12" fontWeight="700" fontFamily="Syne, sans-serif">{cat}</text>
+                    {(causes[cat] || []).map((c, i) => (
+                      <g key={i}>
+                        <line x1={bx + 20} y1={by + 30} x2={bx + 20} y2={by + 32 + i * 20} stroke={color} strokeWidth={1} strokeDasharray="3 2" opacity="0.5" />
+                        <text x={bx + 20} y={by + 47 + i * 20} textAnchor="middle" fill="var(--text-secondary)" fontSize="10" fontFamily="DM Sans, sans-serif">{c.length > 16 ? c.slice(0, 14) + '…' : c}</text>
+                      </g>
+                    ))}
+                  </g>
+                );
+              })}
 
-            {/* Bottom bones: Material, Measurement, Mother Nature */}
-            {[
-              { cat: 'Material', bx: 120, by: 310 },
-              { cat: 'Measurement', bx: 320, by: 310 },
-              { cat: 'Mother Nature', bx: 520, by: 310 },
-            ].map(({ cat, bx, by }) => {
-              const spineX = bx + 70;
-              const color = categoryColors[cat];
-              return (
-                <g key={cat}>
-                  <line x1={bx} y1={by + 10} x2={spineX} y2="220" stroke={color} strokeWidth="2" />
-                  <rect x={bx - 40} y={by} width={140} height={32} rx={8} fill={color} fillOpacity={0.2} stroke={color} strokeWidth={1.5} />
-                  <text x={bx + 30} y={by + 20} textAnchor="middle" fill={color} fontSize="12" fontWeight="700" fontFamily="Syne, sans-serif">{cat}</text>
-                  {(causes[cat] || []).map((c, i) => (
-                    <g key={i}>
-                      <text x={bx + 30} y={by - 10 - i * 18} textAnchor="middle" fill="var(--text-secondary)" fontSize="10" fontFamily="DM Sans, sans-serif">{c.length > 16 ? c.slice(0, 14) + '…' : c}</text>
-                    </g>
-                  ))}
-                </g>
-              );
-            })}
-          </svg>
+              {/* Bottom bones: Material, Measurement, Mother Nature */}
+              {[
+                { cat: 'Material', bx: 120, by: 310 },
+                { cat: 'Measurement', bx: 320, by: 310 },
+                { cat: 'Mother Nature', bx: 520, by: 310 },
+              ].map(({ cat, bx, by }) => {
+                const spineX = bx + 70;
+                const color = categoryColors[cat];
+                return (
+                  <g key={cat}>
+                    <line x1={bx} y1={by + 10} x2={spineX} y2="220" stroke={color} strokeWidth="2" />
+                    <rect x={bx - 40} y={by} width={140} height={32} rx={8} fill={color} fillOpacity={0.2} stroke={color} strokeWidth={1.5} />
+                    <text x={bx + 30} y={by + 20} textAnchor="middle" fill={color} fontSize="12" fontWeight="700" fontFamily="Syne, sans-serif">{cat}</text>
+                    {(causes[cat] || []).map((c, i) => (
+                      <g key={i}>
+                        <text x={bx + 30} y={by - 10 - i * 18} textAnchor="middle" fill="var(--text-secondary)" fontSize="10" fontFamily="DM Sans, sans-serif">{c.length > 16 ? c.slice(0, 14) + '…' : c}</text>
+                      </g>
+                    ))}
+                  </g>
+                );
+              })}
+            </svg>
+          </div>
         </div>
       </div>
 

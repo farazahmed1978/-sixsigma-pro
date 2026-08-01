@@ -1,6 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useWorksheet } from '../context/WorksheetContext';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import html2canvas from 'html2canvas';
+import { useReport } from '../context/ReportContext';
+import { interpretDescriptiveStats } from '../utils/interpretations';
 
 const mean = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
 const variance = arr => { const m = mean(arr); return arr.reduce((a, b) => a + (b - m) ** 2, 0) / (arr.length - 1); };
@@ -13,13 +16,17 @@ const kurtosis = arr => { const m = mean(arr), s = stddev(arr), n = arr.length; 
 
 export default function DescriptiveStats() {
   const { columns, getColumnData, hasData } = useWorksheet();
+  const { addReportItem } = useReport();
+  const chartWrapperRef = useRef(null);
   const [col, setCol] = useState('');
   const [manualData, setManualData] = useState('');
   const [results, setResults] = useState(null);
+  const [addedToReport, setAddedToReport] = useState(false);
 
   const numCols = columns.filter(c => c.data.some(v => !isNaN(parseFloat(v))));
 
   const analyze = () => {
+    setAddedToReport(false);
     let data = col && hasData ? getColumnData(col) : manualData.split(/[\n,\s]+/).map(parseFloat).filter(v => !isNaN(v));
     if (data.length < 2) return;
     const sorted = [...data].sort((a, b) => a - b);
@@ -34,6 +41,37 @@ export default function DescriptiveStats() {
       data
     });
   };
+
+  const handleAddToReport = useCallback(async () => {
+    if (!chartWrapperRef.current || !results) return;
+
+    const canvas = await html2canvas(chartWrapperRef.current, { backgroundColor: null, scale: 2 });
+    const chartImage = canvas.toDataURL('image/png');
+
+    const interpretation = interpretDescriptiveStats(results);
+
+    addReportItem({
+      title: `Descriptive Statistics — ${col || 'Manual Data'}`,
+      toolId: 'descriptive-stats',
+      timestamp: new Date().toISOString(),
+      chartImage,
+      statsSummary: {
+        'N': results.n,
+        'Mean': results.mean.toFixed(4),
+        'Median': results.median.toFixed(4),
+        'Std Dev': results.stddev.toFixed(4),
+        'Min': results.min.toFixed(4),
+        'Max': results.max.toFixed(4),
+        'Skewness': results.skewness.toFixed(4),
+        'Kurtosis': results.kurtosis.toFixed(4),
+        'CV%': results.coefVar.toFixed(2) + '%',
+      },
+      interpretation,
+      rawData: results.data.map((v, i) => ({ sample: i + 1, value: v })),
+    });
+
+    setAddedToReport(true);
+  }, [results, col, addReportItem]);
 
   const stats = results ? [
     { label: 'N', value: results.n, mono: true },
@@ -85,34 +123,41 @@ export default function DescriptiveStats() {
 
       {results && (
         <>
-          <div className="stat-grid">
-            {stats.map(s => (
-              <div key={s.label} className="stat-card">
-                <div className="stat-value" style={{ fontSize: '1.1rem', fontFamily: 'var(--font-mono)' }}>{s.value}</div>
-                <div className="stat-label">{s.label}</div>
-              </div>
-            ))}
-          </div>
+          <div ref={chartWrapperRef}>
+            <div className="stat-grid">
+              {stats.map(s => (
+                <div key={s.label} className="stat-card">
+                  <div className="stat-value" style={{ fontSize: '1.1rem', fontFamily: 'var(--font-mono)' }}>{s.value}</div>
+                  <div className="stat-label">{s.label}</div>
+                </div>
+              ))}
+            </div>
 
-          <div className="chart-wrapper" style={{ marginTop: '1rem' }}>
-            <div className="section-title" style={{ marginBottom: '0.75rem' }}>Distribution</div>
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={histData()}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="bin" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
-                <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
-                <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-primary)' }} />
-                <Bar dataKey="count" fill="var(--accent)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+            <div className="chart-wrapper" style={{ marginTop: '1rem' }}>
+              <div className="section-title" style={{ marginBottom: '0.75rem' }}>Distribution</div>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={histData()}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="bin" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
+                  <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
+                  <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-primary)' }} />
+                  <Bar dataKey="count" fill="var(--accent)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
 
-          <div className={`alert ${Math.abs(results.skewness) < 0.5 ? 'alert-success' : Math.abs(results.skewness) < 1 ? 'alert-warning' : 'alert-danger'}`}>
-            {Math.abs(results.skewness) < 0.5 ? '✓ Distribution is approximately symmetric (|skewness| < 0.5). Normal distribution is a reasonable assumption.' :
-             Math.abs(results.skewness) < 1 ? '⚠ Moderate skewness detected. Consider a normality test before applying parametric methods.' :
-             '✕ High skewness detected. Consider nonparametric tests or data transformation.'}
+            <div className={`alert ${Math.abs(results.skewness) < 0.5 ? 'alert-success' : Math.abs(results.skewness) < 1 ? 'alert-warning' : 'alert-danger'}`}>
+              {Math.abs(results.skewness) < 0.5 ? '✓ Distribution is approximately symmetric (|skewness| < 0.5). Normal distribution is a reasonable assumption.' :
+                Math.abs(results.skewness) < 1 ? '⚠ Moderate skewness detected. Consider a normality test before applying parametric methods.' :
+                  '✕ High skewness detected. Consider nonparametric tests or data transformation.'}
+            </div>
           </div>
-          <button className="btn-secondary no-print" style={{ marginTop: '0.75rem' }} onClick={() => window.print()}>🖨️ Print Results</button>
+          <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+            <button className="btn-secondary no-print" onClick={() => window.print()}>🖨️ Print Results</button>
+            <button className="btn-primary no-print" onClick={handleAddToReport}>
+              {addedToReport ? '✓ Added to Report' : '📄 Add to Report'}
+            </button>
+          </div>
         </>
       )}
     </div>

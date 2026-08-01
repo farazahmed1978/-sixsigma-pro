@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
+import html2canvas from 'html2canvas';
 import { useWorksheet } from '../context/WorksheetContext';
+import { useReport } from '../context/ReportContext';
+import { interpretCorrelationMatrix } from '../utils/interpretations';
 
 const mean = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
 const pearson = (a, b) => {
@@ -19,19 +22,51 @@ const corrColor = (r) => {
 
 export default function CorrelationMatrix() {
   const { columns, getColumnData, hasData } = useWorksheet();
+  const { addReportItem } = useReport();
+  const chartWrapperRef = useRef(null);
   const [selectedCols, setSelectedCols] = useState([]);
   const [matrix, setMatrix] = useState(null);
+  const [addedToReport, setAddedToReport] = useState(false);
 
   const numCols = columns.filter(c => c.data.some(v => !isNaN(parseFloat(v))));
 
   const toggleCol = (name) => setSelectedCols(p => p.includes(name) ? p.filter(c => c !== name) : [...p, name]);
 
   const compute = () => {
+    setAddedToReport(false);
     const cols = selectedCols.map(name => ({ name, data: getColumnData(name) }));
     const n = cols.length;
     const mat = Array(n).fill(null).map((_, i) => Array(n).fill(null).map((_, j) => pearson(cols[i].data, cols[j].data)));
     setMatrix({ cols, mat });
   };
+
+  const handleAddToReport = useCallback(async () => {
+    if (!chartWrapperRef.current || !matrix) return;
+
+    const canvas = await html2canvas(chartWrapperRef.current, { backgroundColor: null, scale: 2 });
+    const chartImage = canvas.toDataURL('image/png');
+
+    const interpretation = interpretCorrelationMatrix(matrix);
+
+    const rawData = [];
+    for (let i = 0; i < matrix.cols.length; i++) {
+      for (let j = i + 1; j < matrix.cols.length; j++) {
+        rawData.push({ variableA: matrix.cols[i].name, variableB: matrix.cols[j].name, r: matrix.mat[i][j].toFixed(4) });
+      }
+    }
+
+    addReportItem({
+      title: `Correlation Matrix — ${matrix.cols.map(c => c.name).join(', ')}`,
+      toolId: 'correlation-matrix',
+      timestamp: new Date().toISOString(),
+      chartImage,
+      statsSummary: { 'Variables': matrix.cols.length, 'Pairs': rawData.length },
+      interpretation,
+      rawData,
+    });
+
+    setAddedToReport(true);
+  }, [matrix, addReportItem]);
 
   return (
     <div style={{ padding: '1.5rem' }}>
@@ -57,42 +92,49 @@ export default function CorrelationMatrix() {
 
       {matrix && (
         <>
-          <div style={{ overflowX: 'auto', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '1.25rem' }}>
-            <table style={{ borderCollapse: 'collapse', minWidth: '400px' }}>
-              <thead>
-                <tr>
-                  <th style={{ padding: '0.5rem 0.75rem', color: 'var(--text-muted)', fontSize: '0.75rem' }}></th>
-                  {matrix.cols.map(c => <th key={c.name} style={{ padding: '0.5rem 0.75rem', color: 'var(--text-secondary)', fontSize: '0.82rem', fontWeight: 600, textAlign: 'center' }}>{c.name}</th>)}
-                </tr>
-              </thead>
-              <tbody>
-                {matrix.cols.map((row, i) => (
-                  <tr key={row.name}>
-                    <td style={{ padding: '0.5rem 0.75rem', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{row.name}</td>
-                    {matrix.cols.map((col, j) => {
-                      const r = matrix.mat[i][j];
-                      const isdiag = i === j;
-                      return (
-                        <td key={col.name} style={{ padding: '0.6rem 0.85rem', textAlign: 'center', background: isdiag ? 'var(--bg-3)' : undefined, fontFamily: 'var(--font-mono)', fontSize: '0.9rem', fontWeight: isdiag ? 700 : 500, color: isdiag ? 'var(--text-muted)' : corrColor(r), borderBottom: '1px solid var(--border)' }}>
-                          {r.toFixed(3)}
-                        </td>
-                      );
-                    })}
+          <div ref={chartWrapperRef}>
+            <div style={{ overflowX: 'auto', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '1.25rem' }}>
+              <table style={{ borderCollapse: 'collapse', minWidth: '400px' }}>
+                <thead>
+                  <tr>
+                    <th style={{ padding: '0.5rem 0.75rem', color: 'var(--text-muted)', fontSize: '0.75rem' }}></th>
+                    {matrix.cols.map(c => <th key={c.name} style={{ padding: '0.5rem 0.75rem', color: 'var(--text-secondary)', fontSize: '0.82rem', fontWeight: 600, textAlign: 'center' }}>{c.name}</th>)}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {matrix.cols.map((row, i) => (
+                    <tr key={row.name}>
+                      <td style={{ padding: '0.5rem 0.75rem', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{row.name}</td>
+                      {matrix.cols.map((col, j) => {
+                        const r = matrix.mat[i][j];
+                        const isdiag = i === j;
+                        return (
+                          <td key={col.name} style={{ padding: '0.6rem 0.85rem', textAlign: 'center', background: isdiag ? 'var(--bg-3)' : undefined, fontFamily: 'var(--font-mono)', fontSize: '0.9rem', fontWeight: isdiag ? 700 : 500, color: isdiag ? 'var(--text-muted)' : corrColor(r), borderBottom: '1px solid var(--border)' }}>
+                            {r.toFixed(3)}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginTop: '1rem' }}>
-            {[['≥ 0.7', '#00c48c', 'Strong positive'], ['0.4–0.7', '#7c5ce8', 'Moderate positive'], ['−0.4 to −0.7', '#ff7d3b', 'Moderate negative'], ['≤ −0.7', '#ef4444', 'Strong negative']].map(([r, c, l]) => (
-              <div key={r} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.78rem' }}>
-                <span style={{ width: 10, height: 10, borderRadius: '50%', background: c, display: 'inline-block' }} />
-                <span style={{ color: 'var(--text-muted)' }}>{r} — {l}</span>
-              </div>
-            ))}
+            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginTop: '1rem' }}>
+              {[['≥ 0.7', '#00c48c', 'Strong positive'], ['0.4–0.7', '#7c5ce8', 'Moderate positive'], ['−0.4 to −0.7', '#ff7d3b', 'Moderate negative'], ['≤ −0.7', '#ef4444', 'Strong negative']].map(([r, c, l]) => (
+                <div key={r} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.78rem' }}>
+                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: c, display: 'inline-block' }} />
+                  <span style={{ color: 'var(--text-muted)' }}>{r} — {l}</span>
+                </div>
+              ))}
+            </div>
           </div>
-          <button className="btn-secondary no-print" style={{ marginTop: '1rem' }} onClick={() => window.print()}>🖨️ Print Matrix</button>
+          <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem', flexWrap: 'wrap' }}>
+            <button className="btn-secondary no-print" onClick={() => window.print()}>🖨️ Print Matrix</button>
+            <button className="btn-primary no-print" onClick={handleAddToReport}>
+              {addedToReport ? '✓ Added to Report' : '📄 Add to Report'}
+            </button>
+          </div>
         </>
       )}
     </div>
