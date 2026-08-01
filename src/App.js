@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { WorksheetProvider } from './context/WorksheetContext';
+import { ReportProvider } from './context/ReportContext';
 import Layout from './components/Layout';
 
 // Pages
@@ -13,6 +14,7 @@ import Pricing from './pages/Pricing';
 import HypothesisTesting from './pages/HypothesisTesting';
 import DOEPage from './pages/DOEPage';
 import Templates from './pages/Templates';
+import ReportBuilder from './pages/ReportBuilder';
 
 // Tool wrapper
 import ToolPage from './pages/ToolPage';
@@ -37,6 +39,11 @@ import MultiVariChart from './tools/MultiVariChart';
 import CorrelationMatrix from './tools/CorrelationMatrix';
 import RegressionTool from './tools/RegressionTool';
 
+// Bucket 3 — calculators
+import SigmaCalculator from './tools/SigmaCalculator';
+import SampleSizeCalculator from './tools/SampleSizeCalculator';
+import PowerCalculator from './tools/PowerCalculator';
+
 import './App.css';
 
 const toolMeta = {
@@ -56,6 +63,9 @@ const toolMeta = {
   'multivari': { title: 'Multi-Vari Chart', phase: 'Analyze', component: <MultiVariChart /> },
   'correlation': { title: 'Correlation Matrix', phase: 'Analyze', component: <CorrelationMatrix /> },
   'regression': { title: 'Regression Analysis', phase: 'Analyze', component: <RegressionTool /> },
+  'sigma-calculator': { title: 'Sigma Level / DPMO Calculator', phase: 'Measure', component: <SigmaCalculator /> },
+  'sample-size-calculator': { title: 'Sample Size Calculator', phase: 'Measure', component: <SampleSizeCalculator /> },
+  'power-calculator': { title: 'Power / Sample Size Calculator', phase: 'Measure', component: <PowerCalculator /> },
 };
 
 function ToolRoute({ toolId }) {
@@ -68,23 +78,26 @@ export default function App() {
   return (
     <ThemeProvider>
       <WorksheetProvider>
-        <Router>
-          <Layout>
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/worksheet" element={<Worksheet />} />
-              <Route path="/resources" element={<Resources />} />
-              <Route path="/about" element={<About />} />
-              <Route path="/pricing" element={<Pricing />} />
-              <Route path="/hypothesis" element={<HypothesisTesting />} />
-              <Route path="/doe" element={<DOEPage />} />
-              <Route path="/templates" element={<Templates />} />
-              {Object.keys(toolMeta).map(id => (
-                <Route key={id} path={`/tool/${id}`} element={<ToolRoute toolId={id} />} />
-              ))}
-            </Routes>
-          </Layout>
-        </Router>
+        <ReportProvider>
+          <Router>
+            <Layout>
+              <Routes>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/worksheet" element={<Worksheet />} />
+                <Route path="/resources" element={<Resources />} />
+                <Route path="/about" element={<About />} />
+                <Route path="/pricing" element={<Pricing />} />
+                <Route path="/hypothesis" element={<HypothesisTesting />} />
+                <Route path="/doe" element={<DOEPage />} />
+                <Route path="/templates" element={<Templates />} />
+                <Route path="/report" element={<ReportBuilder />} />
+                {Object.keys(toolMeta).map(id => (
+                  <Route key={id} path={`/tool/${id}`} element={<ToolRoute toolId={id} />} />
+                ))}
+              </Routes>
+            </Layout>
+          </Router>
+        </ReportProvider>
       </WorksheetProvider>
     </ThemeProvider>
   );
