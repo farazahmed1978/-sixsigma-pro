@@ -1,0 +1,259 @@
+.pw-page {
+  padding: 1.5rem 2rem 3rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.pw-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.pw-header h1 {
+  margin-bottom: 0.25rem;
+}
+
+.pw-header p {
+  color: var(--text-secondary);
+  max-width: 560px;
+}
+
+.pw-back-link {
+  display: inline-block;
+  margin-bottom: 1rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.pw-back-link:hover {
+  color: var(--accent);
+}
+
+/* ── New project form ── */
+.pw-new-form {
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+/* ── Project grid (list view) ── */
+.pw-project-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.pw-project-card {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.pw-project-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.pw-project-card-top h3 {
+  font-size: 1.05rem;
+  margin: 0;
+}
+
+.pw-delete-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  opacity: 0.5;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.pw-delete-btn:hover {
+  opacity: 1;
+}
+
+.pw-project-goal {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  margin: 0.4rem 0 0.9rem;
+}
+
+.pw-progress-track {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+  margin-bottom: 0.6rem;
+}
+
+.pw-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.pw-project-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+}
+
+.pw-progress-label {
+  font-weight: 600;
+}
+
+.pw-open-btn {
+  margin-top: auto;
+  text-align: center;
+  text-decoration: none;
+}
+
+/* ── Project detail header ── */
+.pw-header-card {
+  padding: 1.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.pw-header-meta-row {
+  display: flex;
+  gap: 1.25rem;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* ── Unassigned items ── */
+.pw-unassigned-card {
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.pw-hint {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  margin: 0.25rem 0 0.9rem;
+}
+
+.pw-unassigned-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.pw-unassigned-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+
+.pw-unassigned-item select {
+  font-size: 0.78rem;
+  padding: 0.25rem 0.5rem;
+}
+
+/* ── Phase board ── */
+.pw-phase-board {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(200px, 1fr));
+  gap: 1rem;
+  overflow-x: auto;
+}
+
+@media (max-width: 1100px) {
+  .pw-phase-board {
+    grid-template-columns: repeat(5, minmax(220px, 1fr));
+  }
+}
+
+.pw-phase-col {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--phase-color, var(--accent));
+  border-radius: 10px;
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-height: 220px;
+}
+
+.pw-phase-col-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 700;
+  font-size: 0.85rem;
+  margin-bottom: 0.25rem;
+}
+
+.pw-phase-count {
+  margin-left: auto;
+  background: var(--border);
+  border-radius: 999px;
+  padding: 0.05rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.pw-phase-empty {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 0.4rem 0;
+}
+
+.pw-phase-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.6rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.78rem;
+}
+
+.pw-remove-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 1rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.pw-remove-btn:hover {
+  color: var(--red, #d33);
+}
+
+.pw-phase-notes {
+  margin-top: auto;
+  resize: vertical;
+  min-height: 60px;
+  font-size: 0.78rem;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: inherit;
+}
