@@ -3,7 +3,7 @@ import html2canvas from 'html2canvas';
 import { useWorksheet } from '../context/WorksheetContext';
 import { useReport } from '../context/ReportContext';
 import { tCDF, normCDF, chiSquareCDF } from '../utils/statMath';
-import { oneWayAnova as verifiedOneWayAnova, pairedTTest, twoPropTest, wilcoxonSignedRank, friedmanTest, chiSquareIndependence, fishersExact } from '../utils/statTests';
+import { oneWayAnova as verifiedOneWayAnova, pairedTTest, twoPropTest, wilcoxonSignedRank, friedmanTest, chiSquareIndependence, fishersExact, pearsonCorrelationTest, spearmanCorrelationTest, kendallTauTest, dunnsTest } from '../utils/statTests';
 import { BOOK_EXCERPTS } from '../utils/bookExcerpts';
 import './HypothesisTesting.css';
 
@@ -94,6 +94,10 @@ const TESTS = [
   { id: '2prop', name: '2-Proportion Test', type: 'Discrete', desc: 'Compare two proportions from two independent samples', inputs: '2prop' },
   { id: 'chi2indep', name: 'Chi-Square Test of Independence', type: 'Discrete', desc: 'Test whether two categorical variables are associated', inputs: 'contingency' },
   { id: 'fisher', name: "Fisher's Exact Test", type: 'Discrete', desc: 'Exact test of association for a 2×2 table — more reliable than chi-square when counts are small', inputs: 'contingency' },
+  { id: 'pearson', name: 'Pearson Correlation', type: 'Continuous', desc: 'Test whether a linear correlation between two continuous variables is significant', inputs: 'two' },
+  { id: 'spearman', name: 'Spearman Correlation', type: 'Nonparametric', desc: 'Test whether a monotonic (rank-based) correlation between two variables is significant', inputs: 'two' },
+  { id: 'kendall', name: "Kendall's Tau", type: 'Nonparametric', desc: 'Rank correlation based on concordant/discordant pairs — robust alternative to Spearman for small samples or many tied ranks', inputs: 'two' },
+  { id: 'dunn', name: "Dunn's Test", type: 'Nonparametric', desc: 'Post-hoc pairwise comparisons following a significant Kruskal-Wallis result (3+ groups)', inputs: 'multi' },
 ];
 
 const typeColor = { Continuous: 'var(--green)', Nonparametric: 'var(--orange)', Discrete: 'var(--purple)' };// Builds a plain-English interpretation sentence and a compact stats summary for the
@@ -153,6 +157,24 @@ function buildReportContent(test, result) {
       summary = { 'Odds Ratio': result.oddsRatio === Infinity ? '∞' : result.oddsRatio.toFixed(4), 'p': pStr };
       interpretation = `Fisher's Exact Test on the 2×2 table (odds ratio=${result.oddsRatio === Infinity ? '∞' : result.oddsRatio.toFixed(3)}) gave ${verdict} (p=${pStr}).`;
       break;
+    case 'pearson':
+      summary = { 'n': result.n, 'r': result.r.toFixed(4), 't': result.t.toFixed(4), 'df': result.df, 'p': pStr };
+      interpretation = `Testing the linear correlation between the two variables (r=${result.r.toFixed(3)}, n=${result.n}) gave ${verdict} (t(${result.df})=${result.t.toFixed(3)}, p=${pStr}).`;
+      break;
+    case 'spearman':
+      summary = { 'n': result.n, 'ρ (rho)': result.rho.toFixed(4), 't': result.t.toFixed(4), 'df': result.df, 'p': pStr };
+      interpretation = `Testing the rank (monotonic) correlation between the two variables (ρ=${result.rho.toFixed(3)}, n=${result.n}) gave ${verdict} (t(${result.df})=${result.t.toFixed(3)}, p=${pStr}).`;
+      break;
+    case 'kendall':
+      summary = { 'n': result.n, 'τ (tau)': result.tau.toFixed(4), 'Z': result.z.toFixed(4), 'p': pStr };
+      interpretation = `Testing Kendall's rank correlation between the two variables (τ=${result.tau.toFixed(3)}, n=${result.n}) gave ${verdict} (Z=${result.z.toFixed(3)}, p=${pStr}).`;
+      break;
+    case 'dunn': {
+      const sigPairs = result.pairs.filter(pr => pr.pAdj < 0.05).map(pr => `${pr.a} vs ${pr.b}`).join(', ') || 'none';
+      summary = { 'Groups': result.meanRanks.length, 'N': result.N, 'Significant pairs (Bonferroni)': sigPairs };
+      interpretation = `Post-hoc pairwise comparisons across ${result.meanRanks.length} groups (N=${result.N}) found the following significant pairs at α=0.05 after Bonferroni correction: ${sigPairs}.`;
+      break;
+    }
     default:
       summary = { 'p': pStr };
       interpretation = `This test gave ${verdict} (p=${pStr}).`;
@@ -193,8 +215,7 @@ function ResultBox({ result, testId }) {
           <div><span>n (pairs)</span><strong>{result.n}</strong></div>
           <div><span>Mean Difference</span><strong>{result.meanDiff.toFixed(4)}</strong></div>
           <div><span>SD of Differences</span><strong>{result.sd.toFixed(4)}</strong></div>
-          <div><span>t-statistic</span><strong>{result.t.toFixed(4)}</strong></div>
-          <div><span>df</span><strong>{result.df}</strong></div>
+          <div><span>t-statistic</span><strong>{result.t.toFixed(4)}</strong></div><div><span>df</span><strong>{result.df}</strong></div>
           <div><span>95% CI</span><strong>[{result.ci[0].toFixed(3)}, {result.ci[1].toFixed(3)}]</strong></div>
         </>}
         {testId === 'anova' && <>
@@ -235,7 +256,8 @@ function ResultBox({ result, testId }) {
         {testId === '2prop' && <>
           <div><span>p̂₁</span><strong>{result.p1.toFixed(4)}</strong></div>
           <div><span>p̂₂</span><strong>{result.p2.toFixed(4)}</strong></div>
-          <div><span>Difference</span><strong>{result.diff.toFixed(4)}</strong></div><div><span>Z</span><strong>{result.z.toFixed(4)}</strong></div>
+          <div><span>Difference</span><strong>{result.diff.toFixed(4)}</strong></div>
+          <div><span>Z</span><strong>{result.z.toFixed(4)}</strong></div>
           <div><span>95% CI (diff)</span><strong>[{result.ci[0].toFixed(3)}, {result.ci[1].toFixed(3)}]</strong></div>
         </>}
         {testId === 'chi2indep' && <>
@@ -246,7 +268,47 @@ function ResultBox({ result, testId }) {
         {testId === 'fisher' && <>
           <div><span>Odds Ratio</span><strong>{result.oddsRatio === Infinity ? '∞' : result.oddsRatio.toFixed(4)}</strong></div>
         </>}
+        {testId === 'pearson' && <>
+          <div><span>n</span><strong>{result.n}</strong></div>
+          <div><span>r</span><strong>{result.r.toFixed(4)}</strong></div>
+          <div><span>t-statistic</span><strong>{result.t.toFixed(4)}</strong></div>
+          <div><span>df</span><strong>{result.df}</strong></div>
+        </>}
+        {testId === 'spearman' && <>
+          <div><span>n</span><strong>{result.n}</strong></div>
+          <div><span>ρ (rho)</span><strong>{result.rho.toFixed(4)}</strong></div>
+          <div><span>t-statistic</span><strong>{result.t.toFixed(4)}</strong></div>
+          <div><span>df</span><strong>{result.df}</strong></div>
+        </>}
+        {testId === 'kendall' && <>
+          <div><span>n</span><strong>{result.n}</strong></div>
+          <div><span>τ (tau)</span><strong>{result.tau.toFixed(4)}</strong></div>
+          <div><span>Z</span><strong>{result.z.toFixed(4)}</strong></div>
+        </>}
+        {testId === 'dunn' && <>
+          <div><span>Groups</span><strong>{result.meanRanks.length}</strong></div>
+          <div><span>N</span><strong>{result.N}</strong></div>
+          <div><span>Most Significant Pair (adj. p)</span><strong>{result.p < 0.001 ? '<0.001' : result.p.toFixed(4)}</strong></div>
+        </>}
       </div>
+
+      {testId === 'dunn' && (
+        <table className="data-table" style={{ marginTop: '1rem' }}>
+          <thead><tr><th>Pair</th><th>Z</th><th>p (raw)</th><th>p (Bonferroni-adjusted)</th></tr></thead>
+          <tbody>
+            {result.pairs.map((pr, i) => (
+              <tr key={i}>
+                <td>{pr.a} vs {pr.b}</td>
+                <td style={{ fontFamily: 'var(--font-mono)' }}>{pr.z.toFixed(4)}</td>
+                <td style={{ fontFamily: 'var(--font-mono)' }}>{pr.pRaw < 0.001 ? '<0.001' : pr.pRaw.toFixed(4)}</td>
+                <td style={{ fontFamily: 'var(--font-mono)', fontWeight: pr.pAdj < 0.05 ? 700 : 400, color: pr.pAdj < 0.05 ? 'var(--accent-light)' : 'var(--text-secondary)' }}>
+                  {pr.pAdj < 0.001 ? '<0.001' : pr.pAdj.toFixed(4)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
 
       <div className={`alert ${sig ? 'alert-success' : 'alert-info'}`} style={{ marginTop: '1rem' }}>
         {sig
@@ -272,8 +334,7 @@ export default function HypothesisTesting() {
 
   const handleAddToReport = useCallback(async () => {
     if (!resultRef.current || !result) return;
-    const test = TESTS.find(t => t.id === selectedTest);
-    const canvas = await html2canvas(resultRef.current, { backgroundColor: null, scale: 2 });
+    const test = TESTS.find(t => t.id === selectedTest);const canvas = await html2canvas(resultRef.current, { backgroundColor: null, scale: 2 });
     const chartImage = canvas.toDataURL('image/png');
     const { summary, interpretation } = buildReportContent(test, result);
     addReportItem({
@@ -359,6 +420,24 @@ export default function HypothesisTesting() {
         if (table.some(row => row.some(v => isNaN(v) || v < 0))) throw new Error('All table cells must be filled with non-negative numbers');
         if (table.length !== 2 || table[0].length !== 2) throw new Error("Fisher's Exact Test only supports a 2×2 table — use Chi-Square Test of Independence for larger tables");
         res = fishersExact(table);
+      } else if (test.id === 'pearson') {
+        if (d1.length < 3 || d2.length < 3) throw new Error('Need at least 3 paired data points in each column');
+        const minLen = Math.min(d1.length, d2.length);
+        res = pearsonCorrelationTest(d1.slice(0, minLen), d2.slice(0, minLen));
+      } else if (test.id === 'spearman') {
+        if (d1.length < 3 || d2.length < 3) throw new Error('Need at least 3 paired data points in each column');
+        const minLen = Math.min(d1.length, d2.length);
+        res = spearmanCorrelationTest(d1.slice(0, minLen), d2.slice(0, minLen));
+      } else if (test.id === 'kendall') {
+        if (d1.length < 3 || d2.length < 3) throw new Error('Need at least 3 paired data points in each column');
+        const minLen = Math.min(d1.length, d2.length);
+        res = kendallTauTest(d1.slice(0, minLen), d2.slice(0, minLen));
+      } else if (test.id === 'dunn') {
+        const groups = inputs.groups.map((g, i) => hasData && g ? getColumnData(g) : parseManual(inputs[`manualG${i}`] || ''));
+        const valid = groups.filter(g => g.length >= 2);
+        const validLabels = inputs.groups.map((g, i) => g || `Group ${i + 1}`).filter((_, i) => groups[i].length >= 2);
+        if (valid.length < 3) throw new Error('Need at least 3 groups with 2+ data points each');
+        res = dunnsTest(valid, validLabels);
       }
       setResult(res);
     } catch (e) {
