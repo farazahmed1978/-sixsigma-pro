@@ -26,6 +26,7 @@ import ToolPage from './pages/ToolPage';
 // Existing tools
 import ControlChart from './tools/ControlChart';
 import AttributeChart from './tools/AttributeChart';
+import EffectSizeTool from './tools/EffectSizeTool';
 import ParetoChart from './tools/ParetoChart';
 import Histogram from './tools/Histogram';
 import CapabilityAnalysis from './tools/CapabilityAnalysis';
@@ -57,6 +58,7 @@ import './App.css';
 const toolMeta = {
   'control-chart': { title: 'Control Chart', phase: 'Control', component: <ControlChart /> },
   'attribute-chart': { title: 'Attribute Charts (p/np/c/u)', phase: 'Control', component: <AttributeChart /> },
+  'effect-size': { title: 'Effect Size Calculators', phase: 'Analyze', component: <EffectSizeTool /> },
   'run-chart': { title: 'Run Chart', phase: 'Control', component: <RunChart /> },
   'capability': { title: 'Capability Analysis', phase: 'Measure', component: <CapabilityAnalysis /> },
   'histogram': { title: 'Histogram', phase: 'Analyze', component: <Histogram /> },
