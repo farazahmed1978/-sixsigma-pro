@@ -97,7 +97,8 @@ const TESTS = [
   { id: 'pearson', name: 'Pearson Correlation', type: 'Continuous', desc: 'Test whether a linear correlation between two continuous variables is significant', inputs: 'two' },
   { id: 'spearman', name: 'Spearman Correlation', type: 'Nonparametric', desc: 'Test whether a monotonic (rank-based) correlation between two variables is significant', inputs: 'two' },
   { id: 'kendall', name: "Kendall's Tau", type: 'Nonparametric', desc: 'Rank correlation based on concordant/discordant pairs — robust alternative to Spearman for small samples or many tied ranks', inputs: 'two' },
-  { id: 'dunn', name: "Dunn's Test", type: 'Nonparametric', desc: 'Post-hoc pairwise comparisons following a significant Kruskal-Wallis result (3+ groups)', inputs: 'multi' },];
+  { id: 'dunn', name: "Dunn's Test", type: 'Nonparametric', desc: 'Post-hoc pairwise comparisons following a significant Kruskal-Wallis result (3+ groups)', inputs: 'multi' },
+];
 
 const typeColor = { Continuous: 'var(--green)', Nonparametric: 'var(--orange)', Discrete: 'var(--purple)' };
 
@@ -227,7 +228,17 @@ function ResultBox({ result, testId }) {
       </div>
 
       <div className="ht-result-stats">
-        {testId === '1t' && <><div><span>n₂</span><strong>{result.nb}</strong></div>
+        {testId === '1t' && <>
+          <div><span>n</span><strong>{result.n}</strong></div>
+          <div><span>Mean</span><strong>{result.mean.toFixed(4)}</strong></div>
+          <div><span>Std Dev</span><strong>{result.stddev.toFixed(4)}</strong></div>
+          <div><span>t-statistic</span><strong>{result.t.toFixed(4)}</strong></div>
+          <div><span>df</span><strong>{result.df}</strong></div>
+          <div><span>95% CI</span><strong>[{result.ci[0].toFixed(3)}, {result.ci[1].toFixed(3)}]</strong></div>
+        </>}
+        {testId === '2t' && <>
+          <div><span>n₁</span><strong>{result.na}</strong></div>
+          <div><span>n₂</span><strong>{result.nb}</strong></div>
           <div><span>Mean₁</span><strong>{result.ma.toFixed(4)}</strong></div>
           <div><span>Mean₂</span><strong>{result.mb.toFixed(4)}</strong></div>
           <div><span>Difference</span><strong>{result.diff.toFixed(4)}</strong></div>
@@ -356,7 +367,8 @@ export default function HypothesisTesting() {
   const [addedToReport, setAddedToReport] = useState(false);
   const bookExcerpt = BOOK_EXCERPTS.hypothesis;
 
-  const handleAddToReport = useCallback(async () => {if (!resultRef.current || !result) return;
+  const handleAddToReport = useCallback(async () => {
+    if (!resultRef.current || !result) return;
     const test = TESTS.find(t => t.id === selectedTest);
     const canvas = await html2canvas(resultRef.current, { backgroundColor: null, scale: 2 });
     const chartImage = canvas.toDataURL('image/png');
@@ -485,7 +497,8 @@ export default function HypothesisTesting() {
               {showGuide ? '📊 Hide Guide' : '📖 Show Guide'}
             </button>
           )}
-          {result && <button className="btn-secondary no-print" onClick={printResult}>🖨️ Print Results</button>}</div>
+          {result && <button className="btn-secondary no-print" onClick={printResult}>🖨️ Print Results</button>}
+        </div>
       </div>
 
       {showGuide && bookExcerpt && (
@@ -614,7 +627,8 @@ export default function HypothesisTesting() {
                       <div key={i} className="form-group" style={{ marginBottom: '0.75rem' }}>
                         <label>Group {i + 1} {hasData ? 'Column' : 'Data'}</label>
                         {hasData && numCols.length > 0 ? (
-                          <select value={inputs.groups[i]} onChange={e => setInputs(p => { const g = [...p.groups]; g[i] = e.target.value; return { ...p, groups: g }; })}><option value="">— select —</option>
+                          <select value={inputs.groups[i]} onChange={e => setInputs(p => { const g = [...p.groups]; g[i] = e.target.value; return { ...p, groups: g }; })}>
+                            <option value="">— select —</option>
                             {numCols.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
                           </select>
                         ) : (
@@ -755,12 +769,3 @@ export default function HypothesisTesting() {
     </div>
   );
 }
-          <div><span>n</span><strong>{result.n}</strong></div>
-          <div><span>Mean</span><strong>{result.mean.toFixed(4)}</strong></div>
-          <div><span>Std Dev</span><strong>{result.stddev.toFixed(4)}</strong></div>
-          <div><span>t-statistic</span><strong>{result.t.toFixed(4)}</strong></div>
-          <div><span>df</span><strong>{result.df}</strong></div>
-          <div><span>95% CI</span><strong>[{result.ci[0].toFixed(3)}, {result.ci[1].toFixed(3)}]</strong></div>
-        </>}
-        {testId === '2t' && <>
-          <div><span>n₁</span><strong>{result.na}</strong></div>
