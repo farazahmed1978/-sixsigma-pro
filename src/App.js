@@ -43,6 +43,7 @@ import MultiVariChart from './tools/MultiVariChart';
 import CorrelationMatrix from './tools/CorrelationMatrix';
 import RegressionTool from './tools/RegressionTool';
 import MultipleRegressionTool from './tools/MultipleRegressionTool';
+import LogisticRegressionTool from './tools/LogisticRegressionTool';
 import AnovaTool from './tools/AnovaTool';
 
 // Bucket 3 — calculators
@@ -70,6 +71,7 @@ const toolMeta = {
   'correlation': { title: 'Correlation Matrix', phase: 'Analyze', component: <CorrelationMatrix /> },
   'regression': { title: 'Regression Analysis', phase: 'Analyze', component: <RegressionTool /> },
   'multiregression': { title: 'Multiple Regression', phase: 'Analyze', component: <MultipleRegressionTool /> },
+  'logistic': { title: 'Logistic Regression', phase: 'Analyze', component: <LogisticRegressionTool /> },
   'anova': { title: 'ANOVA', phase: 'Analyze', component: <AnovaTool /> },
   'sigma-calculator': { title: 'Sigma Level / DPMO Calculator', phase: 'Measure', component: <SigmaCalculator /> },
   'sample-size-calculator': { title: 'Sample Size Calculator', phase: 'Measure', component: <SampleSizeCalculator /> },
