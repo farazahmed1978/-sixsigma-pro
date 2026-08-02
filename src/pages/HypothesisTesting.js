@@ -3,7 +3,7 @@ import html2canvas from 'html2canvas';
 import { useWorksheet } from '../context/WorksheetContext';
 import { useReport } from '../context/ReportContext';
 import { tCDF, normCDF, chiSquareCDF } from '../utils/statMath';
-import { oneWayAnova as verifiedOneWayAnova, pairedTTest, twoPropTest, wilcoxonSignedRank, friedmanTest } from '../utils/statTests';
+import { oneWayAnova as verifiedOneWayAnova, pairedTTest, twoPropTest, wilcoxonSignedRank, friedmanTest, chiSquareIndependence, fishersExact } from '../utils/statTests';
 import { BOOK_EXCERPTS } from '../utils/bookExcerpts';
 import './HypothesisTesting.css';
 
@@ -92,11 +92,11 @@ const TESTS = [
   { id: 'chi2gof', name: 'Chi-Square Goodness of Fit', type: 'Discrete', desc: 'Test if observed counts match expected distribution', inputs: 'chi2gof' },
   { id: '1prop', name: '1-Proportion Test', type: 'Discrete', desc: 'Test if a proportion equals a target value', inputs: '1prop' },
   { id: '2prop', name: '2-Proportion Test', type: 'Discrete', desc: 'Compare two proportions from two independent samples', inputs: '2prop' },
+  { id: 'chi2indep', name: 'Chi-Square Test of Independence', type: 'Discrete', desc: 'Test whether two categorical variables are associated', inputs: 'contingency' },
+  { id: 'fisher', name: "Fisher's Exact Test", type: 'Discrete', desc: 'Exact test of association for a 2×2 table — more reliable than chi-square when counts are small', inputs: 'contingency' },
 ];
 
-const typeColor = { Continuous: 'var(--green)', Nonparametric: 'var(--orange)', Discrete: 'var(--purple)' };
-
-// Builds a plain-English interpretation sentence and a compact stats summary for the
+const typeColor = { Continuous: 'var(--green)', Nonparametric: 'var(--orange)', Discrete: 'var(--purple)' };// Builds a plain-English interpretation sentence and a compact stats summary for the
 // report, tailored to each test's specific statistic/field names.
 function buildReportContent(test, result) {
   const pStr = result.p < 0.001 ? '<0.001' : result.p.toFixed(4);
@@ -144,6 +144,14 @@ function buildReportContent(test, result) {
     case '2prop':
       summary = { 'p̂₁': result.p1.toFixed(4), 'p̂₂': result.p2.toFixed(4), 'Difference': result.diff.toFixed(4), 'Z': result.z.toFixed(4), 'p': pStr };
       interpretation = `Comparing two proportions (${result.p1.toFixed(4)} vs ${result.p2.toFixed(4)}, difference=${result.diff.toFixed(4)}) gave ${verdict} (Z=${result.z.toFixed(3)}, p=${pStr}).`;
+      break;
+    case 'chi2indep':
+      summary = { 'χ²': result.chi2.toFixed(4), 'df': result.df, 'N': result.grandTotal, 'p': pStr };
+      interpretation = `Testing association between the two categorical variables (N=${result.grandTotal}) gave ${verdict} (χ²(${result.df})=${result.chi2.toFixed(3)}, p=${pStr}).`;
+      break;
+    case 'fisher':
+      summary = { 'Odds Ratio': result.oddsRatio === Infinity ? '∞' : result.oddsRatio.toFixed(4), 'p': pStr };
+      interpretation = `Fisher's Exact Test on the 2×2 table (odds ratio=${result.oddsRatio === Infinity ? '∞' : result.oddsRatio.toFixed(3)}) gave ${verdict} (p=${pStr}).`;
       break;
     default:
       summary = { 'p': pStr };
@@ -217,7 +225,8 @@ function ResultBox({ result, testId }) {
         </>}
         {testId === 'chi2gof' && <>
           <div><span>χ²</span><strong>{result.chi2.toFixed(4)}</strong></div>
-          <div><span>df</span><strong>{result.df}</strong></div></>}
+          <div><span>df</span><strong>{result.df}</strong></div>
+        </>}
         {testId === '1prop' && <>
           <div><span>p̂ (sample)</span><strong>{result.phat.toFixed(4)}</strong></div>
           <div><span>Z</span><strong>{result.z.toFixed(4)}</strong></div>
@@ -226,9 +235,16 @@ function ResultBox({ result, testId }) {
         {testId === '2prop' && <>
           <div><span>p̂₁</span><strong>{result.p1.toFixed(4)}</strong></div>
           <div><span>p̂₂</span><strong>{result.p2.toFixed(4)}</strong></div>
-          <div><span>Difference</span><strong>{result.diff.toFixed(4)}</strong></div>
-          <div><span>Z</span><strong>{result.z.toFixed(4)}</strong></div>
+          <div><span>Difference</span><strong>{result.diff.toFixed(4)}</strong></div><div><span>Z</span><strong>{result.z.toFixed(4)}</strong></div>
           <div><span>95% CI (diff)</span><strong>[{result.ci[0].toFixed(3)}, {result.ci[1].toFixed(3)}]</strong></div>
+        </>}
+        {testId === 'chi2indep' && <>
+          <div><span>χ²</span><strong>{result.chi2.toFixed(4)}</strong></div>
+          <div><span>df</span><strong>{result.df}</strong></div>
+          <div><span>N</span><strong>{result.grandTotal}</strong></div>
+        </>}
+        {testId === 'fisher' && <>
+          <div><span>Odds Ratio</span><strong>{result.oddsRatio === Infinity ? '∞' : result.oddsRatio.toFixed(4)}</strong></div>
         </>}
       </div>
 
@@ -246,7 +262,7 @@ export default function HypothesisTesting() {
   const { addReportItem } = useReport();
   const resultRef = useRef(null);
   const [selectedTest, setSelectedTest] = useState(null);
-  const [inputs, setInputs] = useState({ col1: '', col2: '', mu0: 0, p0: 0.5, x: 10, n: 100, x1: 10, n1: 100, x2: 10, n2: 100, observed: '', expected: '', groups: ['', '', ''] });
+  const [inputs, setInputs] = useState({ col1: '', col2: '', mu0: 0, p0: 0.5, x: 10, n: 100, x1: 10, n1: 100, x2: 10, n2: 100, observed: '', expected: '', groups: ['', '', ''], tableRows: 2, tableCols: 2, table: [['', ''], ['', '']] });
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [typeFilter, setTypeFilter] = useState('All');
@@ -333,10 +349,21 @@ export default function HypothesisTesting() {
         if (valid.length < 3) throw new Error('Need at least 3 paired conditions with 2+ data points each');
         const minLen = Math.min(...valid.map(g => g.length));
         res = friedmanTest(valid.map(g => g.slice(0, minLen)));
+      } else if (test.id === 'chi2indep') {
+        const table = inputs.table.map(row => row.map(v => parseFloat(v)));
+        if (table.some(row => row.some(v => isNaN(v) || v < 0))) throw new Error('All table cells must be filled with non-negative numbers');
+        if (table.length < 2 || table[0].length < 2) throw new Error('Need at least a 2×2 table');
+        res = chiSquareIndependence(table);
+      } else if (test.id === 'fisher') {
+        const table = inputs.table.map(row => row.map(v => parseFloat(v)));
+        if (table.some(row => row.some(v => isNaN(v) || v < 0))) throw new Error('All table cells must be filled with non-negative numbers');
+        if (table.length !== 2 || table[0].length !== 2) throw new Error("Fisher's Exact Test only supports a 2×2 table — use Chi-Square Test of Independence for larger tables");
+        res = fishersExact(table);
       }
       setResult(res);
     } catch (e) {
-      setError(e.message);}
+      setError(e.message);
+    }
   };
 
   const printResult = () => window.print();
@@ -347,8 +374,7 @@ export default function HypothesisTesting() {
       <div className="ht-header">
         <div>
           <h1>Hypothesis Testing</h1>
-          <p>Select a test, choose your data, and get instant statistical results with interpretation.</p>
-        </div>
+          <p>Select a test, choose your data, and get instant statistical results with interpretation.</p></div>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           {bookExcerpt && (
             <button className={`btn ${showGuide ? 'btn-primary' : 'btn-ghost'} no-print`} onClick={() => setShowGuide(g => !g)}>
@@ -388,7 +414,10 @@ export default function HypothesisTesting() {
               <button
                 key={test.id}
                 className={`ht-test-btn ${selectedTest === test.id ? 'active' : ''}`}
-                onClick={() => { setSelectedTest(test.id); setResult(null); setError(''); }}
+                onClick={() => {
+                  setSelectedTest(test.id); setResult(null); setError('');
+                  if (test.id === 'fisher') setInputs(p => ({ ...p, tableRows: 2, tableCols: 2, table: [['', ''], ['', '']] }));
+                }}
               >
                 <div className="ht-test-header">
                   <span className="ht-test-name">{test.name}</span>
@@ -455,7 +484,8 @@ export default function HypothesisTesting() {
                           <label>Group 2 Column</label>
                           <select value={inputs.col2} onChange={e => setInputs(p => ({ ...p, col2: e.target.value }))}>
                             <option value="">— select —</option>
-                            {numCols.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}</select>
+                            {numCols.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+                          </select>
                         </div>
                       </div>
                     ) : (
@@ -483,8 +513,7 @@ export default function HypothesisTesting() {
                         {hasData && numCols.length > 0 ? (
                           <select value={inputs.groups[i]} onChange={e => setInputs(p => { const g = [...p.groups]; g[i] = e.target.value; return { ...p, groups: g }; })}>
                             <option value="">— select —</option>
-                            {numCols.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
-                          </select>
+                            {numCols.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}</select>
                         ) : (
                           <textarea className="ws-textarea" rows={3} value={inputs[`manualG${i}`] || ''} onChange={e => setInputs(p => ({ ...p, [`manualG${i}`]: e.target.value }))} placeholder="values, comma or line separated" />
                         )}
@@ -543,6 +572,62 @@ export default function HypothesisTesting() {
                       <label>Group 2 — Sample Size (n₂)</label>
                       <input type="number" value={inputs.n2} onChange={e => setInputs(p => ({ ...p, n2: e.target.value }))} />
                     </div>
+                  </div>
+                )}
+
+                {/* Contingency table inputs (Chi-Square Independence + Fisher's Exact) */}
+                {TESTS.find(t => t.id === selectedTest)?.inputs === 'contingency' && (
+                  <div>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+                      Enter observed counts for each combination of the two categorical variables.
+                      {selectedTest === 'fisher' && ' Fisher\'s Exact Test only supports a 2×2 table.'}
+                    </p>
+                    {selectedTest === 'chi2indep' && (
+                      <div className="form-grid" style={{ marginBottom: '1rem' }}>
+                        <div className="form-group">
+                          <label>Rows</label>
+                          <select value={inputs.tableRows} onChange={e => {
+                            const rows = parseInt(e.target.value);
+                            setInputs(p => {
+                              const newTable = Array.from({ length: rows }, (_, i) => p.table[i] || Array.from({ length: p.tableCols }, () => ''));
+                              return { ...p, tableRows: rows, table: newTable };
+                            });
+                          }}>
+                            {[2, 3, 4, 5].map(n => <option key={n} value={n}>{n}</option>)}
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label>Columns</label>
+                          <select value={inputs.tableCols} onChange={e => {
+                            const cols = parseInt(e.target.value);
+                            setInputs(p => {
+                              const newTable = p.table.map(row => Array.from({ length: cols }, (_, j) => row[j] || ''));
+                              return { ...p, tableCols: cols, table: newTable };
+                            });
+                          }}>
+                            {[2, 3, 4, 5].map(n => <option key={n} value={n}>{n}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                    )}
+                    <table className="data-table" style={{ width: 'auto' }}>
+                      <tbody>
+                        {inputs.table.map((row, i) => (
+                          <tr key={i}>
+                            {row.map((val, j) => (
+                              <td key={j}>
+                                <input type="number" value={val} style={{ width: '80px' }}
+                                  onChange={e => setInputs(p => {
+                                    const newTable = p.table.map(r => [...r]);
+                                    newTable[i][j] = e.target.value;
+                                    return { ...p, table: newTable };
+                                  })} />
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 )}
 
