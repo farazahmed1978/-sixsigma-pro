@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { BOOK_EXCERPTS } from '../utils/bookExcerpts';
+import { doeFullFactorialAnalysis } from '../utils/statTests';
 import './DOEPage.css';
 
 function generateFullFactorial(factors) {
@@ -76,20 +77,34 @@ export default function DOEPage() {
 
   const analyze = () => {
     if (!matrix) return;
-    const filled = results.filter(r => r.response !== '' && !isNaN(parseFloat(r.response)));
-    if (filled.length < matrix.rows.length / 2) return;
-    // Simple main effects calculation
+    const filled = results.filter(r => r.response !== '' && !isNaN(parseFloat(r.response)));if (filled.length < matrix.rows.length / 2) return;
     const withResp = matrix.rows.map((row, i) => ({ ...row, response: parseFloat(results[i]?.response) })).filter(r => !isNaN(r.response));
-    const grandMean = withResp.reduce((s, r) => s + r.response, 0) / withResp.length;
-    const effects = matrix.factors.map(f => {
-      const high = withResp.filter(r => r[f.name] === f.high).map(r => r.response);
-      const low = withResp.filter(r => r[f.name] === f.low).map(r => r.response);
-      const meanHigh = high.reduce((s, v) => s + v, 0) / high.length;
-      const meanLow = low.reduce((s, v) => s + v, 0) / low.length;
-      const effect = meanHigh - meanLow;
-      return { factor: f.name, effect, meanHigh: meanHigh.toFixed(3), meanLow: meanLow.toFixed(3) };});
-    effects.sort((a, b) => Math.abs(b.effect) - Math.abs(a.effect));
-    setMatrix(p => ({ ...p, effects, grandMean }));
+
+    if (design === 'full') {
+      // Full factorial: every main effect and every interaction can be estimated cleanly
+      // (no aliasing), so run the complete effects + ANOVA engine.
+      const rows = withResp.map(r => ({
+        factorCodes: Object.fromEntries(matrix.factors.map(f => [f.name, r[f.name] === f.high ? 1 : -1])),
+        value: r.response,
+      }));
+      const analysis = doeFullFactorialAnalysis(rows, matrix.factors.map(f => f.name));
+      setMatrix(p => ({ ...p, fullAnalysis: analysis, effects: null }));
+    } else {
+      // Fractional factorial: main effects here are aliased with higher-order interactions
+      // (and interactions with each other), so a clean full-effects ANOVA isn't valid without
+      // tracking the specific alias structure. Keep the simpler main-effects-only view.
+      const grandMean = withResp.reduce((s, r) => s + r.response, 0) / withResp.length;
+      const effects = matrix.factors.map(f => {
+        const high = withResp.filter(r => r[f.name] === f.high).map(r => r.response);
+        const low = withResp.filter(r => r[f.name] === f.low).map(r => r.response);
+        const meanHigh = high.reduce((s, v) => s + v, 0) / high.length;
+        const meanLow = low.reduce((s, v) => s + v, 0) / low.length;
+        const effect = meanHigh - meanLow;
+        return { factor: f.name, effect, meanHigh: meanHigh.toFixed(3), meanLow: meanLow.toFixed(3) };
+      });
+      effects.sort((a, b) => Math.abs(b.effect) - Math.abs(a.effect));
+      setMatrix(p => ({ ...p, effects, grandMean, fullAnalysis: null }));
+    }
   };
 
   const totalRuns = (() => {
@@ -156,8 +171,7 @@ export default function DOEPage() {
             </select>
           </div>
 
-          <div className="section-title" style={{ marginBottom: '0.75rem' }}>Factors</div>
-          {factors.map((f, i) => (
+          <div className="section-title" style={{ marginBottom: '0.75rem' }}>Factors</div>{factors.map((f, i) => (
             <div key={i} className="doe-factor-row">
               <input type="text" placeholder="Factor name" value={f.name} onChange={e => updateFactor(i, 'name', e.target.value)} style={{ flex: 2 }} />
               <input type="text" placeholder="Low (−)" value={f.low} onChange={e => updateFactor(i, 'low', e.target.value)} style={{ flex: 1 }} />
@@ -175,7 +189,9 @@ export default function DOEPage() {
           )}
 
           <button className="btn-primary" style={{ width: '100%', marginTop: '0.75rem' }} onClick={generate}>Generate Design Matrix</button>
-        </div>{/* Matrix + results */}
+        </div>
+
+        {/* Matrix + results */}
         <div className="doe-right">
           {!matrix ? (
             <div className="empty-state card">
@@ -223,9 +239,54 @@ export default function DOEPage() {
                 </div>
               </div>
 
+              {matrix.fullAnalysis && (
+                <div className="card" style={{ marginTop: '1.25rem' }}>
+                  <div className="section-title" style={{ marginBottom: '0.5rem' }}>Effects &amp; ANOVA — Full Factorial</div>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+                    Grand mean: <strong style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{matrix.fullAnalysis.grandMean.toFixed(3)}</strong>
+                    {matrix.fullAnalysis.hasReplication
+                      ? <> — Error: SS={matrix.fullAnalysis.ssError.toFixed(3)}, df={matrix.fullAnalysis.dfError}, MS={matrix.fullAnalysis.msError.toFixed(4)}</>
+                      : <span style={{ color: 'var(--orange)' }}> — No replication: effects are estimable, but there's no error term to compute p-values from. Add replicates (left panel) for significance testing, or judge magnitude only.</span>
+                    }
+                  </p>
+                  <table className="data-table">
+                    <thead>
+                      <tr><th>Term</th><th>Order</th><th>Effect</th><th>SS</th>{matrix.fullAnalysis.hasReplication && <><th>F</th><th>p</th></>}<th>Impact</th></tr>
+                    </thead>
+                    <tbody>
+                      {matrix.fullAnalysis.effects.map(e => {
+                        const maxSs = Math.max(...matrix.fullAnalysis.effects.map(x => x.ss));const sig = e.p !== null && e.p < 0.05;
+                        return (
+                          <tr key={e.term}>
+                            <td style={{ fontWeight: e.order === 1 ? 600 : 400, color: 'var(--text-primary)' }}>{e.term}</td>
+                            <td style={{ color: 'var(--text-muted)' }}>{e.order === 1 ? 'Main' : `${e.order}-way`}</td>
+                            <td style={{ fontFamily: 'var(--font-mono)', color: e.effect > 0 ? 'var(--green)' : 'var(--red)', fontWeight: 600 }}>
+                              {e.effect > 0 ? '+' : ''}{e.effect.toFixed(4)}
+                            </td>
+                            <td style={{ fontFamily: 'var(--font-mono)' }}>{e.ss.toFixed(3)}</td>
+                            {matrix.fullAnalysis.hasReplication && <>
+                              <td style={{ fontFamily: 'var(--font-mono)' }}>{e.F.toFixed(3)}</td>
+                              <td style={{ fontFamily: 'var(--font-mono)', fontWeight: sig ? 700 : 400, color: sig ? 'var(--accent-light)' : 'var(--text-secondary)' }}>{e.p < 0.001 ? '<0.001' : e.p.toFixed(4)}</td>
+                            </>}
+                            <td>
+                              <div style={{ width: '80px', height: '6px', background: 'var(--bg-3)', borderRadius: '3px', overflow: 'hidden' }}>
+                                <div style={{ width: `${Math.min(100, e.ss / maxSs * 100)}%`, height: '100%', background: e.effect > 0 ? 'var(--green)' : 'var(--red)', borderRadius: '3px' }} />
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
               {matrix.effects && (
                 <div className="card" style={{ marginTop: '1.25rem' }}>
-                  <div className="section-title" style={{ marginBottom: '1rem' }}>Main Effects Analysis</div>
+                  <div className="section-title" style={{ marginBottom: '0.5rem' }}>Main Effects Analysis</div>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--orange)', marginBottom: '0.75rem' }}>
+                    Fractional design — main effects here may be aliased with (confounded with) higher-order interactions, so interaction effects aren't shown separately. Use a full factorial design if you need clean interaction estimates.
+                  </p>
                   <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>Grand mean: <strong style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{matrix.grandMean.toFixed(3)}</strong></p>
                   <table className="data-table">
                     <thead>
