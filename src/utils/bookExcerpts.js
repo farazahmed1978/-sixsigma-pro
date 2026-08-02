@@ -1,154 +1,300 @@
-// Excerpts from "The Black Belt Standard: IASSC Exam Prep & Practitioner Guide" by Faraz Ahmed,
-// mapped to the tool(s) they apply to. Shown as a "From the Book" panel on ToolPage.js so a user
-// stuck on a tool can read the underlying concept without leaving the app.
-//
-// Keys match toolMeta ids in App.js (for /tool/:id pages) plus a couple of standalone routes
-// ('hypothesis', 'doe'). Where one book section covers multiple tools (e.g. Gage R&R covers both
-// 'msa' and 'gage-rr'), the same entry is reused under both keys.
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { BOOK_EXCERPTS } from '../utils/bookExcerpts';
+import './Resources.css';
 
-export const BOOK_EXCERPTS = {
-  pareto: {
-    chapter: '1.2.4 — Pareto Analysis: The 80/20 Rule in Practice',
-    text: `When a quality problem involves multiple defect types, multiple failure modes, or multiple root causes, human nature is to try to fix everything simultaneously. Pareto analysis is the discipline of resisting that impulse. Named after Italian economist Vilfredo Pareto, who observed in 1896 that 80% of Italy's land was owned by 20% of the people, Joseph Juran recognized the same 80/20 pattern in quality data: typically 80% of defects come from 20% of the defect types. He called the high-frequency causes the "vital few" and the low-frequency causes the "trivial many."
-
-How to read a Pareto chart: bars are arranged in descending order of frequency (most common on the left). A cumulative percentage line rises from left to right. The point where the cumulative line crosses 80% marks the boundary between the vital few and the trivial many. Address the vital few first.
-
-Exam note: Pareto analysis is a prioritization tool. It tells you WHERE to focus effort. It does not tell you WHY the problem is happening. Root cause investigation (fishbone, hypothesis testing) happens in Analyze.`,
+const resources = [
+  {
+    phase: 'Define',
+    color: 'var(--yellow)',
+    icon: '🎯',
+    tools: [
+      {
+        name: 'Project Charter',
+        desc: 'Document the problem, goals, scope, timeline, and team for your Six Sigma project.',
+        steps: ['Define the problem statement clearly', 'Set SMART goals (Specific, Measurable, Achievable, Relevant, Time-bound)', 'Establish project scope (what is in/out)', 'Identify team members and stakeholders', 'Set timeline and milestones'],
+        tips: 'A good problem statement describes WHAT is wrong, WHERE it is happening, and the MAGNITUDE of the problem without attributing causes.',
+        bookKey: 'charter',
+      },
+      {
+        name: 'SIPOC Diagram',
+        desc: 'High-level process map showing Suppliers, Inputs, Process, Outputs, and Customers.',
+        steps: ['Start with the Process column (5-7 high-level steps)', 'Work outward to Outputs and Customers', 'Work backward to Inputs and Suppliers', 'Keep it high-level — one page maximum'],
+        tips: 'SIPOC is read right-to-left during creation (start with customer needs), but presented left-to-right.',
+        bookKey: 'sipoc',
+      },
+      {
+        name: 'Voice of Customer (VoC)',
+        desc: 'Capture what customers truly need and translate into measurable CTQs.',
+        steps: ['Identify customer segments', 'Collect data via surveys, interviews, complaints', 'Use Kano model to classify needs', 'Convert VoC to Critical to Quality (CTQ) requirements'],
+        tips: 'Listen for the "voice behind the voice" — customers often describe symptoms, not root needs.',
+        bookKey: 'voc',
+      },
+    ],
   },
-
-  fishbone: {
-    chapter: '2.1.1 — Cause-and-Effect Analysis: The Fishbone Diagram',
-    text: `The fishbone diagram — also called the Ishikawa diagram after its inventor Kaoru Ishikawa, or the cause-and-effect diagram — is the structured tool for generating a comprehensive list of every possible reason a process failure could be occurring. Before the team can confirm what is causing the problem, it must first build an exhaustive list of what could be causing it.
-
-Think of the fishbone diagram as a brainstorm with a skeleton. Without the skeleton, team brainstorms produce duplicates, ignore whole categories, and gravitate toward the two or three causes the loudest voices favor. The fishbone provides structure: each major bone represents a category of causes, and team members hang individual candidate causes as ribs.
-
-The six M categories and what they cover: Man (People) — training level, experience, fatigue, attention, adherence to procedures (people are rarely the true root cause — they usually respond rationally to a broken system). Machine — equipment, tooling, calibration status, preventive maintenance, age and wear. Method — procedures, work instructions, whether standard work exists and is followed. Material — raw materials, components, supplier variation, lot-to-lot inconsistency. Measurement — the measurement system itself: calibration, Gage R&R, resolution, operator technique. Mother Nature (Environment) — temperature, humidity, dust, vibration, seasonal variation.
-
-Critical distinction: the fishbone diagram identifies candidate causes. It does not confirm root causes. Every branch is a hypothesis to be tested in Analyze — never treat a fishbone item as a confirmed root cause without statistical testing.`,
+  {
+    phase: 'Measure',
+    color: 'var(--green)',
+    icon: '📏',
+    tools: [
+      {
+        name: 'Measurement System Analysis (MSA)',
+        desc: 'Verify your measurement system is trustworthy before collecting process data.',
+        steps: ['Select 10 parts spanning the process range', 'Have 2-3 operators measure each part 2-3 times (blind)', 'Calculate %GRR and number of distinct categories (NDC)', 'Accept if %GRR < 10%, investigate if 10-30%, reject if >30%'],
+        tips: '%GRR < 10% = Excellent. NDC ≥ 5 means the gage can distinguish process variation.',
+        link: '/tool/msa',
+        bookKey: 'msa',
+      },
+      {
+        name: 'Process Capability',
+        desc: 'Quantify how well the current process meets specification limits.',
+        steps: ['Verify process is in statistical control first (control chart)', 'Collect at least 30-100 data points', 'Define LSL and USL from specifications', 'Calculate Cp, Cpk, and sigma level', 'Benchmark against Cpk ≥ 1.33 target'],
+        tips: 'Cp measures potential capability (process spread vs. spec width). Cpk measures actual capability (accounting for centering).',
+        link: '/tool/capability',
+        bookKey: 'capability',
+      },
+      {
+        name: 'Data Collection Plan',
+        desc: 'Structured approach to collecting the right data, at the right time, in the right way.',
+        steps: ['Identify what to measure (Y variables and potential Xs)', 'Determine sample size (statistical power)', 'Define operational definitions', 'Design data collection forms', 'Pilot test the plan with small sample'],
+        tips: 'Operational definitions are critical — everyone must measure the same thing the same way.',
+        bookKey: 'data-collection',
+      },
+    ],
   },
-
-  fmea: {
-    chapter: '2.1.4 — FMEA: Failure Mode and Effects Analysis',
-    text: `FMEA asks a different question than the fishbone: of everything that could go wrong, which failure modes represent the most serious risk — and what should we do proactively before they happen? It is a structured risk assessment that drives preventive action across multiple DMAIC phases.
-
-Each failure mode is rated on three dimensions: Severity (S) — impact on the customer if the failure occurs, rated 1-10 (1=no effect, 10=hazardous without warning). Occurrence (O) — how frequently this failure mode is expected to happen, rated 1-10 (1=extremely unlikely, 10=almost certain). Detection (D) — how likely the current process is to catch this failure before it reaches the customer, rated 1-10 (1=near-certain detection, 10=no detection capability).
-
-RPN = Severity × Occurrence × Detection (range: 1 to 1,000)
-
-Three rules worth knowing well: (1) RPN = S × O × D — never add the three scores. Multiplication ensures that an extreme value in any one dimension creates a correspondingly extreme RPN. (2) Any failure mode with Severity ≥ 9 requires immediate action regardless of RPN — S=10, O=1, D=1 gives RPN=10, but the potential for a safety hazard demands action regardless of the low overall score. (3) To reduce RPN: reduce Occurrence (improve the process to prevent the failure) or improve Detection (add a control to catch it earlier). Severity cannot be reduced by process improvement — it is fixed by the nature of the failure and its customer impact.`,
+  {
+    phase: 'Analyze',
+    color: 'var(--orange)',
+    icon: '🔍',
+    tools: [
+      {
+        name: 'Pareto Analysis',
+        desc: 'Use the 80/20 rule to identify the vital few causes driving most of your problems.',
+        steps: ['Collect defect frequency data by category', 'Sort categories from most to least frequent', 'Calculate cumulative percentage', 'Draw the bar chart with cumulative line', 'Focus improvement on categories below 80% cumulative'],
+        tips: 'Always validate Pareto with data. The "vital few" may shift over time as you implement improvements.',
+        link: '/tool/pareto',
+        bookKey: 'pareto',
+      },
+      {
+        name: 'Fishbone (Ishikawa) Diagram',
+        desc: 'Structured brainstorming tool to identify all potential root causes using 6M framework.',
+        steps: ['Write the problem (effect) on the right side', 'Draw the spine and 6M bones: Man, Machine, Method, Material, Measurement, Mother Nature', 'Brainstorm causes for each category', 'Ask "Why?" 5 times for each cause', 'Prioritize causes based on data'],
+        tips: '5-Why drilling is essential — the first cause you identify is rarely the true root cause.',
+        link: '/tool/fishbone',
+        bookKey: 'fishbone',
+      },
+      {
+        name: 'Hypothesis Testing',
+        desc: 'Statistically validate whether differences between groups are significant or due to random chance.',
+        steps: ['State null hypothesis (H₀) and alternative hypothesis (H₁)', 'Choose significance level α = 0.05', 'Select appropriate test (t-test, ANOVA, chi-square)', 'Calculate p-value', 'Reject H₀ if p < α'],
+        tips: 'A p-value < 0.05 means there is less than 5% probability the result occurred by chance. It does NOT prove the alternative is true.',
+        link: '/hypothesis',
+        bookKey: 'hypothesis',
+      },
+      {
+        name: 'Regression Analysis',
+        desc: 'Quantify relationships between input variables (Xs) and output variables (Ys).',
+        steps: ['Plot scatter diagram to visualize relationship', 'Calculate Pearson correlation coefficient r', 'Fit regression model', 'Assess R² (coefficient of determination)', 'Validate assumptions (residual normality, homoscedasticity)'],
+        tips: 'R² tells you what % of Y variation is explained by X. Correlation ≠ causation — always validate with physical reasoning.',
+        link: '/tool/scatter',
+        bookKey: 'regression',
+      },
+      {
+        name: 'ANOVA',
+        desc: 'Compare means across three or more groups to see if at least one is genuinely different.',
+        steps: ['State H₀: all group means are equal', 'Check normality per group (Anderson-Darling)', 'Check equal variances (Bartlett\u2019s or Levene\u2019s)', 'Run ANOVA — get F-statistic and p-value', 'If p ≤ α, run a post-hoc test (Tukey\u2019s HSD) to find which groups differ'],
+        tips: 'ANOVA tells you at least one mean differs — it does not tell you which one. That requires a post-hoc test.',
+        link: '/tool/anova',
+        bookKey: 'anova',
+      },
+    ],
   },
-
-  vsm: {
-    chapter: '2.1.2 — Value Stream Mapping: Seeing Waste Through the Customer\u2019s Eyes',
-    text: `A standard process flowchart shows what steps exist. A Value Stream Map (VSM) shows what those steps actually deliver in terms of customer value — and where value is being destroyed. The VSM adds three layers of information a flowchart lacks: the time dimension (how long each step takes and how long material waits between steps), the inventory dimension (WIP queued at each location), and the quality dimension (first-pass yield at each step).
-
-Takt Time and Process Cycle Efficiency (PCE) are the key metrics that anchor the VSM quantitatively. On the VSM, every process step's cycle time is compared directly against takt time: any step with a cycle time above takt time is a bottleneck.
-
-Takt Time = Available production time / Customer demand rate. Example: 8-hour shift, 30 minutes breaks → available time = 450 minutes. Customer needs 500 units per day. Takt time = 450/500 = 0.90 minutes per unit (54 seconds). Any step with cycle time > 54 seconds is a bottleneck limiting the entire value stream.
-
-PCE = Value-Added Time / Total Lead Time × 100%. World-class manufacturing targets PCE above 25%. Most manufacturing processes run at 5-15%. Service and administrative processes often run below 5%. A PCE of 6% means the product spends 94% of its time waiting — not being transformed. That 94% is the target for Lean improvement.`,
-  },msa: {
-    chapter: '2.3.3 — Gage Repeatability and Reproducibility',
-    text: `Repeatability (Equipment Variation — EV) is variation when the same operator measures the same part with the same gage multiple times. A property of the equipment. Poor repeatability means the gage gives inconsistent readings even with everything else held constant. Root causes: mechanical wear, electronic noise, vibration.
-
-Reproducibility (Appraiser Variation — AV) is variation when different operators measure the same part with the same gage. A property of the operators and measurement procedure. Poor reproducibility means different people get systematically different readings. Root causes: inconsistent technique, different holding positions, inadequate training.
-
-Standard Crossed Gage R&R study: 3 operators × 10 parts × minimum 2 replicates per operator per part = 60 total measurements. Why minimum 2 replicates? With only 1 measurement per operator-part combination, there is no within-cell variation from which to estimate Repeatability. The study must run in random order to prevent operators remembering previous readings.
-
-Exam note: to assess measurement system stability over time, a Control Chart on repeated reference standard measurements is the appropriate tool — a time series plot shows the data but doesn't apply statistical control limits, and a histogram shows distribution but not time-based drift.`,
+  {
+    phase: 'Improve',
+    color: 'var(--purple)',
+    icon: '⚡',
+    tools: [
+      {
+        name: 'FMEA (Failure Mode & Effects Analysis)',
+        desc: 'Proactively identify and prioritize potential failures before implementing solutions.',
+        steps: ['List all process steps', 'For each step, brainstorm potential failure modes', 'Identify effects of each failure on the customer', 'Rate Severity (1-10), Occurrence (1-10), Detection (1-10)', 'Calculate RPN = S × O × D', 'Prioritize items with highest RPN or Severity ≥ 9'],
+        tips: 'Always address failures with Severity = 9 or 10 regardless of RPN. The RPN alone can be misleading.',
+        link: '/tool/fmea',
+        bookKey: 'fmea',
+      },
+      {
+        name: 'Design of Experiments (DOE)',
+        desc: 'Efficiently test multiple factors simultaneously to find optimal process settings.',
+        steps: ['Identify factors (Xs) and their levels', 'Choose design: Full factorial, Fractional factorial, or Taguchi', 'Run experiments in random order', 'Analyze main effects and interactions', 'Confirm optimal settings with validation runs'],
+        tips: 'DOE is far more efficient than one-factor-at-a-time (OFAT) testing. A 2³ full factorial tests 3 factors in just 8 runs.',
+        link: '/doe',
+        bookKey: 'doe',
+      },
+      {
+        name: 'Value Stream Mapping',
+        desc: 'Map the flow of material and information to identify and eliminate waste.',
+        steps: ['Map the current state door-to-door', 'Calculate process efficiency (VA time / Total lead time)', 'Identify the 8 wastes (TIM WOODS)', 'Design the future state map', 'Create implementation plan'],
+        tips: 'Walk the process yourself. Actual process often differs significantly from documented process.',
+        link: '/tool/vsm',
+        bookKey: 'vsm',
+      },
+    ],
   },
-  'gage-rr': {
-    chapter: '2.3.3 — Gage Repeatability and Reproducibility',
-    text: `Repeatability (Equipment Variation — EV) is variation when the same operator measures the same part with the same gage multiple times. A property of the equipment. Poor repeatability means the gage gives inconsistent readings even with everything else held constant. Root causes: mechanical wear, electronic noise, vibration.
-
-Reproducibility (Appraiser Variation — AV) is variation when different operators measure the same part with the same gage. A property of the operators and measurement procedure. Poor reproducibility means different people get systematically different readings. Root causes: inconsistent technique, different holding positions, inadequate training.
-
-Standard Crossed Gage R&R study: 3 operators × 10 parts × minimum 2 replicates per operator per part = 60 total measurements. Why minimum 2 replicates? With only 1 measurement per operator-part combination, there is no within-cell variation from which to estimate Repeatability. The study must run in random order to prevent operators remembering previous readings.
-
-Exam note: to assess measurement system stability over time, a Control Chart on repeated reference standard measurements is the appropriate tool — a time series plot shows the data but doesn't apply statistical control limits, and a histogram shows distribution but not time-based drift.`,
+  {
+    phase: 'Control',
+    color: 'var(--cyan)',
+    icon: '🎛️',
+    tools: [
+      {
+        name: 'Control Charts (SPC)',
+        desc: 'Monitor the improved process over time using statistical control limits.',
+        steps: ['Determine chart type (X-bar/R, Individuals, p-chart, c-chart)', 'Calculate control limits from initial data (25-30 subgroups minimum)', 'Apply Western Electric rules to detect signals', 'Respond to out-of-control signals with documented reaction plan', 'Update limits when process fundamentally changes'],
+        tips: 'Control limits (UCL/LCL) are NOT specification limits. They represent ±3σ of process variation. Never adjust them to specification limits.',
+        link: '/tool/control-chart',
+        bookKey: 'control-chart',
+      },{
+        name: 'Control Plan',
+        desc: 'Document how to maintain improvements and respond to process signals.',
+        steps: ['List all critical process parameters (CTQs)', 'Define control method for each (SPC, visual check, etc.)', 'Set reaction plan for out-of-control conditions', 'Assign ownership and frequency', 'Update process documentation and SOPs'],
+        tips: 'A control plan is a living document. Review and update it whenever the process changes.',
+        bookKey: 'control-plan',
+      },
+      {
+        name: 'Statistical Process Control Rules',
+        desc: 'Western Electric (Nelson) rules for detecting non-random patterns in control charts.',
+        steps: [
+          'Rule 1: 1 point beyond ±3σ (UCL/LCL)',
+          'Rule 2: 9 consecutive points on same side of centerline',
+          'Rule 3: 6 consecutive points trending up or down',
+          'Rule 4: 14 points alternating up and down',
+          'Rule 5: 2 of 3 consecutive points beyond ±2σ',
+        ],
+        tips: 'Using all rules simultaneously increases false alarm rate. Choose rules appropriate for your detection needs.',
+        link: '/tool/control-chart',
+        bookKey: 'spc-rules',
+      },
+    ],
   },
+];
 
-  capability: {
-    chapter: '2.4 — Process Capability: Cp and Cpk',
-    text: `Cp — Potential Capability compares the specification window to the process spread, ignoring where the process is centered. Cp = 1.00: process spread equals specification window — barely acceptable if perfectly centered. Cp ≥ 1.33: standard acceptance threshold. Cp < 1.00: defects will occur even if the process is perfectly centered. Cp's critical limitation: it completely ignores centering — a Cp of 2.0 could mean zero defects (perfectly centered) or nearly all defects (shifted against one specification limit).
+const sigmaTable = [
+  { sigma: '1σ', dpmo: '691,462', yield: '30.85%', cpk: '0.33' },
+  { sigma: '2σ', dpmo: '308,537', yield: '69.15%', cpk: '0.67' },
+  { sigma: '3σ', dpmo: '66,807', yield: '93.32%', cpk: '1.00' },
+  { sigma: '4σ', dpmo: '6,210', yield: '99.38%', cpk: '1.33' },
+  { sigma: '5σ', dpmo: '233', yield: '99.977%', cpk: '1.67' },
+  { sigma: '6σ', dpmo: '3.4', yield: '99.9997%', cpk: '2.00' },
+];
 
-Cpk — Actual Capability accounts for both spread and centering by measuring the distance from the process mean to the nearest specification limit.
+function BookExcerptBlock({ bookKey }) {
+  const [expanded, setExpanded] = useState(false);
+  const excerpt = BOOK_EXCERPTS[bookKey];
+  if (!excerpt) return null;
 
-Cpk = minimum of [ (USL − μ) / 3σ , (μ − LSL) / 3σ ]
+  return (
+    <div className="resource-book" style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+      <button
+        onClick={() => setExpanded(e => !e)}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', fontWeight: 600, color: 'var(--accent-light)' }}
+      >
+        📖 From the Book — {excerpt.chapter} {expanded ? '▲' : '▼'}
+      </button>
+      {expanded && (
+        <div style={{ marginTop: 8, fontSize: '0.85rem', lineHeight: 1.6, color: 'var(--text-secondary)' }}>
+          {excerpt.text.split('\n\n').map((para, i, arr) => (
+            <p key={i} style={{ marginBottom: i < arr.length - 1 ? '0.7rem' : 0 }}>{para}</p>
+          ))}
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.5rem', fontStyle: 'italic' }}>
+            Excerpted from The Black Belt Standard by Faraz Ahmed.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
-Cpk takes the minimum of the upper and lower indices because the nearest specification limit is where defects are most likely to occur — that is the dangerous side.
+export default function Resources() {
+  const [activePhase, setActivePhase] = useState('Analyze');
 
-Three critical rules: Cpk ≤ Cp always (equal only when perfectly centered). Standard threshold: Cpk ≥ 1.33. A negative Cpk means the process mean is outside a specification limit — most output is defective. If Cpk < Cp by a large margin, re-centering is the improvement strategy — not variation reduction.`,
-  },
+  return (
+    <div className="resources-page animate-in">
+      <div className="resources-header">
+        <div className="section-label">Knowledge Base</div>
+        <h1>Six Sigma Resources & Guides</h1>
+        <p>Comprehensive reference material for DMAIC methodology. Click any tool card to open the interactive tool.</p>
+      </div>
 
-  'control-chart': {
-    chapter: '5.2.1 — Control Limits vs. Specification Limits',
-    text: `Control limits (UCL/LCL) are calculated FROM the process data — they are statistical boundaries of common cause variation. Specification limits (USL/LSL) are set BY the customer — they are the acceptable range for the product. They measure completely different things: control limits measure STABILITY (is the process predictable?); specification limits measure CAPABILITY (is the process good enough?).
+      {/* DMAIC Phase tabs */}
+      <div className="phase-tabs">
+        {resources.map(r => (
+          <button
+            key={r.phase}
+            className={`phase-tab ${activePhase === r.phase ? 'active' : ''}`}
+            style={{ '--phase-color': r.color }}
+            onClick={() => setActivePhase(r.phase)}
+          >
+            {r.icon} {r.phase}
+          </button>
+        ))}
+      </div>
 
-Never plot specification limits on a control chart. A process can be in statistical control (all points within UCL/LCL) while producing 100% defects if the spec limits are tighter than the control limits.
+      {/* Phase content */}
+      {resources.filter(r => r.phase === activePhase).map(section => (
+        <div key={section.phase} className="phase-section">
+          <div className="tools-resource-grid">
+            {section.tools.map(tool => (
+              <div key={tool.name} className="resource-card">
+                <div className="resource-card-header" style={{ borderLeftColor: section.color }}>
+                  <div className="resource-card-title">{tool.name}</div>
+                  <div className="resource-card-desc">{tool.desc}</div>
+                </div>
+                <div className="resource-steps">
+                  <div className="resource-steps-title">How to use:</div>
+                  <ol className="steps-list">
+                    {tool.steps.map((s, i) => <li key={i}>{s}</li>)}
+                  </ol>
+                </div>
+                {tool.tips && (
+                  <div className="resource-tip">
+                    <span>💡</span>
+                    <span>{tool.tips}</span>
+                  </div>
+                )}
+                {tool.bookKey && <BookExcerptBlock bookKey={tool.bookKey} />}
+                {tool.link && (
+                  <Link to={tool.link} className="btn btn-outline" style={{ marginTop: 12, display: 'inline-flex' }}>
+                    Open Tool →
+                  </Link>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
 
-Control limits are calculated FROM process data and measure stability — a point outside them signals a special cause to investigate. Specification limits are set BY the customer and measure capability — a point outside them signals a defect to scrap or rework. Control limits typically sit at ±3σ from the process mean and change only when the process itself changes; specification limits change only when the customer changes their requirement.`,
-  },
-  'run-chart': {
-    chapter: '5.2.1 — Control Limits vs. Specification Limits',
-    text: `A run chart is the precursor to a formal control chart — it plots data over time without statistical control limits, useful for spotting obvious trends and shifts before applying the more rigorous control chart analysis.
-
-Control limits (UCL/LCL), once you move to a full control chart, are calculated FROM the process data — they are statistical boundaries of common cause variation. This is different from specification limits (USL/LSL), which are set BY the customer as the acceptable range for the product. Control limits measure STABILITY (is the process predictable?); specification limits measure CAPABILITY (is the process good enough?). Never plot specification limits on a control chart — a process can be in statistical control while still producing defects if the spec limits are tighter than the natural process variation.`,
-  },
-
-  hypothesis: {
-    chapter: '3.4.1 — Normality Testing: Before Every Other Test',
-    text: `Before you choose any parametric hypothesis test, you must determine whether your data is normally distributed. This is not optional — parametric tests assume normality, and using them on non-normal data can produce misleading p-values.
-
-The Anderson-Darling (AD) test compares your data's cumulative distribution function against the theoretical normal CDF and produces a test statistic and a p-value. H₀: data follows a normal distribution. H₁: data does not.
-
-Decision: p > 0.05 = fail to reject H₀ = treat data as approximately normal. p ≤ 0.05 = reject H₀ = data is not normal, consider non-parametric alternatives or data transformation.
-
-Exam note: p > 0.05 does NOT prove the data is perfectly normal. With small samples (n < 20), even substantially non-normal data may not fail the test. With large samples (n > 200), the test becomes very sensitive and may flag minor deviations as significant even when irrelevant in practice. Always combine the p-value with visual inspection of the probability plot and histogram.`,
-  },anova: {
-    chapter: '3.4.5 — One-Way ANOVA: Three or More Group Means',
-    text: `When to use: comparing the means of three or more independent groups of continuous, approximately normal data. Examples: "Do the four production shifts produce parts with different mean dimensions?" "Do the three material suppliers produce materials with different mean tensile strength?"
-
-Why not just run multiple t-tests? If you compare 4 groups with 6 pairwise t-tests each at α=0.05, the overall probability of at least one false positive is 1 − (0.95)⁶ = 26.5%. ANOVA controls the overall Type I error rate at α by testing all groups simultaneously.
-
-What ANOVA actually tests: H₀: all group means are equal. H₁: at least one group mean is different. ANOVA does NOT tell you which group is different — that requires post-hoc tests. The F-ratio = between-group variance / within-group variance. A large F-ratio (small p-value) suggests real group differences.
-
-Step-by-step: (1) Set H₀/H₁, α = 0.05. (2) Check normality for each group (Anderson-Darling). (3) Check equal variances: Bartlett's test (if data is normal) or Levene's test (robust to non-normality). (4) Run ANOVA — get F-statistic and p-value. (5) p ≤ α → reject H₀ → at least one mean differs. (6) Run a post-hoc test (Tukey's HSD) to identify which groups differ.`,
-  },
-
-  regression: {
-    chapter: '3.5.1 — Scatter Plots and Correlation',
-    text: `Before running regression, always plot your data. A scatter plot of Y (vertical axis) vs. X (horizontal axis) shows you the relationship visually — this is step zero in any regression analysis.
-
-What to look for: (1) Direction — does Y tend to increase as X increases (positive) or decrease (negative)? (2) Form — is the relationship linear (points cluster around a straight line) or curved? Linear regression is only appropriate for linear relationships. (3) Strength — are points tightly clustered around the pattern or widely scattered? (4) Outliers — are there individual points that deviate dramatically from the pattern?
-
-Pearson Correlation Coefficient (r) quantifies the strength and direction of the linear relationship between two continuous variables. Range: −1.0 to +1.0. r = +1.0: perfect positive linear relationship. r = +0.7 to +0.9: strong positive. r = +0.4 to +0.7: moderate positive. r = 0 to +0.4: weak positive. r = 0: no linear relationship (could still have a non-linear one).
-
-r² (R-squared) = the proportion of variation in Y explained by the linear relationship with X.`,
-  },
-  correlation: {
-    chapter: '3.5.1 — Scatter Plots and Correlation',
-    text: `Before running regression, always plot your data. A scatter plot of Y (vertical axis) vs. X (horizontal axis) shows you the relationship visually — this is step zero in any regression analysis.
-
-What to look for: (1) Direction — does Y tend to increase as X increases (positive) or decrease (negative)? (2) Form — is the relationship linear (points cluster around a straight line) or curved? Linear regression is only appropriate for linear relationships. (3) Strength — are points tightly clustered around the pattern or widely scattered? (4) Outliers — are there individual points that deviate dramatically from the pattern?
-
-Pearson Correlation Coefficient (r) quantifies the strength and direction of the linear relationship between two continuous variables. Range: −1.0 to +1.0. r = +1.0: perfect positive linear relationship. r = +0.7 to +0.9: strong positive. r = +0.4 to +0.7: moderate positive. r = 0 to +0.4: weak positive. r = 0: no linear relationship (could still have a non-linear one).
-
-Correlation does not imply causation. Two variables can have r=0.95 because they are both driven by a third variable — ice cream sales and drowning rates are highly correlated (both peak in summer), but ice cream does not cause drowning.`,
-  },
-
-  doe: {
-    chapter: '4.3.3 / 4.4.1 — Experiment Design Considerations',
-    text: `Every designed experiment requires a few key decisions before running a single trial:
-
-Response variable (Y) — exactly what is measured, how, and with what instrument. Must have valid MSA — measurement system error should be small relative to expected factor effects.
-
-Factors and levels — which X variables are being studied, and at what levels (high/low, coded as +1/−1). Levels must be wide enough to see effects but within a safe, feasible operating range.
-
-Number of runs — determined by the design type (2^k full factorial, fractional, RSM). Each additional run costs time and money but provides more information.
-
-Blocking — group runs that must be performed under the same conditions (same batch, same day, same operator) into blocks, and include the block as a factor in the analysis. This removes known nuisance variation from the error term, making it easier to see the real factor effects.
-
-Nuisance variables — what is held constant (controlled) and what cannot be controlled (blocked or randomized over). Any uncontrolled variable that changes during the experiment can confound the results.`,
-  },
-};
+      {/* Sigma Reference Table */}
+      <div className="sigma-section">
+        <div className="section-label">Reference</div>
+        <h2>Sigma Level Benchmarks</h2>
+        <div style={{ overflowX: 'auto', marginTop: 16 }}>
+          <table className="data-table" style={{ maxWidth: 600 }}>
+            <thead>
+              <tr><th>Sigma Level</th><th>DPMO</th><th>Yield</th><th>Cpk</th><th>World Class?</th></tr>
+            </thead>
+            <tbody>
+              {sigmaTable.map(row => (
+                <tr key={row.sigma} style={row.sigma === '6σ' ? { background: 'rgba(0,229,160,0.06)' } : {}}>
+                  <td style={{ fontFamily: 'var(--font-display)', fontWeight: 700, color: row.sigma === '6σ' ? 'var(--green)' : 'inherit' }}>{row.sigma}</td>
+                  <td style={{ fontFamily: 'var(--font-mono)' }}>{row.dpmo}</td>
+                  <td style={{ fontFamily: 'var(--font-mono)' }}>{row.yield}</td>
+                  <td style={{ fontFamily: 'var(--font-mono)' }}>{row.cpk}</td>
+                  <td>{row.sigma === '6σ' ? '⭐ Six Sigma' : row.sigma === '5σ' ? '✅ Excellent' : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
