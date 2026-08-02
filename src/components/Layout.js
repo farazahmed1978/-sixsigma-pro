@@ -48,6 +48,7 @@ const NAV = [
       { id: 'correlation', name: 'Correlation Matrix', icon: '🔗', path: '/tool/correlation' },
       { id: 'regression', name: 'Regression', icon: '📐', path: '/tool/regression' },
       { id: 'multiregression', name: 'Multiple Regression', icon: '📊', path: '/tool/multiregression' },
+      { id: 'logistic', name: 'Logistic Regression', icon: '🎲', path: '/tool/logistic' },
       { id: 'anova', name: 'ANOVA', icon: '📶', path: '/tool/anova' },
     ]
   },
