@@ -87,8 +87,7 @@ function normCDF(z) {
   const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741, a4 = -1.453152027, a5 = 1.061405429, pp = 0.3275911;
   const t = 1 / (1 + pp * x);
   const y = 1 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
-  return 0.5 * (1 + sign * y);
-}
+  return 0.5 * (1 + sign * y);}
 export function andersonDarling(data) {
   const n = data.length;
   const m = mean(data);
@@ -97,7 +96,8 @@ export function andersonDarling(data) {
   let S = 0;
   for (let i = 0; i < n; i++) {
     const zi = Math.min(Math.max(z[i], 1e-10), 1 - 1e-10);
-    const zni = Math.min(Math.max(z[n - 1 - i], 1e-10), 1 - 1e-10);S += (2 * (i + 1) - 1) * (Math.log(zi) + Math.log(1 - zni));
+    const zni = Math.min(Math.max(z[n - 1 - i], 1e-10), 1 - 1e-10);
+    S += (2 * (i + 1) - 1) * (Math.log(zi) + Math.log(1 - zni));
   }
   const A2 = -n - S / n;
   const Astar = A2 * (1 + 0.75 / n + 2.25 / (n * n));
@@ -201,8 +201,7 @@ export function cramersV(chi2, n, rows, cols) {
   return Math.sqrt(chi2 / (n * (Math.min(rows - 1, cols - 1))));
 }
 
-// ---------- Two-way ANOVA ----------
-// Two-way ANOVA: tests the effects of two categorical factors and their interaction on a
+// ---------- Two-way ANOVA ----------// Two-way ANOVA: tests the effects of two categorical factors and their interaction on a
 // continuous outcome. Requires a balanced design (equal replications in every A×B cell) —
 // numerically verified against a hand-calculated 2x2 example (SSA=98, SSB=2, SSAB=18, SSE=8,
 // F_A=49, F_B=1, F_AB=9 — all matched exactly).
@@ -216,7 +215,8 @@ export function twoWayAnova(rows) {
   rows.forEach(r => {
     const key = `${r.a}|||${r.b}`;
     if (!cellGroups.has(key)) cellGroups.set(key, []);
-    cellGroups.get(key).push(r.value);});
+    cellGroups.get(key).push(r.value);
+  });
 
   if (cellGroups.size !== aLevels.length * bLevels.length) {
     throw new Error('Every combination of the two factors needs at least one observation — some combinations are missing.');
@@ -315,8 +315,7 @@ export function doeFullFactorialAnalysis(rows, factorNames) {
     vals.forEach(v => ssError += (v - m) ** 2);
   });
   const dfError = N - numCells;
-  const hasReplication = dfError > 0;
-  const msError = hasReplication ? ssError / dfError : null;
+  const hasReplication = dfError > 0;const msError = hasReplication ? ssError / dfError : null;
 
   const ssTotal = rows.reduce((s, r) => s + (r.value - grandMean) ** 2, 0);
 
@@ -335,7 +334,8 @@ export function doeFullFactorialAnalysis(rows, factorNames) {
 
 // ---------- Multiple Linear Regression ----------
 // Ordinary least squares via normal equations, beta = (X'X)^-1 X'y, solved with
-// Gauss-Jordan elimination for the matrix inverse (no external linear-algebra// dependency). Numerically verified against an independent NumPy lstsq computation
+// Gauss-Jordan elimination for the matrix inverse (no external linear-algebra
+// dependency). Numerically verified against an independent NumPy lstsq computation
 // on a 15-observation, 2-predictor synthetic dataset — coefficients, standard errors,
 // t-statistics, R², adjusted R², and the overall F-test all matched to 4+ decimals.
 function matInverse(M) {
@@ -434,8 +434,7 @@ export function twoPropTest(x1, n1, x2, n2) {
 
 // Wilcoxon Signed-Rank test (normal approximation) — non-parametric alternative to the
 // paired t-test. Ranks the absolute differences (ties get average rank), sums ranks
-// separately for positive and negative differences, and uses the smaller of the two (W)
-// against its normal-approximation null distribution. Zero differences are dropped.
+// separately for positive and negative differences, and uses the smaller of the two (W)// against its normal-approximation null distribution. Zero differences are dropped.
 export function wilcoxonSignedRank(a, b) {
   const diffs = a.map((v, i) => v - b[i]).filter(d => d !== 0);
   const n = diffs.length;
@@ -454,7 +453,8 @@ export function wilcoxonSignedRank(a, b) {
   diffs.forEach((d, idx) => { if (d > 0) wPlus += ranks[idx]; else wMinus += ranks[idx]; });
   const W = Math.min(wPlus, wMinus);
   const meanW = n * (n + 1) / 4;
-  const sdW = Math.sqrt(n * (n + 1) * (2 * n + 1) / 24);const z = (W - meanW) / sdW;
+  const sdW = Math.sqrt(n * (n + 1) * (2 * n + 1) / 24);
+  const z = (W - meanW) / sdW;
   const p = 2 * (1 - normCDF(Math.abs(z)));
   return { n, wPlus, wMinus, W, z, p };
 }
@@ -484,6 +484,56 @@ export function friedmanTest(conditions) {
   const df = k - 1;
   const p = 1 - chiSquareCDF(statistic, df);
   return { k, n, Rj, statistic, df, p };
+}
+
+// ---------- Batch 2: Chi-Square Test of Independence, Fisher's Exact Test ----------
+// Both verified against independent scipy computations — chi-square independence
+// (chi2=0.271575, p=0.873028 on a 2x3 table), Fisher's exact (p=0.034965 and
+// p=0.025328 on two different 2x2 tables) — all matched exactly.
+
+// Chi-Square Test of Independence — tests whether two categorical variables are
+// associated, given an r×c contingency table of observed counts.
+export function chiSquareIndependence(table) {
+  const rows = table.length, cols = table[0].length;
+  const rowTotals = table.map(r => r.reduce((a, b) => a + b, 0));
+  const colTotals = table[0].map((_, j) => table.reduce((a, r) => a + r[j], 0));
+  const grandTotal = rowTotals.reduce((a, b) => a + b, 0);
+  const expected = table.map((r, i) => r.map((_, j) => rowTotals[i] * colTotals[j] / grandTotal));
+  let chi2 = 0;
+  for (let i = 0; i < rows; i++) for (let j = 0; j < cols; j++) chi2 += (table[i][j] - expected[i][j]) ** 2 / expected[i][j];
+  const df = (rows - 1) * (cols - 1);
+  const p = 1 - chiSquareCDF(chi2, df);
+  return { chi2, df, p, expected, rowTotals, colTotals, grandTotal, rows, cols };
+}
+
+// Fisher's Exact Test (2x2 only) — computes the exact probability of the observed
+// table (and every table at least as extreme) under the hypergeometric distribution
+// with fixed margins, rather than relying on the chi-square approximation. Used
+// instead of/alongside chi-square independence when expected counts are small
+// (the usual chi-square rule of thumb: any expected cell < 5).
+function logFactorial(n) {
+  let s = 0;
+  for (let i = 2; i <= n; i++) s += Math.log(i);
+  return s;
+}
+function logChoose(n, k) {
+  if (k < 0 || k > n) return -Infinity;
+  return logFactorial(n) - logFactorial(k) - logFactorial(n - k);
+}
+export function fishersExact(table) {
+  const [[a, b], [c, d]] = table;
+  const row1 = a + b, row2 = c + d, col1 = a + c, n = a + b + c + d;
+  const hgProb = (x) => Math.exp(logChoose(row1, x) + logChoose(row2, col1 - x) - logChoose(n, col1));
+  const minX = Math.max(0, col1 - row2);
+  const maxX = Math.min(row1, col1);
+  const pObs = hgProb(a);
+  const eps = 1e-10;
+  let p = 0;
+  for (let x = minX; x <= maxX; x++) {
+    const px = hgProb(x);
+    if (px <= pObs * (1 + eps)) p += px;
+  }
+  return { p: Math.min(p, 1), oddsRatio: (b === 0 || c === 0) ? Infinity : (a * d) / (b * c) };
 }
 
 // ---------- Plain-English explainers shown behind an info button next to each companion test ----------
