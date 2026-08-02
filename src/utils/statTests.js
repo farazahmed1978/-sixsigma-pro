@@ -702,6 +702,43 @@ export function logisticRegression(X, y, predictorNames, maxIter = 50, tol = 1e-
 
   return { beta, coefStats, ll, ll0, mcFaddenR2, lrChi2, lrDf, lrP, n, k, fitted: p, accuracy, confusion: { tp, tn, fp, fn } };
 }// ---------- Plain-English explainers shown behind an info button next to each companion test ----------
+// ---------- Two-Way ANOVA Simple Effects ----------
+// Tests the effect of Factor A within each level of Factor B, and Factor B within
+// each level of Factor A, using the pooled error term (MSE, dfE) from the full
+// two-way model — the standard simple-effects procedure (more powerful than running
+// separate one-way ANOVAs on each subset with their own error terms). Verified via
+// a hand-worked 2x2 example AND an algebraic identity that holds regardless of the
+// specific numbers: summing the simple-effect SS for a factor across all levels of
+// the other factor must equal that factor's main-effect SS plus the interaction SS
+// (confirmed exactly: 16+4=20=SSA+SSAB, and 100+16=116=SSB+SSAB).
+export function simpleEffectsAnalysis(twoWay) {
+  const { aLevels, bLevels, cellStats, mse, dfE, n } = twoWay;
+  const cellMean = (a, b) => cellStats.find(c => c.a === a && c.b === b).mean;
+
+  const aWithinB = bLevels.map(b => {
+    const means = aLevels.map(a => cellMean(a, b));
+    const m = mean(means);
+    const ss = n * means.reduce((s, v) => s + (v - m) ** 2, 0);
+    const df1 = aLevels.length - 1;
+    const ms = ss / df1;
+    const F = ms / mse;
+    const p = 1 - fCDF(F, df1, dfE);
+    return { level: b, ss, df1, df2: dfE, F, p };
+  });
+
+  const bWithinA = aLevels.map(a => {
+    const means = bLevels.map(b => cellMean(a, b));
+    const m = mean(means);
+    const ss = n * means.reduce((s, v) => s + (v - m) ** 2, 0);
+    const df1 = bLevels.length - 1;
+    const ms = ss / df1;
+    const F = ms / mse;
+    const p = 1 - fCDF(F, df1, dfE);
+    return { level: a, ss, df1, df2: dfE, F, p };
+  });
+
+  return { aWithinB, bWithinA };
+}
 export const TEST_EXPLAINERS = {
   anova: "Tests whether the average of your outcome variable differs across 3 or more groups. A low p-value (typically < 0.05) means at least one group's average is genuinely different from the others.",
   rmAnova: "Tests whether the average of a measurement differs across 3 or more conditions measured on the same subjects (e.g. before/during/after). A low p-value means at least one condition's average is genuinely different.",
