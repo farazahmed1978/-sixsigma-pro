@@ -97,10 +97,34 @@ const TESTS = [
   { id: 'pearson', name: 'Pearson Correlation', type: 'Continuous', desc: 'Test whether a linear correlation between two continuous variables is significant', inputs: 'two' },
   { id: 'spearman', name: 'Spearman Correlation', type: 'Nonparametric', desc: 'Test whether a monotonic (rank-based) correlation between two variables is significant', inputs: 'two' },
   { id: 'kendall', name: "Kendall's Tau", type: 'Nonparametric', desc: 'Rank correlation based on concordant/discordant pairs — robust alternative to Spearman for small samples or many tied ranks', inputs: 'two' },
-  { id: 'dunn', name: "Dunn's Test", type: 'Nonparametric', desc: 'Post-hoc pairwise comparisons following a significant Kruskal-Wallis result (3+ groups)', inputs: 'multi' },
-];
+  { id: 'dunn', name: "Dunn's Test", type: 'Nonparametric', desc: 'Post-hoc pairwise comparisons following a significant Kruskal-Wallis result (3+ groups)', inputs: 'multi' },];
 
-const typeColor = { Continuous: 'var(--green)', Nonparametric: 'var(--orange)', Discrete: 'var(--purple)' };// Builds a plain-English interpretation sentence and a compact stats summary for the
+const typeColor = { Continuous: 'var(--green)', Nonparametric: 'var(--orange)', Discrete: 'var(--purple)' };
+
+// Plain-English null (H0) and alternative (H1) hypothesis statements, shown on-screen
+// and included in generated reports so they read like a proper hypothesis-test write-up
+// rather than just a results dump.
+const HYPOTHESIS_STATEMENTS = {
+  '1t': { h0: 'H\u2080: The population mean equals the hypothesized value (\u03BC = \u03BC\u2080).', h1: 'H\u2081: The population mean does not equal the hypothesized value (\u03BC \u2260 \u03BC\u2080).' },
+  '2t': { h0: 'H\u2080: The two group means are equal (\u03BC\u2081 = \u03BC\u2082).', h1: 'H\u2081: The two group means are not equal (\u03BC\u2081 \u2260 \u03BC\u2082).' },
+  pairedt: { h0: 'H\u2080: The mean difference between the paired measurements is zero (\u03BCd = 0).', h1: 'H\u2081: The mean difference between the paired measurements is not zero (\u03BCd \u2260 0).' },
+  anova: { h0: 'H\u2080: All group means are equal (\u03BC\u2081 = \u03BC\u2082 = ... = \u03BC\u2096).', h1: 'H\u2081: At least one group mean differs from the others.' },
+  mw: { h0: 'H\u2080: The two groups come from the same distribution.', h1: 'H\u2081: The two groups come from different distributions (one is stochastically greater than the other).' },
+  wilcoxon: { h0: 'H\u2080: The median difference between the paired measurements is zero.', h1: 'H\u2081: The median difference between the paired measurements is not zero.' },
+  kw: { h0: 'H\u2080: All groups come from the same distribution.', h1: 'H\u2081: At least one group comes from a different distribution.' },
+  friedman: { h0: 'H\u2080: All conditions come from the same distribution (no treatment effect).', h1: 'H\u2081: At least one condition differs from the others.' },
+  chi2gof: { h0: 'H\u2080: The observed counts follow the expected distribution.', h1: 'H\u2081: The observed counts do not follow the expected distribution.' },
+  '1prop': { h0: 'H\u2080: The population proportion equals the hypothesized value (p = p\u2080).', h1: 'H\u2081: The population proportion does not equal the hypothesized value (p \u2260 p\u2080).' },
+  '2prop': { h0: 'H\u2080: The two population proportions are equal (p\u2081 = p\u2082).', h1: 'H\u2081: The two population proportions are not equal (p\u2081 \u2260 p\u2082).' },
+  chi2indep: { h0: 'H\u2080: The two categorical variables are independent (no association).', h1: 'H\u2081: The two categorical variables are associated (not independent).' },
+  fisher: { h0: 'H\u2080: The two categorical variables are independent (no association), for this 2\u00D72 table.', h1: 'H\u2081: The two categorical variables are associated (not independent).' },
+  pearson: { h0: 'H\u2080: There is no linear correlation between the two variables (\u03C1 = 0).', h1: 'H\u2081: There is a linear correlation between the two variables (\u03C1 \u2260 0).' },
+  spearman: { h0: 'H\u2080: There is no monotonic correlation between the two variables.', h1: 'H\u2081: There is a monotonic correlation between the two variables.' },
+  kendall: { h0: 'H\u2080: There is no association between the two variables (\u03C4 = 0).', h1: 'H\u2081: There is an association between the two variables (\u03C4 \u2260 0).' },
+  dunn: { h0: 'H\u2080 (per pair): The two groups come from the same distribution.', h1: 'H\u2081 (per pair): The two groups come from different distributions. (Tested pairwise as a follow-up to a significant Kruskal-Wallis result.)' },
+};
+
+// Builds a plain-English interpretation sentence and a compact stats summary for the
 // report, tailored to each test's specific statistic/field names.
 function buildReportContent(test, result) {
   const pStr = result.p < 0.001 ? '<0.001' : result.p.toFixed(4);
@@ -179,32 +203,31 @@ function buildReportContent(test, result) {
       summary = { 'p': pStr };
       interpretation = `This test gave ${verdict} (p=${pStr}).`;
   }
-  return { summary, interpretation };
+  const hyp = HYPOTHESIS_STATEMENTS[test.id];
+  const fullInterpretation = hyp ? `${hyp.h0} ${hyp.h1} ${interpretation}` : interpretation;
+  return { summary, interpretation: fullInterpretation };
 }
 
 function ResultBox({ result, testId }) {
   if (!result) return null;
   const sig = result.p < 0.05;
+  const hyp = HYPOTHESIS_STATEMENTS[testId];
 
   return (
     <div className="ht-result-box">
+      {hyp && (
+        <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', background: 'var(--bg-3)', padding: '0.65rem 0.85rem', borderRadius: '8px', marginBottom: '0.85rem', lineHeight: 1.6 }}>
+          <div>{hyp.h0}</div>
+          <div>{hyp.h1}</div>
+        </div>
+      )}
       <div className={`ht-result-verdict ${sig ? 'significant' : 'not-significant'}`}>
         {sig ? '✓ Statistically Significant' : '○ Not Statistically Significant'}
         <span className="ht-p-value">p = {result.p < 0.001 ? '<0.001' : result.p.toFixed(4)}</span>
       </div>
 
       <div className="ht-result-stats">
-        {testId === '1t' && <>
-          <div><span>n</span><strong>{result.n}</strong></div>
-          <div><span>Mean</span><strong>{result.mean.toFixed(4)}</strong></div>
-          <div><span>Std Dev</span><strong>{result.stddev.toFixed(4)}</strong></div>
-          <div><span>t-statistic</span><strong>{result.t.toFixed(4)}</strong></div>
-          <div><span>df</span><strong>{result.df}</strong></div>
-          <div><span>95% CI</span><strong>[{result.ci[0].toFixed(3)}, {result.ci[1].toFixed(3)}]</strong></div>
-        </>}
-        {testId === '2t' && <>
-          <div><span>n₁</span><strong>{result.na}</strong></div>
-          <div><span>n₂</span><strong>{result.nb}</strong></div>
+        {testId === '1t' && <><div><span>n₂</span><strong>{result.nb}</strong></div>
           <div><span>Mean₁</span><strong>{result.ma.toFixed(4)}</strong></div>
           <div><span>Mean₂</span><strong>{result.mb.toFixed(4)}</strong></div>
           <div><span>Difference</span><strong>{result.diff.toFixed(4)}</strong></div>
@@ -215,7 +238,8 @@ function ResultBox({ result, testId }) {
           <div><span>n (pairs)</span><strong>{result.n}</strong></div>
           <div><span>Mean Difference</span><strong>{result.meanDiff.toFixed(4)}</strong></div>
           <div><span>SD of Differences</span><strong>{result.sd.toFixed(4)}</strong></div>
-          <div><span>t-statistic</span><strong>{result.t.toFixed(4)}</strong></div><div><span>df</span><strong>{result.df}</strong></div>
+          <div><span>t-statistic</span><strong>{result.t.toFixed(4)}</strong></div>
+          <div><span>df</span><strong>{result.df}</strong></div>
           <div><span>95% CI</span><strong>[{result.ci[0].toFixed(3)}, {result.ci[1].toFixed(3)}]</strong></div>
         </>}
         {testId === 'anova' && <>
@@ -332,9 +356,9 @@ export default function HypothesisTesting() {
   const [addedToReport, setAddedToReport] = useState(false);
   const bookExcerpt = BOOK_EXCERPTS.hypothesis;
 
-  const handleAddToReport = useCallback(async () => {
-    if (!resultRef.current || !result) return;
-    const test = TESTS.find(t => t.id === selectedTest);const canvas = await html2canvas(resultRef.current, { backgroundColor: null, scale: 2 });
+  const handleAddToReport = useCallback(async () => {if (!resultRef.current || !result) return;
+    const test = TESTS.find(t => t.id === selectedTest);
+    const canvas = await html2canvas(resultRef.current, { backgroundColor: null, scale: 2 });
     const chartImage = canvas.toDataURL('image/png');
     const { summary, interpretation } = buildReportContent(test, result);
     addReportItem({
@@ -453,15 +477,15 @@ export default function HypothesisTesting() {
       <div className="ht-header">
         <div>
           <h1>Hypothesis Testing</h1>
-          <p>Select a test, choose your data, and get instant statistical results with interpretation.</p></div>
+          <p>Select a test, choose your data, and get instant statistical results with interpretation.</p>
+        </div>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           {bookExcerpt && (
             <button className={`btn ${showGuide ? 'btn-primary' : 'btn-ghost'} no-print`} onClick={() => setShowGuide(g => !g)}>
               {showGuide ? '📊 Hide Guide' : '📖 Show Guide'}
             </button>
           )}
-          {result && <button className="btn-secondary no-print" onClick={printResult}>🖨️ Print Results</button>}
-        </div>
+          {result && <button className="btn-secondary no-print" onClick={printResult}>🖨️ Print Results</button>}</div>
       </div>
 
       {showGuide && bookExcerpt && (
@@ -590,9 +614,9 @@ export default function HypothesisTesting() {
                       <div key={i} className="form-group" style={{ marginBottom: '0.75rem' }}>
                         <label>Group {i + 1} {hasData ? 'Column' : 'Data'}</label>
                         {hasData && numCols.length > 0 ? (
-                          <select value={inputs.groups[i]} onChange={e => setInputs(p => { const g = [...p.groups]; g[i] = e.target.value; return { ...p, groups: g }; })}>
-                            <option value="">— select —</option>
-                            {numCols.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}</select>
+                          <select value={inputs.groups[i]} onChange={e => setInputs(p => { const g = [...p.groups]; g[i] = e.target.value; return { ...p, groups: g }; })}><option value="">— select —</option>
+                            {numCols.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+                          </select>
                         ) : (
                           <textarea className="ws-textarea" rows={3} value={inputs[`manualG${i}`] || ''} onChange={e => setInputs(p => ({ ...p, [`manualG${i}`]: e.target.value }))} placeholder="values, comma or line separated" />
                         )}
@@ -731,3 +755,12 @@ export default function HypothesisTesting() {
     </div>
   );
 }
+          <div><span>n</span><strong>{result.n}</strong></div>
+          <div><span>Mean</span><strong>{result.mean.toFixed(4)}</strong></div>
+          <div><span>Std Dev</span><strong>{result.stddev.toFixed(4)}</strong></div>
+          <div><span>t-statistic</span><strong>{result.t.toFixed(4)}</strong></div>
+          <div><span>df</span><strong>{result.df}</strong></div>
+          <div><span>95% CI</span><strong>[{result.ci[0].toFixed(3)}, {result.ci[1].toFixed(3)}]</strong></div>
+        </>}
+        {testId === '2t' && <>
+          <div><span>n₁</span><strong>{result.na}</strong></div>
