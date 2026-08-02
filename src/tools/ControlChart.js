@@ -85,6 +85,43 @@ function calcXbarRStats(rows) {
   return { subgroupStats, xbarBar, rBar, xbarUcl, xbarLcl, rUcl, rLcl, n, k: subgroupStats.length, A2, D3, D4 };
 }
 
+// ---------- CUSUM (tabular, two-sided) ----------
+// Standard Montgomery formulas. k (the "allowance"/slack) is typically half the shift size
+// you want to detect, expressed in sigma units — k = 0.5*sigma detects a 1-sigma shift with
+// good speed. H (the decision interval) is typically 4-5 sigma. Verified via hand-trace on a
+// small 5-point example, matching to 4+ decimals (deterministic recursive arithmetic — no
+// probability distribution involved, so no external library needed for verification).
+function cusumChart(values, target, sigma, kFactor, hFactor) {
+  const k = kFactor * sigma;
+  const H = hFactor * sigma;
+  let cPlus = 0, cMinus = 0;
+  const points = values.map((x, i) => {
+    cPlus = Math.max(0, (x - target - k) + cPlus);
+    cMinus = Math.max(0, (target - k - x) + cMinus);
+    return { label: `${i + 1}`, x, cPlus, cMinus: -cMinus, outOfControl: cPlus > H || cMinus > H };
+  });
+  return { points, k, H, target, sigma };
+}
+
+// ---------- EWMA (Exponentially Weighted Moving Average) ----------
+// Standard Montgomery formulas with exact (time-varying) control limits — the limits widen
+// point by point until converging to their asymptotic width, rather than using the
+// (slightly anti-conservative) fixed asymptotic limits from the very first point. lambda
+// (weight given to the most recent observation) typically 0.05-0.3; smaller values detect
+// smaller shifts more slowly. L (limit width in sigma units) typically 2.7-3. Verified via
+// hand-trace on the same 5-point example, matching to 4+ decimals.
+function ewmaChart(values, target, sigma, lambda, L) {
+  let z = target;
+  const points = values.map((x, i) => {
+    z = lambda * x + (1 - lambda) * z;
+    const factor = Math.sqrt((lambda / (2 - lambda)) * (1 - Math.pow(1 - lambda, 2 * (i + 1))));
+    const ucl = target + L * sigma * factor;
+    const lcl = target - L * sigma * factor;
+    return { label: `${i + 1}`, x, z, ucl, lcl, outOfControl: z > ucl || z < lcl };
+  });
+  return { points, lambda, L, target, sigma };
+}
+
 // Western Electric Rules (applied to the Individuals chart, or the X-bar chart in X-bar/R mode)
 function applyWesternElectricRules(values, mean, sigma) {
   const n = values.length;
@@ -94,15 +131,15 @@ function applyWesternElectricRules(values, mean, sigma) {
   for (let i = 0; i < n; i++) {
     const z = zone(values[i]);
     if (Math.abs(z) > 3) flags[i].push('Rule 1: beyond 3\u03C3 (special cause)');
-  }
-
-  for (let i = 2; i < n; i++) {
+  }for (let i = 2; i < n; i++) {
     const window = [i - 2, i - 1, i];
     const beyond2Pos = window.filter(idx => zone(values[idx]) > 2).length;
     const beyond2Neg = window.filter(idx => zone(values[idx]) < -2).length;
     if (beyond2Pos >= 2) flags[i].push('Rule 2: 2 of 3 points beyond 2\u03C3 (high side)');
     if (beyond2Neg >= 2) flags[i].push('Rule 2: 2 of 3 points beyond 2\u03C3 (low side)');
-  }for (let i = 4; i < n; i++) {
+  }
+
+  for (let i = 4; i < n; i++) {
     const window = [i - 4, i - 3, i - 2, i - 1, i];
     const beyond1Pos = window.filter(idx => zone(values[idx]) > 1).length;
     const beyond1Neg = window.filter(idx => zone(values[idx]) < -1).length;
@@ -127,7 +164,7 @@ export default function ControlChart() {
   const { addReportItem } = useReport();
   const chartWrapperRef = useRef(null);
 
-  const [chartType, setChartType] = useState('imr'); // 'imr' | 'xbarR'
+  const [chartType, setChartType] = useState('imr'); // 'imr' | 'xbarR' | 'cusum' | 'ewma'
 
   const [data, setData] = useState(null);
   const [cols, setCols] = useState([]);
@@ -141,6 +178,17 @@ export default function ControlChart() {
   const [rChartData, setRChartData] = useState(null);
   const [xbarRStats, setXbarRStats] = useState(null);
   const [xbarRError, setXbarRError] = useState('');
+
+  // CUSUM / EWMA shared parameters
+  const [targetVal, setTargetVal] = useState('');
+  const [sigmaVal, setSigmaVal] = useState('');
+  const [cusumK, setCusumK] = useState(0.5);
+  const [cusumH, setCusumH] = useState(5);
+  const [ewmaLambda, setEwmaLambda] = useState(0.2);
+  const [ewmaL, setEwmaL] = useState(3);
+  const [cusumResult, setCusumResult] = useState(null);
+  const [ewmaResult, setEwmaResult] = useState(null);
+  const [cusumEwmaError, setCusumEwmaError] = useState('');
 
   const [addedToReport, setAddedToReport] = useState(false);
 
@@ -161,11 +209,19 @@ export default function ControlChart() {
     setCols([colName]);
     setValueCol(colName);
     resetOutputs();
+    // Pre-fill CUSUM/EWMA target & sigma with the column's own mean/sd — user can override.
+    if (vals.length > 1) {
+      const m = vals.reduce((a, b) => a + b, 0) / vals.length;
+      const sd = Math.sqrt(vals.reduce((a, v) => a + (v - m) ** 2, 0) / (vals.length - 1));
+      setTargetVal(m.toFixed(4));
+      setSigmaVal(sd.toFixed(4));
+    }
   };
 
   const resetOutputs = () => {
     setChartData(null); setMrChartData(null); setStats(null);
     setXbarChartData(null); setRChartData(null); setXbarRStats(null); setXbarRError('');
+    setCusumResult(null); setEwmaResult(null); setCusumEwmaError('');
     setAddedToReport(false);
   };
 
@@ -209,8 +265,7 @@ export default function ControlChart() {
         rows = values.map((v, i) => ({ value: v, subgroup: subgroupVals[i] }));
       } else {
         rows = (data || []).map(r => ({ value: +r[valueCol], subgroup: r[subgroupCol] }));
-      }
-      rows = rows.filter(r => !isNaN(r.value) && r.subgroup !== undefined && r.subgroup !== '');
+      }rows = rows.filter(r => !isNaN(r.value) && r.subgroup !== undefined && r.subgroup !== '');
       const s = calcXbarRStats(rows);
       setXbarRStats(s);
 
@@ -225,7 +280,7 @@ export default function ControlChart() {
       }));
       setXbarChartData(xcd);
 
-      const rcd = s.subgroupStats.map(sg => ({label: `${sg.id}`, r: sg.r, rUcl: s.rUcl, rLcl: s.rLcl, rBar: s.rBar,
+      const rcd = s.subgroupStats.map(sg => ({ label: `${sg.id}`, r: sg.r, rUcl: s.rUcl, rLcl: s.rLcl, rBar: s.rBar,
         outOfControl: sg.r > s.rUcl || sg.r < s.rLcl,
       }));
       setRChartData(rcd);
@@ -234,9 +289,50 @@ export default function ControlChart() {
     }
   }, [data, valueCol, subgroupCol]);
 
+  const getRawValues = () => {
+    if (hasData) return getColumnData(valueCol).map(Number);
+    return (data || []).map(r => +r[valueCol]).filter(v => !isNaN(v));
+  };
+
+  const analyzeCusum = useCallback(() => {
+    if (!valueCol) return;
+    setAddedToReport(false);
+    setCusumEwmaError('');
+    try {
+      const values = getRawValues();
+      const target = parseFloat(targetVal), sigma = parseFloat(sigmaVal);
+      if (values.length < 2) throw new Error('Need at least 2 data points.');
+      if (isNaN(target) || isNaN(sigma) || sigma <= 0) throw new Error('Enter a valid target and a positive sigma.');
+      setCusumResult(cusumChart(values, target, sigma, parseFloat(cusumK), parseFloat(cusumH)));
+    } catch (e) {
+      setCusumEwmaError(e.message);
+    }
+  }, [valueCol, targetVal, sigmaVal, cusumK, cusumH, data, hasData]);
+
+  const analyzeEwma = useCallback(() => {
+    if (!valueCol) return;
+    setAddedToReport(false);
+    setCusumEwmaError('');
+    try {
+      const values = getRawValues();
+      const target = parseFloat(targetVal), sigma = parseFloat(sigmaVal);
+      if (values.length < 2) throw new Error('Need at least 2 data points.');
+      if (isNaN(target) || isNaN(sigma) || sigma <= 0) throw new Error('Enter a valid target and a positive sigma.');
+      const lambda = parseFloat(ewmaLambda);
+      if (isNaN(lambda) || lambda <= 0 || lambda > 1) throw new Error('Lambda must be between 0 and 1.');
+      setEwmaResult(ewmaChart(values, target, sigma, lambda, parseFloat(ewmaL)));
+    } catch (e) {
+      setCusumEwmaError(e.message);
+    }
+  }, [valueCol, targetVal, sigmaVal, ewmaLambda, ewmaL, data, hasData]);
+
   const violationCount = chartType === 'imr'
     ? (chartData ? chartData.filter(d => d.outOfControl).length : 0)
-    : (xbarChartData ? xbarChartData.filter(d => d.outOfControl).length + (rChartData ? rChartData.filter(d => d.outOfControl).length : 0) : 0);
+    : chartType === 'xbarR'
+    ? (xbarChartData ? xbarChartData.filter(d => d.outOfControl).length + (rChartData ? rChartData.filter(d => d.outOfControl).length : 0) : 0)
+    : chartType === 'cusum'
+    ? (cusumResult ? cusumResult.points.filter(d => d.outOfControl).length : 0)
+    : (ewmaResult ? ewmaResult.points.filter(d => d.outOfControl).length : 0);
 
   const handleAddToReport = useCallback(async () => {
     if (!chartWrapperRef.current) return;
@@ -266,7 +362,7 @@ export default function ControlChart() {
         interpretation,
         rawData: chartData.map(d => ({ label: d.label, value: d.value })),
       });
-    } else {
+    } else if (chartType === 'xbarR') {
       if (!xbarRStats || !xbarChartData) return;
       const interpretation = violationCount > 0
         ? `${violationCount} point(s) across the X-bar and R charts triggered a Western Electric rule — investigate for special cause variation before treating the process as stable.`
@@ -286,9 +382,36 @@ export default function ControlChart() {
         interpretation,
         rawData: xbarRStats.subgroupStats.map(sg => ({ subgroup: sg.id, xbar: sg.xbar.toFixed(4), range: sg.r.toFixed(4) })),
       });
+    } else if (chartType === 'cusum') {
+      if (!cusumResult) return;
+      const interpretation = violationCount > 0
+        ? `${violationCount} point(s) exceeded the decision interval (H=${cusumResult.H.toFixed(4)}) — this signals a sustained shift away from the target of ${cusumResult.target.toFixed(4)}, worth investigating for special cause.`
+        : `No CUSUM signal — the cumulative sums stayed within the decision interval (H=${cusumResult.H.toFixed(4)}), consistent with the process running on target at ${cusumResult.target.toFixed(4)}.`;
+      addReportItem({
+        title: `CUSUM Chart — ${valueCol}`,
+        toolId: 'control-chart',
+        timestamp: new Date().toISOString(),
+        chartImage,
+        statsSummary: { 'Target': cusumResult.target.toFixed(4), 'Sigma': cusumResult.sigma.toFixed(4), 'k (slack)': cusumResult.k.toFixed(4), 'H (decision interval)': cusumResult.H.toFixed(4), 'Violations': violationCount },
+        interpretation,
+        rawData: cusumResult.points.map(p => ({ label: p.label, value: p.x, cPlus: p.cPlus.toFixed(4), cMinus: p.cMinus.toFixed(4) })),
+      });
+    } else if (chartType === 'ewma') {
+      if (!ewmaResult) return;
+      const interpretation = violationCount > 0
+        ? `${violationCount} point(s) fell outside the EWMA control limits — this signals a shift away from the target of ${ewmaResult.target.toFixed(4)}, worth investigating for special cause.`
+        : `No EWMA signal — the smoothed statistic stayed within its control limits throughout, consistent with the process running on target at ${ewmaResult.target.toFixed(4)}.`;
+      addReportItem({
+        title: `EWMA Chart — ${valueCol}`,
+        toolId: 'control-chart',
+        timestamp: new Date().toISOString(),chartImage,
+        statsSummary: { 'Target': ewmaResult.target.toFixed(4), 'Sigma': ewmaResult.sigma.toFixed(4), 'Lambda': ewmaResult.lambda.toFixed(4), 'L': ewmaResult.L.toFixed(4), 'Violations': violationCount },
+        interpretation,
+        rawData: ewmaResult.points.map(p => ({ label: p.label, value: p.x, ewma: p.z.toFixed(4) })),
+      });
     }
     setAddedToReport(true);
-  }, [chartType, stats, chartData, xbarRStats, xbarChartData, valueCol, subgroupCol, violationCount, addReportItem]);
+  }, [chartType, stats, chartData, xbarRStats, xbarChartData, cusumResult, ewmaResult, valueCol, subgroupCol, violationCount, addReportItem]);
 
   return (
     <div style={{ padding: '1.5rem' }}>
@@ -309,11 +432,15 @@ export default function ControlChart() {
       <div className="card" style={{ marginBottom: '1.5rem' }}>
         <h3 className="section-title" style={{ marginBottom: '0.75rem' }}>Control Chart</h3>
 
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
           <button className={chartType === 'imr' ? 'btn-primary' : 'btn-secondary'} style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
             onClick={() => { setChartType('imr'); resetOutputs(); }}>Individuals &amp; Moving Range (I-MR)</button>
           <button className={chartType === 'xbarR' ? 'btn-primary' : 'btn-secondary'} style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
             onClick={() => { setChartType('xbarR'); resetOutputs(); }}>X-bar &amp; R</button>
+          <button className={chartType === 'cusum' ? 'btn-primary' : 'btn-secondary'} style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
+            onClick={() => { setChartType('cusum'); resetOutputs(); }}>CUSUM</button>
+          <button className={chartType === 'ewma' ? 'btn-primary' : 'btn-secondary'} style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
+            onClick={() => { setChartType('ewma'); resetOutputs(); }}>EWMA</button>
         </div>
 
         {!hasData && <CSVUploader onData={handleData} />}
@@ -338,7 +465,27 @@ export default function ControlChart() {
           </div>
         )}
 
-        {/* I-MR, or X-bar & R without worksheet data (manual CSV upload for this tool) */}
+        {/* CUSUM / EWMA + Worksheet data: value column picker, no pre-load needed */}
+        {hasData && (chartType === 'cusum' || chartType === 'ewma') && (
+          <div className="form-group" style={{ marginBottom: '0.75rem' }}>
+            <label>Value Column</label>
+            <select value={valueCol} onChange={e => {
+              setValueCol(e.target.value);
+              const vals = getColumnData(e.target.value);
+              if (vals.length > 1) {
+                const m = vals.reduce((a, b) => a + b, 0) / vals.length;
+                const sd = Math.sqrt(vals.reduce((a, v) => a + (v - m) ** 2, 0) / (vals.length - 1));
+                setTargetVal(m.toFixed(4));
+                setSigmaVal(sd.toFixed(4));
+              }
+            }}>
+              <option value="">— select —</option>
+              {numericWsCols.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+            </select>
+          </div>
+        )}
+
+        {/* I-MR, or X-bar & R / CUSUM / EWMA without worksheet data (manual CSV upload) */}
         {(!hasData || chartType === 'imr') && cols.length > 0 && (
           <div className="form-grid" style={{ marginBottom: '0.75rem' }}>
             <div className="form-group">
@@ -358,18 +505,56 @@ export default function ControlChart() {
           </div>
         )}
 
+        {(chartType === 'cusum' || chartType === 'ewma') && (
+          <div className="form-grid" style={{ marginBottom: '0.75rem' }}>
+            <div className="form-group">
+              <label>Target (Center Value)</label>
+              <input type="number" step="any" value={targetVal} onChange={e => setTargetVal(e.target.value)} placeholder="e.g. process mean" />
+            </div>
+            <div className="form-group">
+              <label>Sigma (Process Std Dev)</label>
+              <input type="number" step="any" value={sigmaVal} onChange={e => setSigmaVal(e.target.value)} placeholder="e.g. historical sigma" />
+            </div>
+            {chartType === 'cusum' ? (
+              <>
+                <div className="form-group">
+                  <label>k (slack, in sigma units — default 0.5 detects a 1σ shift)</label>
+                  <input type="number" step="0.05" value={cusumK} onChange={e => setCusumK(e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label>H (decision interval, in sigma units — default 5)</label>
+                  <input type="number" step="0.5" value={cusumH} onChange={e => setCusumH(e.target.value)} />
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="form-group">
+                  <label>λ (lambda — weight on newest point, 0-1, default 0.2)</label>
+                  <input type="number" step="0.05" min="0.01" max="1" value={ewmaLambda} onChange={e => setEwmaLambda(e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label>L (limit width, in sigma units — default 3)</label>
+                  <input type="number" step="0.1" value={ewmaL} onChange={e => setEwmaL(e.target.value)} />
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
         <button
           className="btn-primary"
-          onClick={chartType === 'imr' ? analyzeIMR : analyzeXbarR}
-          disabled={
+          onClick={chartType === 'imr' ? analyzeIMR : chartType === 'xbarR' ? analyzeXbarR : chartType === 'cusum' ? analyzeCusum : analyzeEwma}disabled={
             chartType === 'imr'
               ? (!data || !valueCol)
-              : (!valueCol || !subgroupCol || (!hasData && !data))
+              : chartType === 'xbarR'
+              ? (!valueCol || !subgroupCol || (!hasData && !data))
+              : (!valueCol || !targetVal || !sigmaVal || (!hasData && !data))
           }
         >
           Generate Charts
         </button>
         {xbarRError && <div className="alert alert-danger" style={{ marginTop: '0.75rem' }}>⚠️ {xbarRError}</div>}
+        {cusumEwmaError && <div className="alert alert-danger" style={{ marginTop: '0.75rem' }}>⚠️ {cusumEwmaError}</div>}
       </div>
 
       {chartType === 'imr' && stats && (
@@ -389,6 +574,28 @@ export default function ControlChart() {
             ['X-bar-bar', xbarRStats.xbarBar.toFixed(4)], ['R-bar', xbarRStats.rBar.toFixed(4)],
             ['X-bar UCL', xbarRStats.xbarUcl.toFixed(4)], ['X-bar LCL', xbarRStats.xbarLcl.toFixed(4)],
             ['R UCL', xbarRStats.rUcl.toFixed(4)], ['Subgroup n / k', `${xbarRStats.n} / ${xbarRStats.k}`],
+          ].map(([l, v]) => (
+            <div key={l} className="stat-card"><div className="stat-value" style={{ fontSize: '1.1rem', fontFamily: 'var(--font-mono)' }}>{v}</div><div className="stat-label">{l}</div></div>
+          ))}
+        </div>
+      )}
+
+      {chartType === 'cusum' && cusumResult && (
+        <div className="stat-grid">
+          {[
+            ['Target', cusumResult.target.toFixed(4)], ['Sigma', cusumResult.sigma.toFixed(4)],
+            ['k (slack)', cusumResult.k.toFixed(4)], ['H (decision interval)', cusumResult.H.toFixed(4)],
+          ].map(([l, v]) => (
+            <div key={l} className="stat-card"><div className="stat-value" style={{ fontSize: '1.1rem', fontFamily: 'var(--font-mono)' }}>{v}</div><div className="stat-label">{l}</div></div>
+          ))}
+        </div>
+      )}
+
+      {chartType === 'ewma' && ewmaResult && (
+        <div className="stat-grid">
+          {[
+            ['Target', ewmaResult.target.toFixed(4)], ['Sigma', ewmaResult.sigma.toFixed(4)],
+            ['Lambda', ewmaResult.lambda.toFixed(4)], ['L', ewmaResult.L.toFixed(4)],
           ].map(([l, v]) => (
             <div key={l} className="stat-card"><div className="stat-value" style={{ fontSize: '1.1rem', fontFamily: 'var(--font-mono)' }}>{v}</div><div className="stat-label">{l}</div></div>
           ))}
@@ -453,7 +660,9 @@ export default function ControlChart() {
             <button className="btn-primary no-print" onClick={handleAddToReport}>{addedToReport ? '✓ Added to Report' : '📄 Add to Report'}</button>
           </div>
         </div>
-      )}{chartType === 'xbarR' && xbarChartData && (
+      )}
+
+      {chartType === 'xbarR' && xbarChartData && (
         <div className="chart-wrapper">
           <div ref={chartWrapperRef}>
           <h4 style={{ margin: '1rem 0 0.5rem' }}>X-bar Chart (Subgroup Means)</h4>
@@ -473,8 +682,7 @@ export default function ControlChart() {
               <ReferenceLine y={xbarRStats.xbarBar} stroke="var(--green)" strokeDasharray="4 4" label={{ value: 'X-bar-bar', fill: 'var(--green)', fontSize: 11 }} />
               <ReferenceLine y={xbarRStats.xbarLcl} stroke="var(--red)" strokeDasharray="4 4" label={{ value: 'LCL', fill: 'var(--red)', fontSize: 11 }} />
               <Line type="monotone" dataKey="value" stroke="var(--accent)" strokeWidth={2} dot={(props) => {
-                const { cx, cy, payload } = props;
-                return <circle key={cx} cx={cx} cy={cy} r={4} fill={payload.outOfControl ? 'var(--red)' : 'var(--accent)'} />;
+                const { cx, cy, payload } = props;return <circle key={cx} cx={cx} cy={cy} r={4} fill={payload.outOfControl ? 'var(--red)' : 'var(--accent)'} />;
               }} />
             </LineChart>
           </ResponsiveContainer>
@@ -500,6 +708,76 @@ export default function ControlChart() {
             <div className="alert alert-danger">⚠ {violationCount} point(s) across the X-bar and R charts triggered a Western Electric rule — investigate for special cause variation.</div>
           ) : (
             <div className="alert alert-success">✓ No Western Electric rule violations — the process mean and within-subgroup variation both appear stable.</div>
+          )}
+          <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+            <button className="btn-secondary no-print" onClick={() => window.print()}>🖨️ Print</button>
+            <button className="btn-primary no-print" onClick={handleAddToReport}>{addedToReport ? '✓ Added to Report' : '📄 Add to Report'}</button>
+          </div>
+        </div>
+      )}
+
+      {chartType === 'cusum' && cusumResult && (
+        <div className="chart-wrapper">
+          <div ref={chartWrapperRef}>
+          <h4 style={{ margin: '1rem 0 0.5rem' }}>CUSUM Chart</h4>
+          <ResponsiveContainer width="100%" height={320}>
+            <LineChart data={cusumResult.points}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+              <XAxis dataKey="label" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
+              <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
+              <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px' }} />
+              <ReferenceLine y={cusumResult.H} stroke="var(--red)" strokeDasharray="4 4" label={{ value: 'H', fill: 'var(--red)', fontSize: 11 }} />
+              <ReferenceLine y={-cusumResult.H} stroke="var(--red)" strokeDasharray="4 4" label={{ value: '-H', fill: 'var(--red)', fontSize: 11 }} />
+              <ReferenceLine y={0} stroke="var(--green)" strokeDasharray="4 4" />
+              <Line type="monotone" dataKey="cPlus" name="C+" stroke="var(--accent)" strokeWidth={2} dot={(props) => {
+                const { cx, cy, payload } = props;
+                return <circle key={`p-${cx}`} cx={cx} cy={cy} r={4} fill={payload.cPlus > cusumResult.H ? 'var(--red)' : 'var(--accent)'} />;
+              }} />
+              <Line type="monotone" dataKey="cMinus" name="C-" stroke="var(--orange)" strokeWidth={2} dot={(props) => {
+                const { cx, cy, payload } = props;
+                return <circle key={`m-${cx}`} cx={cx} cy={cy} r={4} fill={payload.cMinus < -cusumResult.H ? 'var(--red)' : 'var(--orange)'} />;
+              }} />
+            </LineChart>
+          </ResponsiveContainer>
+          </div>
+
+          {violationCount > 0 ? (
+            <div className="alert alert-danger">⚠ {violationCount} point(s) exceeded the decision interval (±H = ±{cusumResult.H.toFixed(4)}) — this signals a sustained shift away from target.</div>
+          ) : (
+            <div className="alert alert-success">✓ No CUSUM signal — the cumulative sums stayed within the decision interval, consistent with the process running on target.</div>
+          )}
+          <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+            <button className="btn-secondary no-print" onClick={() => window.print()}>🖨️ Print</button>
+            <button className="btn-primary no-print" onClick={handleAddToReport}>{addedToReport ? '✓ Added to Report' : '📄 Add to Report'}</button>
+          </div>
+        </div>
+      )}
+
+      {chartType === 'ewma' && ewmaResult && (
+        <div className="chart-wrapper">
+          <div ref={chartWrapperRef}>
+          <h4 style={{ margin: '1rem 0 0.5rem' }}>EWMA Chart</h4>
+          <ResponsiveContainer width="100%" height={320}>
+            <LineChart data={ewmaResult.points}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+              <XAxis dataKey="label" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
+              <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 11 }} domain={['auto', 'auto']} />
+              <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px' }} />
+              <ReferenceLine y={ewmaResult.target} stroke="var(--green)" strokeDasharray="4 4" label={{ value: 'Target', fill: 'var(--green)', fontSize: 11 }} />
+              <Line type="monotone" dataKey="ucl" name="UCL" stroke="var(--red)" strokeWidth={1} strokeDasharray="4 4" dot={false} />
+              <Line type="monotone" dataKey="lcl" name="LCL" stroke="var(--red)" strokeWidth={1} strokeDasharray="4 4" dot={false} />
+              <Line type="monotone" dataKey="z" name="EWMA" stroke="var(--accent)" strokeWidth={2} dot={(props) => {
+                const { cx, cy, payload } = props;
+                return <circle key={cx} cx={cx} cy={cy} r={4} fill={payload.outOfControl ? 'var(--red)' : 'var(--accent)'} />;
+              }} />
+            </LineChart>
+          </ResponsiveContainer>
+          </div>
+
+          {violationCount > 0 ? (
+            <div className="alert alert-danger">⚠ {violationCount} point(s) fell outside the EWMA control limits — this signals a shift away from target.</div>
+          ) : (
+            <div className="alert alert-success">✓ No EWMA signal — the smoothed statistic stayed within its control limits, consistent with the process running on target.</div>
           )}
           <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
             <button className="btn-secondary no-print" onClick={() => window.print()}>🖨️ Print</button>
