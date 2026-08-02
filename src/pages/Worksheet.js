@@ -83,10 +83,27 @@ function DataGrid() {
                 <td key={colIndex}>
                   <input
                     style={cellInputStyle}
+                    data-row={rowIndex}
+                    data-col={colIndex}
                     value={c.data[rowIndex] ?? ''}
                     onChange={e => updateCell(colIndex, rowIndex, e.target.value)}
                     onFocus={e => e.target.style.border = '1px solid var(--accent)'}
                     onBlur={e => e.target.style.border = '1px solid transparent'}
+                    onKeyDown={e => {
+                      if (e.key !== 'Enter') return;
+                      e.preventDefault();
+                      const nextRow = rowIndex + 1;
+                      const focusNext = () => {
+                        const next = document.querySelector(`input[data-row="${nextRow}"][data-col="${colIndex}"]`);
+                        if (next) next.focus();
+                      };
+                      if (nextRow < visibleRows) {
+                        focusNext();
+                      } else {
+                        addBlankRow();
+                        setTimeout(focusNext, 0);
+                      }
+                    }}
                   />
                 </td>
               ))}
