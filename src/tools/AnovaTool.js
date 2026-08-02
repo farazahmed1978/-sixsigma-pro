@@ -6,7 +6,7 @@ import { useReport } from '../context/ReportContext';
 import { interpretAnova, interpretRMAnova, interpretTwoWayAnova } from '../utils/interpretations';
 import {
   oneWayAnova, rmAnova, twoWayAnova, levenesTest, bartlettsTest, andersonDarling,
-  pairwisePostHoc, pairwisePostHocPaired, mauchlysTest, TEST_EXPLAINERS
+  pairwisePostHoc, pairwisePostHocPaired, mauchlysTest, simpleEffectsAnalysis, TEST_EXPLAINERS
 } from '../utils/statTests';
 import { QQPlot, SimpleHistogram, GroupBoxPlot } from '../utils/statViews';
 import './Tool.css';
@@ -91,7 +91,8 @@ export default function AnovaTool() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const toggleCondition = (name) => setConditionVars(p => p.includes(name) ? p.filter(c => c !== name) : [...p, name]);const resetResults = () => { setOwResult(null); setOwGroups(null); setRmResult(null); setTwResult(null); setTwError(''); setAddedToReport(false); };
+  const toggleCondition = (name) => setConditionVars(p => p.includes(name) ? p.filter(c => c !== name) : [...p, name]);
+  const resetResults = () => { setOwResult(null); setOwGroups(null); setRmResult(null); setTwResult(null); setTwError(''); setAddedToReport(false); };
 
   const runOneWay = () => {
     setAddedToReport(false);
@@ -151,8 +152,7 @@ export default function AnovaTool() {
         timestamp: new Date().toISOString(),
         chartImage,
         statsSummary: { 'F': owResult.F.toFixed(3), 'df': `${owResult.dfB}, ${owResult.dfW}`, 'p-value': owResult.p.toFixed(4), 'η²': owResult.etaSq.toFixed(3) },
-        interpretation,
-        rawData: owGroups.labels.map((lab, i) => ({ group: lab, n: owGroups.groups[i].length, mean: owResult.groupStats[i].mean.toFixed(4), sd: owResult.groupStats[i].sd.toFixed(4) })),
+        interpretation,rawData: owGroups.labels.map((lab, i) => ({ group: lab, n: owGroups.groups[i].length, mean: owResult.groupStats[i].mean.toFixed(4), sd: owResult.groupStats[i].sd.toFixed(4) })),
       });
     } else if (mode === 'rm' && rmResult) {
       const interpretation = interpretRMAnova(rmResult, conditionVars);
@@ -190,7 +190,8 @@ export default function AnovaTool() {
 
   return (
     <div style={{ padding: '1.5rem' }}>
-      <div className="card" style={{ marginBottom: '1.5rem' }}><h3 className="section-title" style={{ marginBottom: '0.5rem' }}>ANOVA</h3>
+      <div className="card" style={{ marginBottom: '1.5rem' }}>
+        <h3 className="section-title" style={{ marginBottom: '0.5rem' }}>ANOVA</h3>
         <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
           Compare means across 3 or more groups or conditions.
         </p>
@@ -289,7 +290,8 @@ export default function AnovaTool() {
         )}
       </div>
 
-      {(owResult || rmResult || twResult) && (<div ref={resultsRef}>
+      {(owResult || rmResult || twResult) && (
+        <div ref={resultsRef}>
           {mode === 'oneway' && owResult && owGroups && (
             <div className="card" style={{ padding: '1.25rem 1.5rem', marginBottom: '1rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
@@ -304,8 +306,7 @@ export default function AnovaTool() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', marginBottom: '1rem' }}>
                 <thead><tr>
                   <th style={{ textAlign: 'left', padding: '0.4rem', color: 'var(--text-muted)' }}>Group</th>
-                  <th style={{ textAlign: 'right', padding: '0.4rem', color: 'var(--text-muted)' }}>n</th>
-                  <th style={{ textAlign: 'right', padding: '0.4rem', color: 'var(--text-muted)' }}>Mean</th>
+                  <th style={{ textAlign: 'right', padding: '0.4rem', color: 'var(--text-muted)' }}>n</th><th style={{ textAlign: 'right', padding: '0.4rem', color: 'var(--text-muted)' }}>Mean</th>
                   <th style={{ textAlign: 'right', padding: '0.4rem', color: 'var(--text-muted)' }}>SD</th>
                 </tr></thead>
                 <tbody>
@@ -388,7 +389,8 @@ export default function AnovaTool() {
                     <td style={{ padding: '0.4rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{twResult.ssab.toFixed(3)}</td>
                     <td style={{ padding: '0.4rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{twResult.dfAB}</td>
                     <td style={{ padding: '0.4rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{twResult.Fab.toFixed(3)}</td>
-                    <td style={{ padding: '0.4rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{twResult.pab.toFixed(4)}</td><td style={{ padding: '0.4rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{sigBadge(twResult.pab)}</td>
+                    <td style={{ padding: '0.4rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{twResult.pab.toFixed(4)}</td>
+                    <td style={{ padding: '0.4rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{sigBadge(twResult.pab)}</td>
                   </tr>
                   <tr>
                     <td style={{ padding: '0.4rem', borderTop: '1px solid var(--border)', color: 'var(--text-muted)' }}>Error</td>
@@ -458,8 +460,7 @@ export default function AnovaTool() {
             <>
               <CompanionTest label="Check Normality — Anderson-Darling Test" explainer={TEST_EXPLAINERS.andersonDarling}
                 onRun={() => andersonDarling(owResult.residuals)}
-                renderResult={(r) => (<div style={{ fontSize: '0.85rem' }}>A² = {r.A2.toFixed(4)}, p = {r.p.toFixed(4)} &nbsp; {assumptionBadge(r.p)}</div>)}
-              />
+                renderResult={(r) => (<div style={{ fontSize: '0.85rem' }}>A² = {r.A2.toFixed(4)}, p = {r.p.toFixed(4)} &nbsp; {assumptionBadge(r.p)}</div>)}/>
               <CompanionTest label="Check Equal Variance — Levene's Test" explainer={TEST_EXPLAINERS.levene}
                 onRun={() => levenesTest(owGroups.groups)}
                 renderResult={(r) => (<div style={{ fontSize: '0.85rem' }}>F({r.dfB},{r.dfW}) = {r.F.toFixed(4)}, p = {r.p.toFixed(4)} &nbsp; {assumptionBadge(r.p)}</div>)}
@@ -482,7 +483,8 @@ export default function AnovaTool() {
                       {pairs.map((pr, i) => (
                         <tr key={i}>
                           <td style={{ padding: '0.35rem', borderTop: '1px solid var(--border)' }}>{pr.a} vs {pr.b}</td>
-                          <td style={{ padding: '0.35rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{pr.diff.toFixed(4)}</td><td style={{ padding: '0.35rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{pr.pAdj.toFixed(4)}</td>
+                          <td style={{ padding: '0.35rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{pr.diff.toFixed(4)}</td>
+                          <td style={{ padding: '0.35rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{pr.pAdj.toFixed(4)}</td>
                           <td style={{ padding: '0.35rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{sigBadge(pr.pAdj, 'Differs', 'No difference')}</td>
                         </tr>
                       ))}
@@ -551,6 +553,51 @@ export default function AnovaTool() {
                 onRun={() => levenesTest(twResult.cellStats.map(c => c.values))}
                 renderResult={(r) => (<div style={{ fontSize: '0.85rem' }}>F({r.dfB},{r.dfW}) = {r.F.toFixed(4)}, p = {r.p.toFixed(4)} &nbsp; {assumptionBadge(r.p)}</div>)}
               />
+              <CompanionTest label={`Simple Effects — ${factorAVar} within each level of ${factorBVar}, and vice versa`} explainer="If the interaction is significant, this breaks it down further: tests whether Factor A has an effect at each individual level of Factor B (and Factor B at each level of Factor A), using the pooled error term from the full model. This tells you exactly where the interaction is coming from."
+                onRun={() => simpleEffectsAnalysis(twResult)}
+                renderResult={(r) => (
+                  <>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.4rem' }}>{factorAVar} within each {factorBVar}</div>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', marginBottom: '1rem' }}>
+                      <thead><tr>
+                        <th style={{ textAlign: 'left', padding: '0.35rem' }}>{factorBVar} =</th>
+                        <th style={{ textAlign: 'right', padding: '0.35rem' }}>F</th>
+                        <th style={{ textAlign: 'right', padding: '0.35rem' }}>p</th>
+                        <th style={{ textAlign: 'right', padding: '0.35rem' }}></th>
+                      </tr></thead>
+                      <tbody>
+                        {r.aWithinB.map((row, i) => (
+                          <tr key={i}>
+                            <td style={{ padding: '0.35rem', borderTop: '1px solid var(--border)' }}>{row.level}</td>
+                            <td style={{ padding: '0.35rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>F({row.df1},{row.df2}) = {row.F.toFixed(3)}</td>
+                            <td style={{ padding: '0.35rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{row.p.toFixed(4)}</td>
+                            <td style={{ padding: '0.35rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{sigBadge(row.p)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.4rem' }}>{factorBVar} within each {factorAVar}</div>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                      <thead><tr>
+                        <th style={{ textAlign: 'left', padding: '0.35rem' }}>{factorAVar} =</th>
+                        <th style={{ textAlign: 'right', padding: '0.35rem' }}>F</th>
+                        <th style={{ textAlign: 'right', padding: '0.35rem' }}>p</th>
+                        <th style={{ textAlign: 'right', padding: '0.35rem' }}></th>
+                      </tr></thead>
+                      <tbody>
+                        {r.bWithinA.map((row, i) => (
+                          <tr key={i}>
+                            <td style={{ padding: '0.35rem', borderTop: '1px solid var(--border)' }}>{row.level}</td>
+                            <td style={{ padding: '0.35rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>F({row.df1},{row.df2}) = {row.F.toFixed(3)}</td>
+                            <td style={{ padding: '0.35rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{row.p.toFixed(4)}</td>
+                            <td style={{ padding: '0.35rem', textAlign: 'right', borderTop: '1px solid var(--border)' }}>{sigBadge(row.p)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </>
+                )}
+              />
             </>
           )}
 
@@ -561,4 +608,3 @@ export default function AnovaTool() {
       )}
     </div>
   );
-}
