@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useWorksheet } from '../context/WorksheetContext';
 import { tCDF, normCDF, chiSquareCDF } from '../utils/statMath';
 import { oneWayAnova as verifiedOneWayAnova } from '../utils/statTests';
+import { BOOK_EXCERPTS } from '../utils/bookExcerpts';
 import './HypothesisTesting.css';
 
 // Statistical helpers — descriptive only. All p-value math below now comes from
@@ -131,8 +132,7 @@ function ResultBox({ result, testId }) {
           <div><span>Z</span><strong>{result.z.toFixed(4)}</strong></div>
         </>}
         {testId === 'chi2gof' && <>
-          <div><span>χ²</span><strong>{result.chi2.toFixed(4)}</strong></div>
-          <div><span>df</span><strong>{result.df}</strong></div>
+          <div><span>χ²</span><strong>{result.chi2.toFixed(4)}</strong></div><div><span>df</span><strong>{result.df}</strong></div>
         </>}
         {testId === '1prop' && <>
           <div><span>p̂ (sample)</span><strong>{result.phat.toFixed(4)}</strong></div>
@@ -157,6 +157,8 @@ export default function HypothesisTesting() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [typeFilter, setTypeFilter] = useState('All');
+  const [showGuide, setShowGuide] = useState(false);
+  const bookExcerpt = BOOK_EXCERPTS.hypothesis;
 
   const numCols = columns.filter(c => c.data.some(v => !isNaN(parseFloat(v))));
 
@@ -190,7 +192,8 @@ export default function HypothesisTesting() {
         const obs = inputs.observed.split(/[\n,\s]+/).map(Number).filter(v => !isNaN(v));
         const exp = inputs.expected.split(/[\n,\s]+/).map(Number).filter(v => !isNaN(v));
         if (obs.length < 2 || obs.length !== exp.length) throw new Error('Need matching observed/expected counts');
-        res = chiSquareGoF(obs, exp);} else if (test.id === '1prop') {
+        res = chiSquareGoF(obs, exp);
+      } else if (test.id === '1prop') {
         const x = parseInt(inputs.x), n = parseInt(inputs.n);
         if (isNaN(x) || isNaN(n) || n <= 0 || x < 0 || x > n) throw new Error('Invalid counts');
         res = proportionTest(x, n, parseFloat(inputs.p0));
@@ -217,8 +220,31 @@ export default function HypothesisTesting() {
           <h1>Hypothesis Testing</h1>
           <p>Select a test, choose your data, and get instant statistical results with interpretation.</p>
         </div>
-        {result && <button className="btn-secondary no-print" onClick={printResult}>🖨️ Print Results</button>}
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {bookExcerpt && (
+            <button className={`btn ${showGuide ? 'btn-primary' : 'btn-ghost'} no-print`} onClick={() => setShowGuide(g => !g)}>
+              {showGuide ? '📊 Hide Guide' : '📖 Show Guide'}
+            </button>
+          )}
+          {result && <button className="btn-secondary no-print" onClick={printResult}>🖨️ Print Results</button>}
+        </div>
       </div>
+
+      {showGuide && bookExcerpt && (
+        <div className="info-panel animate-in no-print" style={{ marginBottom: '1.25rem' }}>
+          <div className="info-block">
+            <div className="info-block-title">📖 From the Book — <em style={{ fontWeight: 500 }}>{bookExcerpt.chapter}</em></div>
+            <div style={{ fontSize: '0.88rem', lineHeight: 1.65, color: 'var(--text-secondary)' }}>
+              {bookExcerpt.text.split('\n\n').map((para, i, arr) => (
+                <p key={i} style={{ marginBottom: i < arr.length - 1 ? '0.85rem' : 0 }}>{para}</p>
+              ))}
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.6rem', fontStyle: 'italic' }}>
+              Excerpted from <strong>The Black Belt Standard</strong> by Faraz Ahmed.
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="ht-layout">
         {/* Test selector */}
@@ -240,8 +266,7 @@ export default function HypothesisTesting() {
                   <span className="ht-test-type" style={{ color: typeColor[test.type] }}>{test.type}</span>
                 </div>
                 <div className="ht-test-desc">{test.desc}</div>
-              </button>
-            ))}
+              </button>))}
           </div>
         </div>
 
@@ -320,8 +345,7 @@ export default function HypothesisTesting() {
                 )}
 
                 {/* Multi-group inputs */}
-                {TESTS.find(t => t.id === selectedTest)?.inputs === 'multi' && (
-                  <div>
+                {TESTS.find(t => t.id === selectedTest)?.inputs === 'multi' && (<div>
                     <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>Enter data for at least 3 groups</p>
                     {[0, 1, 2].map(i => (
                       <div key={i} className="form-group" style={{ marginBottom: '0.75rem' }}>
