@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
+import html2canvas from 'html2canvas';
 import { useWorksheet } from '../context/WorksheetContext';
+import { useReport } from '../context/ReportContext';
 import { tCDF, normCDF, chiSquareCDF } from '../utils/statMath';
 import { oneWayAnova as verifiedOneWayAnova, pairedTTest, twoPropTest, wilcoxonSignedRank, friedmanTest } from '../utils/statTests';
 import { BOOK_EXCERPTS } from '../utils/bookExcerpts';
@@ -94,6 +96,61 @@ const TESTS = [
 
 const typeColor = { Continuous: 'var(--green)', Nonparametric: 'var(--orange)', Discrete: 'var(--purple)' };
 
+// Builds a plain-English interpretation sentence and a compact stats summary for the
+// report, tailored to each test's specific statistic/field names.function buildReportContent(test, result) {
+  const pStr = result.p < 0.001 ? '<0.001' : result.p.toFixed(4);
+  const verdict = result.p < 0.05 ? 'a statistically significant result' : 'not a statistically significant result';
+  let summary = {}, interpretation = '';
+
+  switch (test.id) {
+    case '1t':
+      summary = { 'n': result.n, 'Mean': result.mean.toFixed(4), 't': result.t.toFixed(4), 'df': result.df, 'p': pStr };
+      interpretation = `The sample mean (${result.mean.toFixed(3)}, n=${result.n}) was tested against the hypothesized value. This is ${verdict} (t(${result.df})=${result.t.toFixed(3)}, p=${pStr}).`;
+      break;
+    case '2t':
+      summary = { 'n₁': result.na, 'n₂': result.nb, 'Mean₁': result.ma.toFixed(4), 'Mean₂': result.mb.toFixed(4), 't': result.t.toFixed(4), 'p': pStr };
+      interpretation = `Comparing two independent groups (means ${result.ma.toFixed(3)} vs ${result.mb.toFixed(3)}, difference=${result.diff.toFixed(3)}) gave ${verdict} (t(${result.df})=${result.t.toFixed(3)}, p=${pStr}).`;
+      break;
+    case 'pairedt':
+      summary = { 'n (pairs)': result.n, 'Mean Diff': result.meanDiff.toFixed(4), 't': result.t.toFixed(4), 'df': result.df, 'p': pStr };
+      interpretation = `Comparing paired measurements (mean difference=${result.meanDiff.toFixed(3)}, n=${result.n} pairs) gave ${verdict} (t(${result.df})=${result.t.toFixed(3)}, p=${pStr}).`;
+      break;
+    case 'anova':
+    case 'kw':
+      summary = { 'Groups': result.k, 'N': result.N, 'F': result.F.toFixed(4), 'df Between': result.dfBetween, 'df Within': result.dfWithin, 'p': pStr };
+      interpretation = `Comparing ${result.k} groups (N=${result.N}) gave ${verdict} (F(${result.dfBetween},${result.dfWithin})=${result.F.toFixed(3)}, p=${pStr}).`;
+      break;
+    case 'mw':
+      summary = { 'U statistic': result.u.toFixed(2), 'Z': result.z.toFixed(4), 'p': pStr };
+      interpretation = `The non-parametric comparison of two independent groups gave ${verdict} (U=${result.u.toFixed(2)}, Z=${result.z.toFixed(3)}, p=${pStr}).`;
+      break;
+    case 'wilcoxon':
+      summary = { 'n (pairs)': result.n, 'W': result.W.toFixed(2), 'Z': result.z.toFixed(4), 'p': pStr };
+      interpretation = `The non-parametric comparison of paired measurements (n=${result.n} non-zero pairs) gave ${verdict} (W=${result.W.toFixed(2)}, Z=${result.z.toFixed(3)}, p=${pStr}).`;
+      break;
+    case 'friedman':
+      summary = { 'Conditions': result.k, 'Subjects': result.n, 'χ²': result.statistic.toFixed(4), 'df': result.df, 'p': pStr };
+      interpretation = `Comparing ${result.k} paired conditions across ${result.n} subjects gave ${verdict} (χ²(${result.df})=${result.statistic.toFixed(3)}, p=${pStr}).`;
+      break;
+    case 'chi2gof':
+      summary = { 'χ²': result.chi2.toFixed(4), 'df': result.df, 'p': pStr };
+      interpretation = `Comparing observed counts to the expected distribution gave ${verdict} (χ²(${result.df})=${result.chi2.toFixed(3)}, p=${pStr}).`;
+      break;
+    case '1prop':
+      summary = { 'p̂': result.phat.toFixed(4), 'Z': result.z.toFixed(4), 'p': pStr, '95% CI': `[${result.ci[0].toFixed(3)}, ${result.ci[1].toFixed(3)}]` };
+      interpretation = `The sample proportion (p̂=${result.phat.toFixed(4)}) was tested against the hypothesized value. This is ${verdict} (Z=${result.z.toFixed(3)}, p=${pStr}).`;
+      break;
+    case '2prop':
+      summary = { 'p̂₁': result.p1.toFixed(4), 'p̂₂': result.p2.toFixed(4), 'Difference': result.diff.toFixed(4), 'Z': result.z.toFixed(4), 'p': pStr };
+      interpretation = `Comparing two proportions (${result.p1.toFixed(4)} vs ${result.p2.toFixed(4)}, difference=${result.diff.toFixed(4)}) gave ${verdict} (Z=${result.z.toFixed(3)}, p=${pStr}).`;
+      break;
+    default:
+      summary = { 'p': pStr };
+      interpretation = `This test gave ${verdict} (p=${pStr}).`;
+  }
+  return { summary, interpretation };
+}
+
 function ResultBox({ result, testId }) {
   if (!result) return null;
   const sig = result.p < 0.05;
@@ -159,8 +216,7 @@ function ResultBox({ result, testId }) {
         </>}
         {testId === 'chi2gof' && <>
           <div><span>χ²</span><strong>{result.chi2.toFixed(4)}</strong></div>
-          <div><span>df</span><strong>{result.df}</strong></div>
-        </>}
+          <div><span>df</span><strong>{result.df}</strong></div></>}
         {testId === '1prop' && <>
           <div><span>p̂ (sample)</span><strong>{result.phat.toFixed(4)}</strong></div>
           <div><span>Z</span><strong>{result.z.toFixed(4)}</strong></div>
@@ -186,20 +242,41 @@ function ResultBox({ result, testId }) {
 
 export default function HypothesisTesting() {
   const { columns, getColumnData, hasData } = useWorksheet();
+  const { addReportItem } = useReport();
+  const resultRef = useRef(null);
   const [selectedTest, setSelectedTest] = useState(null);
   const [inputs, setInputs] = useState({ col1: '', col2: '', mu0: 0, p0: 0.5, x: 10, n: 100, x1: 10, n1: 100, x2: 10, n2: 100, observed: '', expected: '', groups: ['', '', ''] });
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [typeFilter, setTypeFilter] = useState('All');
   const [showGuide, setShowGuide] = useState(false);
+  const [addedToReport, setAddedToReport] = useState(false);
   const bookExcerpt = BOOK_EXCERPTS.hypothesis;
+
+  const handleAddToReport = useCallback(async () => {
+    if (!resultRef.current || !result) return;
+    const test = TESTS.find(t => t.id === selectedTest);
+    const canvas = await html2canvas(resultRef.current, { backgroundColor: null, scale: 2 });
+    const chartImage = canvas.toDataURL('image/png');
+    const { summary, interpretation } = buildReportContent(test, result);
+    addReportItem({
+      title: test.name,
+      toolId: 'hypothesis',
+      timestamp: new Date().toISOString(),
+      chartImage,
+      statsSummary: summary,
+      interpretation,
+      rawData: [],
+    });
+    setAddedToReport(true);
+  }, [result, selectedTest, addReportItem]);
 
   const numCols = columns.filter(c => c.data.some(v => !isNaN(parseFloat(v))));
 
   const parseManual = (str) => str.split(/[\n,\s]+/).map(parseFloat).filter(v => !isNaN(v));
 
   const runTest = () => {
-    setError(''); setResult(null);
+    setError(''); setResult(null); setAddedToReport(false);
     try {
       const test = TESTS.find(t => t.id === selectedTest);
       if (!test) return;
@@ -258,8 +335,7 @@ export default function HypothesisTesting() {
       }
       setResult(res);
     } catch (e) {
-      setError(e.message);
-    }
+      setError(e.message);}
   };
 
   const printResult = () => window.print();
@@ -378,8 +454,7 @@ export default function HypothesisTesting() {
                           <label>Group 2 Column</label>
                           <select value={inputs.col2} onChange={e => setInputs(p => ({ ...p, col2: e.target.value }))}>
                             <option value="">— select —</option>
-                            {numCols.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
-                          </select>
+                            {numCols.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}</select>
                         </div>
                       </div>
                     ) : (
@@ -474,7 +549,16 @@ export default function HypothesisTesting() {
                 <button className="btn-primary" style={{ marginTop: '1.25rem' }} onClick={runTest}>Run Test</button>
               </div>
 
-              {result && <ResultBox result={result} testId={selectedTest} />}
+              {result && (
+                <div ref={resultRef}>
+                  <ResultBox result={result} testId={selectedTest} />
+                </div>
+              )}
+              {result && (
+                <button className="btn-primary no-print" style={{ marginTop: '1rem' }} onClick={handleAddToReport}>
+                  {addedToReport ? '✓ Added to Report' : 'Add to Report'}
+                </button>
+              )}
             </div>
           )}
         </div>
