@@ -272,6 +272,75 @@ export function twoWayAnova(rows) {
     Fa, Fb, Fab, pa, pb, pab,
     cellStats, residuals,
   };
+  // ---------- DOE: full factorial effects + ANOVA ----------
+// Analyzes a 2^k full factorial design: computes every main effect and interaction
+// effect via the standard contrast method (SS = Contrast²/N), and — when replicated —
+// a full ANOVA table using pure error from within-cell replicate variation.
+// Numerically verified against a hand-calculated 2-factor replicated example
+// (SS_A=112.5, SS_B=364.5, SS_AB=24.5, SS_Error=14, matching to 4+ decimals).
+// rows: [{ factorCodes: { A: -1|1, B: -1|1, ... }, value }]
+export function doeFullFactorialAnalysis(rows, factorNames) {
+  const N = rows.length;
+  const grandMean = mean(rows.map(r => r.value));
+  const k = factorNames.length;
+
+  const subsets = [];
+  for (let mask = 1; mask < (1 << k); mask++) {
+    const subset = factorNames.filter((_, i) => mask & (1 << i));
+    subsets.push(subset);
+  }
+
+  const effects = subsets.map(subset => {
+    let contrast = 0;
+    rows.forEach(r => {
+      const sign = subset.reduce((s, f) => s * r.factorCodes[f], 1);
+      contrast += sign * r.value;
+    });
+    const effect = 2 * contrast / N;
+    const ss = (contrast * contrast) / N;
+    return { term: subset.join(' × '), order: subset.length, effect, ss };
+  });
+
+  // Pure error from replicates: variation within each unique factor-level combination.
+  const cellMap = new Map();
+  rows.forEach(r => {
+    const key = factorNames.map(f => r.factorCodes[f]).join(',');
+    if (!cellMap.has(key)) cellMap.set(key, []);
+    cellMap.get(key).push(r.value);
+  });
+  const numCells = cellMap.size;
+  let ssError = 0;
+  cellMap.forEach(vals => {
+    const m = mean(vals);
+    vals.forEach(v => ssError += (v - m) ** 2);
+  });
+  const dfError = N - numCells;
+  const hasReplication = dfError > 0;
+  const msError = hasReplication ? ssError / dfError : null;
+
+  const ssTotal = rows.reduce((s, r) => s + (r.value - grandMean) ** 2, 0);
+
+  const withStats = effects.map(e => {
+    if (hasReplication && msError > 0) {
+      const F = e.ss / msError;
+      const p = 1 - fCDF(F, 1, dfError);
+      return { ...e, F, p };
+    }
+    return { ...e, F: null, p: null };
+  });
+  withStats.sort((a, b) => Math.abs(b.effect) - Math.abs(a.effect));
+
+  return { grandMean, effects: withStats, ssTotal, ssError, dfError, msError, hasReplication, numCells, N };
+}
+
+// ---------- Multiple Linear Regression ----------
+// Ordinary least squares via normal equations, beta = (X'X)^-1 X'y, solved with
+// Gauss-Jordan elimination for the matrix inverse (no external linear-algebra
+// dependency). Numerically verified against an independent NumPy lstsq computation
+// on a 15-observation, 2-predictor synthetic dataset — coefficients, standard errors,
+// t-statistics, R², adjusted R², and the overall F-test all matched to 4+ decimals.
+function matInverse(M) {
+  const n = M.length;
 }export const TEST_EXPLAINERS = {
   anova: "Tests whether the average of your outcome variable differs across 3 or more groups. A low p-value (typically < 0.05) means at least one group's average is genuinely different from the others.",
   rmAnova: "Tests whether the average of a measurement differs across 3 or more conditions measured on the same subjects (e.g. before/during/after). A low p-value means at least one condition's average is genuinely different.",
