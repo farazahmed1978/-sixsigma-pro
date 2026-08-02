@@ -147,6 +147,15 @@ const toolMeta = {
     interpretation: 'R² ≥ 0.7 is a strong fit. Check the t-statistic (|t| ≥ ~2) before treating the slope as a real, non-random effect.',
     csvFormat: 'Two numeric columns loaded in the Worksheet — one predictor (X), one response (Y).',
   },
+  'multiregression': {
+    name: 'Multiple Regression', icon: '📊', category: 'Analyze', phase: 'Analyze',
+    phaseColor: 'var(--orange)',
+    desc: 'Fit an outcome (Y) against two or more predictors (X) at once, with coefficients, per-predictor significance tests, R², adjusted R², and the overall model F-test.',
+    formulas: ['Ŷ = β₀ + β₁X₁ + β₂X₂ + ...', 'R²adj = 1 − (1−R²)(n−1)/(n−k−1)', 'F = MSregression / MSresidual'],
+    whenToUse: 'Use when a single predictor (simple regression) is not enough — when you suspect 2 or more X variables jointly affect Y and want to see each one\u2019s independent effect after accounting for the others.',
+    interpretation: 'Check the overall model p-value first; only trust individual coefficient p-values if the overall model is significant. Adjusted R² (not raw R²) is the fairer comparison when adding more predictors.',
+    csvFormat: 'One numeric outcome column (Y) and 2+ numeric predictor columns (X) loaded in the Worksheet.',
+  },
   'anova': {
     name: 'ANOVA', icon: '📶', category: 'Analyze', phase: 'Analyze',
     phaseColor: 'var(--orange)',
