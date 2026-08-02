@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useWorksheet } from '../context/WorksheetContext';
 import { tCDF, normCDF, chiSquareCDF } from '../utils/statMath';
-import { oneWayAnova as verifiedOneWayAnova } from '../utils/statTests';
+import { oneWayAnova as verifiedOneWayAnova, pairedTTest, twoPropTest, wilcoxonSignedRank, friedmanTest } from '../utils/statTests';
 import { BOOK_EXCERPTS } from '../utils/bookExcerpts';
 import './HypothesisTesting.css';
 
@@ -81,11 +81,15 @@ function proportionTest(x, n, p0) {
 const TESTS = [
   { id: '1t', name: '1-Sample t-Test', type: 'Continuous', desc: 'Test if a population mean equals a target value', inputs: 'single' },
   { id: '2t', name: '2-Sample t-Test', type: 'Continuous', desc: 'Compare means of two independent groups', inputs: 'two' },
+  { id: 'pairedt', name: 'Paired t-Test', type: 'Continuous', desc: 'Compare two related/paired measurements (e.g. before vs. after on the same subjects)', inputs: 'two' },
   { id: 'anova', name: 'One-Way ANOVA', type: 'Continuous', desc: 'Compare means across 3 or more groups', inputs: 'multi' },
   { id: 'mw', name: 'Mann-Whitney', type: 'Nonparametric', desc: 'Non-parametric alternative to 2-sample t-test', inputs: 'two' },
+  { id: 'wilcoxon', name: 'Wilcoxon Signed-Rank', type: 'Nonparametric', desc: 'Non-parametric alternative to the paired t-test', inputs: 'two' },
   { id: 'kw', name: 'Kruskal-Wallis', type: 'Nonparametric', desc: 'Non-parametric alternative to one-way ANOVA', inputs: 'multi' },
+  { id: 'friedman', name: 'Friedman Test', type: 'Nonparametric', desc: 'Non-parametric alternative to repeated-measures ANOVA (3+ paired conditions)', inputs: 'multi' },
   { id: 'chi2gof', name: 'Chi-Square Goodness of Fit', type: 'Discrete', desc: 'Test if observed counts match expected distribution', inputs: 'chi2gof' },
   { id: '1prop', name: '1-Proportion Test', type: 'Discrete', desc: 'Test if a proportion equals a target value', inputs: '1prop' },
+  { id: '2prop', name: '2-Proportion Test', type: 'Discrete', desc: 'Compare two proportions from two independent samples', inputs: '2prop' },
 ];
 
 const typeColor = { Continuous: 'var(--green)', Nonparametric: 'var(--orange)', Discrete: 'var(--purple)' };
@@ -119,6 +123,14 @@ function ResultBox({ result, testId }) {
           <div><span>t-statistic</span><strong>{result.t.toFixed(4)}</strong></div>
           <div><span>df</span><strong>{result.df}</strong></div>
         </>}
+        {testId === 'pairedt' && <>
+          <div><span>n (pairs)</span><strong>{result.n}</strong></div>
+          <div><span>Mean Difference</span><strong>{result.meanDiff.toFixed(4)}</strong></div>
+          <div><span>SD of Differences</span><strong>{result.sd.toFixed(4)}</strong></div>
+          <div><span>t-statistic</span><strong>{result.t.toFixed(4)}</strong></div>
+          <div><span>df</span><strong>{result.df}</strong></div>
+          <div><span>95% CI</span><strong>[{result.ci[0].toFixed(3)}, {result.ci[1].toFixed(3)}]</strong></div>
+        </>}
         {testId === 'anova' && <>
           <div><span>Groups</span><strong>{result.k}</strong></div>
           <div><span>N</span><strong>{result.N}</strong></div>
@@ -131,13 +143,35 @@ function ResultBox({ result, testId }) {
           <div><span>U statistic</span><strong>{result.u.toFixed(2)}</strong></div>
           <div><span>Z</span><strong>{result.z.toFixed(4)}</strong></div>
         </>}
+        {testId === 'wilcoxon' && <>
+          <div><span>n (non-zero pairs)</span><strong>{result.n}</strong></div>
+          <div><span>W+ (sum, positive)</span><strong>{result.wPlus.toFixed(2)}</strong></div>
+          <div><span>W− (sum, negative)</span><strong>{result.wMinus.toFixed(2)}</strong></div>
+          <div><span>W statistic</span><strong>{result.W.toFixed(2)}</strong></div>
+          <div><span>Z</span><strong>{result.z.toFixed(4)}</strong></div>
+        </>}
+        {testId === 'friedman' && <>
+          <div><span>Conditions (k)</span><strong>{result.k}</strong></div>
+          <div><span>Subjects (n)</span><strong>{result.n}</strong></div>
+          <div><span>Rank Sums</span><strong>{result.Rj.map(r => r.toFixed(1)).join(', ')}</strong></div>
+          <div><span>χ² statistic</span><strong>{result.statistic.toFixed(4)}</strong></div>
+          <div><span>df</span><strong>{result.df}</strong></div>
+        </>}
         {testId === 'chi2gof' && <>
-          <div><span>χ²</span><strong>{result.chi2.toFixed(4)}</strong></div><div><span>df</span><strong>{result.df}</strong></div>
+          <div><span>χ²</span><strong>{result.chi2.toFixed(4)}</strong></div>
+          <div><span>df</span><strong>{result.df}</strong></div>
         </>}
         {testId === '1prop' && <>
           <div><span>p̂ (sample)</span><strong>{result.phat.toFixed(4)}</strong></div>
           <div><span>Z</span><strong>{result.z.toFixed(4)}</strong></div>
           <div><span>95% CI</span><strong>[{result.ci[0].toFixed(3)}, {result.ci[1].toFixed(3)}]</strong></div>
+        </>}
+        {testId === '2prop' && <>
+          <div><span>p̂₁</span><strong>{result.p1.toFixed(4)}</strong></div>
+          <div><span>p̂₂</span><strong>{result.p2.toFixed(4)}</strong></div>
+          <div><span>Difference</span><strong>{result.diff.toFixed(4)}</strong></div>
+          <div><span>Z</span><strong>{result.z.toFixed(4)}</strong></div>
+          <div><span>95% CI (diff)</span><strong>[{result.ci[0].toFixed(3)}, {result.ci[1].toFixed(3)}]</strong></div>
         </>}
       </div>
 
@@ -153,7 +187,7 @@ function ResultBox({ result, testId }) {
 export default function HypothesisTesting() {
   const { columns, getColumnData, hasData } = useWorksheet();
   const [selectedTest, setSelectedTest] = useState(null);
-  const [inputs, setInputs] = useState({ col1: '', col2: '', mu0: 0, p0: 0.5, x: 10, n: 100, observed: '', expected: '', groups: ['', '', ''] });
+  const [inputs, setInputs] = useState({ col1: '', col2: '', mu0: 0, p0: 0.5, x: 10, n: 100, x1: 10, n1: 100, x2: 10, n2: 100, observed: '', expected: '', groups: ['', '', ''] });
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [typeFilter, setTypeFilter] = useState('All');
@@ -180,6 +214,10 @@ export default function HypothesisTesting() {
       } else if (test.id === '2t') {
         if (d1.length < 2 || d2.length < 2) throw new Error('Need at least 2 data points in each group');
         res = twoSampleT(d1, d2);
+      } else if (test.id === 'pairedt') {
+        if (d1.length < 2 || d2.length < 2) throw new Error('Need at least 2 paired data points in each column');
+        const minLen = Math.min(d1.length, d2.length);
+        res = pairedTTest(d1.slice(0, minLen), d2.slice(0, minLen));
       } else if (test.id === 'anova') {
         const groups = inputs.groups.map((g, i) => hasData && g ? getColumnData(g) : parseManual(inputs[`manualG${i}`] || ''));
         const valid = groups.filter(g => g.length >= 2);
@@ -188,6 +226,10 @@ export default function HypothesisTesting() {
       } else if (test.id === 'mw') {
         if (d1.length < 2 || d2.length < 2) throw new Error('Need at least 2 data points in each group');
         res = mannWhitney(d1, d2);
+      } else if (test.id === 'wilcoxon') {
+        if (d1.length < 2 || d2.length < 2) throw new Error('Need at least 2 paired data points in each column');
+        const minLen = Math.min(d1.length, d2.length);
+        res = wilcoxonSignedRank(d1.slice(0, minLen), d2.slice(0, minLen));
       } else if (test.id === 'chi2gof') {
         const obs = inputs.observed.split(/[\n,\s]+/).map(Number).filter(v => !isNaN(v));
         const exp = inputs.expected.split(/[\n,\s]+/).map(Number).filter(v => !isNaN(v));
@@ -197,12 +239,22 @@ export default function HypothesisTesting() {
         const x = parseInt(inputs.x), n = parseInt(inputs.n);
         if (isNaN(x) || isNaN(n) || n <= 0 || x < 0 || x > n) throw new Error('Invalid counts');
         res = proportionTest(x, n, parseFloat(inputs.p0));
+      } else if (test.id === '2prop') {
+        const x1 = parseInt(inputs.x1), n1 = parseInt(inputs.n1), x2 = parseInt(inputs.x2), n2 = parseInt(inputs.n2);
+        if ([x1, n1, x2, n2].some(isNaN) || n1 <= 0 || n2 <= 0 || x1 < 0 || x1 > n1 || x2 < 0 || x2 > n2) throw new Error('Invalid counts');
+        res = twoPropTest(x1, n1, x2, n2);
       } else if (test.id === 'kw') {
         const groups = inputs.groups.map((g, i) => hasData && g ? getColumnData(g) : parseManual(inputs[`manualG${i}`] || ''));
         const valid = groups.filter(g => g.length >= 2);
         if (valid.length < 3) throw new Error('Need at least 3 groups');
         const anova = oneWayAnova(valid);
         res = { ...anova, note: 'Kruskal-Wallis H ≈ F for large samples' };
+      } else if (test.id === 'friedman') {
+        const groups = inputs.groups.map((g, i) => hasData && g ? getColumnData(g) : parseManual(inputs[`manualG${i}`] || ''));
+        const valid = groups.filter(g => g.length >= 2);
+        if (valid.length < 3) throw new Error('Need at least 3 paired conditions with 2+ data points each');
+        const minLen = Math.min(...valid.map(g => g.length));
+        res = friedmanTest(valid.map(g => g.slice(0, minLen)));
       }
       setResult(res);
     } catch (e) {
@@ -266,7 +318,8 @@ export default function HypothesisTesting() {
                   <span className="ht-test-type" style={{ color: typeColor[test.type] }}>{test.type}</span>
                 </div>
                 <div className="ht-test-desc">{test.desc}</div>
-              </button>))}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -345,7 +398,8 @@ export default function HypothesisTesting() {
                 )}
 
                 {/* Multi-group inputs */}
-                {TESTS.find(t => t.id === selectedTest)?.inputs === 'multi' && (<div>
+                {TESTS.find(t => t.id === selectedTest)?.inputs === 'multi' && (
+                  <div>
                     <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>Enter data for at least 3 groups</p>
                     {[0, 1, 2].map(i => (
                       <div key={i} className="form-group" style={{ marginBottom: '0.75rem' }}>
@@ -391,6 +445,27 @@ export default function HypothesisTesting() {
                     <div className="form-group">
                       <label>Hypothesized Proportion (p₀)</label>
                       <input type="number" step="0.01" min="0" max="1" value={inputs.p0} onChange={e => setInputs(p => ({ ...p, p0: e.target.value }))} />
+                    </div>
+                  </div>
+                )}
+
+                {TESTS.find(t => t.id === selectedTest)?.inputs === '2prop' && (
+                  <div className="form-grid">
+                    <div className="form-group">
+                      <label>Group 1 — Events (x₁)</label>
+                      <input type="number" value={inputs.x1} onChange={e => setInputs(p => ({ ...p, x1: e.target.value }))} />
+                    </div>
+                    <div className="form-group">
+                      <label>Group 1 — Sample Size (n₁)</label>
+                      <input type="number" value={inputs.n1} onChange={e => setInputs(p => ({ ...p, n1: e.target.value }))} />
+                    </div>
+                    <div className="form-group">
+                      <label>Group 2 — Events (x₂)</label>
+                      <input type="number" value={inputs.x2} onChange={e => setInputs(p => ({ ...p, x2: e.target.value }))} />
+                    </div>
+                    <div className="form-group">
+                      <label>Group 2 — Sample Size (n₂)</label>
+                      <input type="number" value={inputs.n2} onChange={e => setInputs(p => ({ ...p, n2: e.target.value }))} />
                     </div>
                   </div>
                 )}
