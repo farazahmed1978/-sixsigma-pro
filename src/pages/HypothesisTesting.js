@@ -97,7 +97,8 @@ const TESTS = [
 const typeColor = { Continuous: 'var(--green)', Nonparametric: 'var(--orange)', Discrete: 'var(--purple)' };
 
 // Builds a plain-English interpretation sentence and a compact stats summary for the
-// report, tailored to each test's specific statistic/field names.function buildReportContent(test, result) {
+// report, tailored to each test's specific statistic/field names.
+function buildReportContent(test, result) {
   const pStr = result.p < 0.001 ? '<0.001' : result.p.toFixed(4);
   const verdict = result.p < 0.05 ? 'a statistically significant result' : 'not a statistically significant result';
   let summary = {}, interpretation = '';
