@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { BOOK_EXCERPTS } from '../utils/bookExcerpts';
 import './ToolPage.css';
 
-const toolMeta = {
+const meta = toolMeta[tool] || {};
+  const bookExcerpt = BOOK_EXCERPTS[tool];
   'control-chart': {
     name: 'Control Chart (X-bar & R)', icon: '📈', category: 'Control', phase: 'Control',
     phaseColor: 'var(--cyan)',
@@ -239,15 +241,7 @@ export default function ToolPage({ tool, children }) {
               <div className="info-block-title">📋 When to Use</div>
               <p>{meta.whenToUse}</p>
             </div>
-            <div className="info-block">
-              <div className="info-block-title">🔍 Interpretation</div>
-              <p>{meta.interpretation}</p>
-            </div>
-            <div className="info-block">
-              <div className="info-block-title">📁 CSV Format</div>
-              <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{meta.csvFormat}</p>
-            </div>
-            <div className="info-block">
+          <div className="info-block">
               <div className="info-block-title">🧮 Key Formulas</div>
               <div className="formula-list">
                 {(meta.formulas || []).map(f => (
@@ -256,8 +250,23 @@ export default function ToolPage({ tool, children }) {
               </div>
             </div>
           </div>
+
+          {bookExcerpt && (
+            <div className="info-block" style={{ marginTop: '1rem', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
+              <div className="info-block-title">📖 From the Book — <em style={{ fontWeight: 500 }}>{bookExcerpt.chapter}</em></div>
+              <div style={{ fontSize: '0.88rem', lineHeight: 1.65, color: 'var(--text-secondary)' }}>
+                {bookExcerpt.text.split('\n\n').map((para, i) => (
+                  <p key={i} style={{ marginBottom: i < bookExcerpt.text.split('\n\n').length - 1 ? '0.85rem' : 0 }}>{para}</p>
+                ))}
+              </div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.6rem', fontStyle: 'italic' }}>
+                Excerpted from <strong>The Black Belt Standard</strong> by Faraz Ahmed.
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      )}  
+         
 
       {/* Tool Component */}
       <div className="tool-content">
