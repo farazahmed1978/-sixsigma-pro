@@ -3,8 +3,7 @@ import { Link } from 'react-router-dom';
 import { BOOK_EXCERPTS } from '../utils/bookExcerpts';
 import './ToolPage.css';
 
-const meta = toolMeta[tool] || {};
-  const bookExcerpt = BOOK_EXCERPTS[tool];
+const toolMeta = {
   'control-chart': {
     name: 'Control Chart (X-bar & R)', icon: '📈', category: 'Control', phase: 'Control',
     phaseColor: 'var(--cyan)',
@@ -98,8 +97,7 @@ const meta = toolMeta[tool] || {};
   'gage-rr': {
     name: 'Gage R&R Study', icon: '🔬', category: 'Measure', phase: 'Measure',
     phaseColor: 'var(--green)',
-    desc: 'Full crossed Gage R&R study separating repeatability and reproducibility using ANOVA method.',
-    formulas: ['Repeatability (EV) = Equipment Variation', 'Reproducibility (AV) = Appraiser Variation', '%GRR = √(EV² + AV²) / TV'],
+    desc: 'Full crossed Gage R&R study separating repeatability and reproducibility using ANOVA method.',formulas: ['Repeatability (EV) = Equipment Variation', 'Reproducibility (AV) = Appraiser Variation', '%GRR = √(EV² + AV²) / TV'],
     whenToUse: 'Use when evaluating a measurement system with multiple operators measuring multiple parts. Standard MSA study.',
     interpretation: 'Number of distinct categories ≥ 5 is acceptable. %GRR < 30% to proceed with data collection.',
     csvFormat: 'Columns: "part" (1-10), "operator" (A/B/C), "trial" (1-3), "measurement" (numeric).',
@@ -190,6 +188,7 @@ const meta = toolMeta[tool] || {};
 export default function ToolPage({ tool, children }) {
   const [showInfo, setShowInfo] = useState(false);
   const meta = toolMeta[tool] || {};
+  const bookExcerpt = BOOK_EXCERPTS[tool];
 
   return (
     <div className="tool-page animate-in">
@@ -197,8 +196,7 @@ export default function ToolPage({ tool, children }) {
       <div className="tool-header">
         <div className="tool-header-left">
           <Link to="/" className="breadcrumb" style={{
-            display: 'inline-flex',
-            alignItems: 'center',
+            display: 'inline-flex',alignItems: 'center',
             gap: '0.4rem',
             padding: '0.4rem 0.85rem',
             marginBottom: '0.5rem',
@@ -241,7 +239,15 @@ export default function ToolPage({ tool, children }) {
               <div className="info-block-title">📋 When to Use</div>
               <p>{meta.whenToUse}</p>
             </div>
-          <div className="info-block">
+            <div className="info-block">
+              <div className="info-block-title">🔍 Interpretation</div>
+              <p>{meta.interpretation}</p>
+            </div>
+            <div className="info-block">
+              <div className="info-block-title">📁 CSV Format</div>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{meta.csvFormat}</p>
+            </div>
+            <div className="info-block">
               <div className="info-block-title">🧮 Key Formulas</div>
               <div className="formula-list">
                 {(meta.formulas || []).map(f => (
@@ -265,8 +271,7 @@ export default function ToolPage({ tool, children }) {
             </div>
           )}
         </div>
-      )}  
-         
+      )}
 
       {/* Tool Component */}
       <div className="tool-content">
