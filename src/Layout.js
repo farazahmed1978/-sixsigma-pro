@@ -47,6 +47,7 @@ const NAV = [
       { id: 'multivari', name: 'Multi-Vari Chart', icon: '🔀', path: '/tool/multivari' },
       { id: 'correlation', name: 'Correlation Matrix', icon: '🔗', path: '/tool/correlation' },
       { id: 'regression', name: 'Regression', icon: '📐', path: '/tool/regression' },
+      { id: 'multiregression', name: 'Multiple Regression', icon: '📊', path: '/tool/multiregression' },
       { id: 'anova', name: 'ANOVA', icon: '📶', path: '/tool/anova' },
     ]
   },
