@@ -92,7 +92,13 @@ function normCDF(z) {
 export function andersonDarling(data) {
   const n = data.length;
   const m = mean(data);
-  const sd = Math.sqrt(variance(data));S += (2 * (i + 1) - 1) * (Math.log(zi) + Math.log(1 - zni));
+  const sd = Math.sqrt(variance(data));
+  const z = [...data].sort((a, b) => a - b).map(v => normCDF((v - m) / sd));
+  let S = 0;
+  for (let i = 0; i < n; i++) {
+    const zi = Math.min(Math.max(z[i], 1e-10), 1 - 1e-10);
+    const zni = Math.min(Math.max(z[n - 1 - i], 1e-10), 1 - 1e-10);
+    S += (2 * (i + 1) - 1) * (Math.log(zi) + Math.log(1 - zni));
   }
   const A2 = -n - S / n;
   const Astar = A2 * (1 + 0.75 / n + 2.25 / (n * n));
