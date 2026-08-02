@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { BOOK_EXCERPTS } from '../utils/bookExcerpts';
 import './DOEPage.css';
 
 function generateFullFactorial(factors) {
@@ -53,6 +54,8 @@ export default function DOEPage() {
   const [replicates, setReplicates] = useState(1);
   const [matrix, setMatrix] = useState(null);
   const [results, setResults] = useState([]);
+  const [showGuide, setShowGuide] = useState(false);
+  const bookExcerpt = BOOK_EXCERPTS.doe;
 
   const addFactor = () => setFactors(p => [...p, { ...EMPTY_FACTOR }]);
   const removeFactor = (i) => setFactors(p => p.filter((_, j) => j !== i));
@@ -84,8 +87,7 @@ export default function DOEPage() {
       const meanHigh = high.reduce((s, v) => s + v, 0) / high.length;
       const meanLow = low.reduce((s, v) => s + v, 0) / low.length;
       const effect = meanHigh - meanLow;
-      return { factor: f.name, effect, meanHigh: meanHigh.toFixed(3), meanLow: meanLow.toFixed(3) };
-    });
+      return { factor: f.name, effect, meanHigh: meanHigh.toFixed(3), meanLow: meanLow.toFixed(3) };});
     effects.sort((a, b) => Math.abs(b.effect) - Math.abs(a.effect));
     setMatrix(p => ({ ...p, effects, grandMean }));
   };
@@ -103,8 +105,31 @@ export default function DOEPage() {
           <h1>Design of Experiments (DOE)</h1>
           <p>Generate experimental designs and analyze factor effects on your response variable.</p>
         </div>
-        {matrix && <button className="btn-secondary no-print" onClick={() => window.print()}>🖨️ Print Design</button>}
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {bookExcerpt && (
+            <button className={`btn ${showGuide ? 'btn-primary' : 'btn-ghost'} no-print`} onClick={() => setShowGuide(g => !g)}>
+              {showGuide ? '📊 Hide Guide' : '📖 Show Guide'}
+            </button>
+          )}
+          {matrix && <button className="btn-secondary no-print" onClick={() => window.print()}>🖨️ Print Design</button>}
+        </div>
       </div>
+
+      {showGuide && bookExcerpt && (
+        <div className="info-panel animate-in no-print" style={{ marginBottom: '1.25rem' }}>
+          <div className="info-block">
+            <div className="info-block-title">📖 From the Book — <em style={{ fontWeight: 500 }}>{bookExcerpt.chapter}</em></div>
+            <div style={{ fontSize: '0.88rem', lineHeight: 1.65, color: 'var(--text-secondary)' }}>
+              {bookExcerpt.text.split('\n\n').map((para, i, arr) => (
+                <p key={i} style={{ marginBottom: i < arr.length - 1 ? '0.85rem' : 0 }}>{para}</p>
+              ))}
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.6rem', fontStyle: 'italic' }}>
+              Excerpted from <strong>The Black Belt Standard</strong> by Faraz Ahmed.
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="doe-layout">
         {/* Setup panel */}
@@ -150,9 +175,7 @@ export default function DOEPage() {
           )}
 
           <button className="btn-primary" style={{ width: '100%', marginTop: '0.75rem' }} onClick={generate}>Generate Design Matrix</button>
-        </div>
-
-        {/* Matrix + results */}
+        </div>{/* Matrix + results */}
         <div className="doe-right">
           {!matrix ? (
             <div className="empty-state card">
