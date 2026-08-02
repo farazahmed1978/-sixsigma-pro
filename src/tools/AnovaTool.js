@@ -96,10 +96,18 @@ export default function AnovaTool() {
 
   const runOneWay = () => {
     setAddedToReport(false);
-    const outcomeData = getColumnData(outcomeVar).map(Number);
-    const groupData = getColumnData(groupingVar);
-    const labels = [...new Set(groupData)];
-    const groups = labels.map(lab => outcomeData.filter((_, i) => groupData[i] === lab));
+    const outcomeRaw = getRawColumnData(outcomeVar);
+    const groupRaw = getRawColumnData(groupingVar);
+    const minLen = Math.min(outcomeRaw.length, groupRaw.length);
+    const pairs = [];
+    for (let i = 0; i < minLen; i++) {
+      const v = parseFloat(outcomeRaw[i]);
+      if (!isNaN(v) && groupRaw[i] !== undefined && groupRaw[i] !== '') {
+        pairs.push({ group: groupRaw[i], value: v });
+      }
+    }
+    const labels = [...new Set(pairs.map(p => p.group))];
+    const groups = labels.map(lab => pairs.filter(p => p.group === lab).map(p => p.value));
     if (groups.length < 2 || groups.some(g => g.length < 2)) return;
     setOwGroups({ groups, labels });
     setOwResult(oneWayAnova(groups));
