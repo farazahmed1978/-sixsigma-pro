@@ -51,6 +51,7 @@ const NAV = [
       { id: 'multiregression', name: 'Multiple Regression', icon: '📊', path: '/tool/multiregression' },
       { id: 'logistic', name: 'Logistic Regression', icon: '🎲', path: '/tool/logistic' },
       { id: 'anova', name: 'ANOVA', icon: '📶', path: '/tool/anova' },
+      { id: 'effect-size', name: 'Effect Size Calculators', icon: '📏', path: '/tool/effect-size' },
     ]
   },
   {
