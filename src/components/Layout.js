@@ -25,6 +25,7 @@ const NAV = [
     color: 'var(--green)',
     items: [
       { id: 'control-chart', name: 'Control Chart', icon: '📈', path: '/tool/control-chart' },
+      { id: 'attribute-chart', name: 'Attribute Charts (p/np/c/u)', icon: '🔢', path: '/tool/attribute-chart' },
       { id: 'run-chart', name: 'Run Chart', icon: '📉', path: '/tool/run-chart' },
       { id: 'capability', name: 'Capability Analysis', icon: '🎯', path: '/tool/capability' },
       { id: 'histogram', name: 'Histogram', icon: '📊', path: '/tool/histogram' },
