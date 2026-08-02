@@ -107,8 +107,7 @@ export function andersonDarling(data) {
   else if (Astar > 0.34) p = Math.exp(0.9177 - 4.279 * Astar - 1.38 * Astar * Astar);
   else if (Astar > 0.2) p = 1 - Math.exp(-8.318 + 42.796 * Astar - 59.938 * Astar * Astar);
   else p = 1 - Math.exp(-13.436 + 101.14 * Astar - 223.73 * Astar * Astar);
-  return { A2: Astar, p: Math.min(Math.max(p, 0), 1) };
-}
+  return { A2: Astar, p: Math.min(Math.max(p, 0), 1) };}
 
 // Post-hoc pairwise comparisons for one-way ANOVA. Approximates Tukey HSD / Games-Howell
 // using Bonferroni-corrected pairwise Welch t-tests (does not assume equal variances).
@@ -202,14 +201,12 @@ export function cramersV(chi2, n, rows, cols) {
   return Math.sqrt(chi2 / (n * (Math.min(rows - 1, cols - 1))));
 }
 
-// ---------- Plain-English explainers shown behind an info button next to each companion test ----------
 // ---------- Two-way ANOVA ----------
 // Two-way ANOVA: tests the effects of two categorical factors and their interaction on a
 // continuous outcome. Requires a balanced design (equal replications in every A×B cell) —
 // numerically verified against a hand-calculated 2x2 example (SSA=98, SSB=2, SSAB=18, SSE=8,
 // F_A=49, F_B=1, F_AB=9 — all matched exactly).
-export function twoWayAnova(rows) {
-  // rows: [{ a, b, value }]
+export function twoWayAnova(rows) {// rows: [{ a, b, value }]
   const aLevels = [...new Set(rows.map(r => r.a))];
   const bLevels = [...new Set(rows.map(r => r.b))];
   const grand = mean(rows.map(r => r.value));
@@ -272,7 +269,10 @@ export function twoWayAnova(rows) {
     Fa, Fb, Fab, pa, pb, pab,
     cellStats, residuals,
   };
-  // ---------- DOE: full factorial effects + ANOVA ----------
+}
+
+
+// ---------- DOE: full factorial effects + ANOVA ----------
 // Analyzes a 2^k full factorial design: computes every main effect and interaction
 // effect via the standard contrast method (SS = Contrast²/N), and — when replicated —
 // a full ANOVA table using pure error from within-cell replicate variation.
@@ -305,8 +305,7 @@ export function doeFullFactorialAnalysis(rows, factorNames) {
   const cellMap = new Map();
   rows.forEach(r => {
     const key = factorNames.map(f => r.factorCodes[f]).join(',');
-    if (!cellMap.has(key)) cellMap.set(key, []);
-    cellMap.get(key).push(r.value);
+    if (!cellMap.has(key)) cellMap.set(key, []);cellMap.get(key).push(r.value);
   });
   const numCells = cellMap.size;
   let ssError = 0;
@@ -341,7 +340,71 @@ export function doeFullFactorialAnalysis(rows, factorNames) {
 // t-statistics, R², adjusted R², and the overall F-test all matched to 4+ decimals.
 function matInverse(M) {
   const n = M.length;
-}export const TEST_EXPLAINERS = {
+  const A = M.map((row, i) => [...row, ...Array.from({ length: n }, (_, j) => (i === j ? 1 : 0))]);
+  for (let i = 0; i < n; i++) {
+    let piv = i;
+    for (let j = i + 1; j < n; j++) if (Math.abs(A[j][i]) > Math.abs(A[piv][i])) piv = j;
+    [A[i], A[piv]] = [A[piv], A[i]];
+    const div = A[i][i];
+    for (let c = 0; c < 2 * n; c++) A[i][c] /= div;
+    for (let r = 0; r < n; r++) {
+      if (r === i) continue;
+      const factor = A[r][i];
+      for (let c = 0; c < 2 * n; c++) A[r][c] -= factor * A[i][c];
+    }
+  }
+  return A.map(row => row.slice(n));
+}
+function matMultiply(A, B) {
+  const r = A.length, c = B[0].length, inner = B.length;
+  const out = Array.from({ length: r }, () => new Array(c).fill(0));
+  for (let i = 0; i < r; i++) for (let j = 0; j < c; j++) {
+    let s = 0; for (let m = 0; m < inner; m++) s += A[i][m] * B[m][j];
+    out[i][j] = s;
+  }
+  return out;
+}
+function transpose(A) { return A[0].map((_, j) => A.map(row => row[j])); }
+
+export function multipleRegression(X, y, predictorNames) {
+  // X: array of rows, each row = [x1, x2, ...xk]; y: array of outcomes
+  const n = y.length;
+  const k = predictorNames.length;
+  if (n - k - 1 < 1) throw new Error(`Need at least ${k + 2} rows of data for ${k} predictors (have ${n}) — not enough degrees of freedom left to estimate error.`);
+
+  const Xd = X.map(row => [1, ...row]); // design matrix with intercept
+  const Xt = transpose(Xd);
+  const XtX = matMultiply(Xt, Xd);
+  const XtXinv = matInverse(XtX);
+  const Xty = matMultiply(Xt, y.map(v => [v]));
+  const betaMat = matMultiply(XtXinv, Xty);
+  const beta = betaMat.map(row => row[0]);
+
+  const fitted = Xd.map(row => row.reduce((s, v, i) => s + v * beta[i], 0));
+  const residuals = y.map((v, i) => v - fitted[i]);
+  const yMean = mean(y);
+  const ssTotal = y.reduce((s, v) => s + (v - yMean) ** 2, 0);
+  const ssResidual = residuals.reduce((s, v) => s + v * v, 0);
+  const ssRegression = ssTotal - ssResidual;
+  const r2 = ssRegression / ssTotal;
+  const dfModel = k, dfResidual = n - k - 1;
+  const adjR2 = 1 - (1 - r2) * (n - 1) / dfResidual;
+  const msResidual = ssResidual / dfResidual;
+  const F = (ssRegression / dfModel) / msResidual;
+  const pF = 1 - fCDF(F, dfModel, dfResidual);
+
+  const coefStats = beta.map((b, i) => {
+    const se = Math.sqrt(msResidual * XtXinv[i][i]);
+    const t = b / se;
+    const p = 2 * (1 - tCDF(Math.abs(t), dfResidual));
+    return { name: i === 0 ? 'Intercept' : predictorNames[i - 1], coef: b, se, t, p };
+  });
+
+  return { beta, coefStats, r2, adjR2, F, pF, dfModel, dfResidual, ssTotal, ssRegression, ssResidual, msResidual, fitted, residuals, n, k };
+}
+
+// ---------- Plain-English explainers shown behind an info button next to each companion test ----------
+export const TEST_EXPLAINERS = {
   anova: "Tests whether the average of your outcome variable differs across 3 or more groups. A low p-value (typically < 0.05) means at least one group's average is genuinely different from the others.",
   rmAnova: "Tests whether the average of a measurement differs across 3 or more conditions measured on the same subjects (e.g. before/during/after). A low p-value means at least one condition's average is genuinely different.",
   levene: "Checks whether your groups have roughly equal variance (spread), which ANOVA assumes. A low p-value (< 0.05) means variances are NOT equal, and the standard ANOVA result may be less trustworthy — consider Games-Howell post-hoc instead of Tukey.",
