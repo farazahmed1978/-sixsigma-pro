@@ -72,28 +72,11 @@ function useReveal(threshold = 0.15) {
   return [ref, inView];
 }
 
-function useParallax(speed = 0.12) {
-  const ref = useRef(null);
-  useEffect(() => {
-    if (prefersReducedMotion()) return;
-    const scrollEl = document.querySelector('.main-content') || window;
-    let raf = null;
-    const update = () => {
-      const el = ref.current;
-      if (el) {
-        const rect = el.getBoundingClientRect();
-        const vh = window.innerHeight || 800;
-        const offset = (rect.top - vh / 2) * speed;
-        el.style.transform = `translateY(${offset}px)`;
-      }
-      raf = null;
-    };
-    const onScroll = () => { if (!raf) raf = requestAnimationFrame(update); };
-    scrollEl.addEventListener('scroll', onScroll, { passive: true });
-    update();
-    return () => scrollEl.removeEventListener('scroll', onScroll);
-  }, [speed]);
-  return ref;
+function useParallax() {
+  // Parallax removed — it required oversizing the image, which kept
+  // reading as unwanted zoom. Background photos now sit static at their
+  // correct, uncropped-feeling size.
+  return useRef(null);
 }
 
 function Hero() {
