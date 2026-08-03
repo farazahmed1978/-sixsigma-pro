@@ -113,9 +113,11 @@
 .closing-chapter-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; }
 .closing-chapter-actions .btn-primary, .closing-chapter-actions .btn-secondary { font-size: 0.92rem; padding: 0.75rem 1.5rem; }
 
-.sigma-reveal-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 2.5rem 1.5rem 1.5rem; position: relative; }
+.sigma-reveal-wrap { background: #0f1e38; border: 1px solid rgba(255,255,255,0.1); border-radius: var(--radius-lg); padding: 2.5rem 1.5rem 1.5rem; position: relative; }
 .sigma-reveal { position: relative; }
 .sigma-reveal-logo { position: absolute; top: -2.2rem; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 0.4rem; }
+.sigma-reveal-logo .brand-wordmark { color: #edf2ff; }
+.sigma-reveal-logo .brand-wordmark b { color: #7fb0ff; }
 .sigma-logo-mark { height: 22px; width: auto; }
 .sigma-reveal-svg { width: 100%; height: auto; display: block; }
 
@@ -123,14 +125,14 @@
   fill: none; stroke: var(--accent); stroke-width: 7; opacity: 0.22; filter: blur(4px);
   stroke-linecap: round; stroke-linejoin: round;
   stroke-dasharray: 1100; stroke-dashoffset: 1100;
-  animation: sigmaDrawLine 2.6s cubic-bezier(0.4,0,0.2,1) forwards;
+  animation: sigmaDrawLine 4.6s cubic-bezier(0.4,0,0.2,1) forwards;
   animation-play-state: paused;
 }
 .sigma-reveal-line {
   fill: none; stroke: url(#sigmaLineGrad); stroke-width: 3;
   stroke-linecap: round; stroke-linejoin: round;
   stroke-dasharray: 1100; stroke-dashoffset: 1100;
-  animation: sigmaDrawLine 2.6s cubic-bezier(0.4,0,0.2,1) forwards;
+  animation: sigmaDrawLine 4.6s cubic-bezier(0.4,0,0.2,1) forwards;
   animation-play-state: paused;
 }
 @keyframes sigmaDrawLine { to { stroke-dashoffset: 0; } }
@@ -147,7 +149,7 @@
   fill: none; stroke: var(--red); stroke-width: 2;
   transform-box: fill-box; transform-origin: center;
   opacity: 0;
-  animation: sigmaApexPulse 1.6s ease-in-out 2.1s infinite;
+  animation: sigmaApexPulse 1.8s ease-in-out 3.7s infinite;
 }
 @keyframes sigmaApexPulse {
   0% { opacity: 0.8; transform: scale(0.6); }
