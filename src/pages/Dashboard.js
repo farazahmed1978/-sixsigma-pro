@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useWorksheet } from '../context/WorksheetContext';
 import './Dashboard.css';
@@ -36,7 +36,7 @@ const DMAIC_SECTIONS = [
     icon: '🔬',
     desc: 'Identify root causes using data — not assumptions.',
     tools: [
-      { name: 'Hypothesis Testing', path: '/hypothesis', icon: '🧪', desc: '20+ tests: t-tests, ANOVA, chi-square, nonparametric' },
+      { name: 'Hypothesis Testing', path: '/hypothesis', icon: '🧪', desc: '17 tests: t-tests, ANOVA, chi-square, nonparametric' },
       { name: 'Regression Analysis', path: '/tool/regression', icon: '📐', desc: 'Model relationships between variables' },
       { name: 'Correlation Matrix', path: '/tool/correlation', icon: '🔗', desc: 'Pearson r across all variable pairs' },
       { name: 'Pareto Chart', path: '/tool/pareto', icon: '🏆', desc: 'Identify the vital few causes' },
@@ -70,36 +70,18 @@ const DMAIC_SECTIONS = [
   },
 ];
 
-const STATS = [
-  { target: 40, suffix: '+', label: 'Analysis Tools' },
-  { target: 20, suffix: '+', label: 'Hypothesis Tests' },
-  { target: 9, suffix: '', label: 'Pro Templates' },
-  { target: 100, suffix: '%', label: 'Browser-Based' },
+const TICKER_ITEMS = [
+  'Control Charts (I-MR / X-bar-R / CUSUM / EWMA)', 'Attribute Charts (p/np/c/u)', 'Capability Analysis',
+  'Gage R&R (MSA)', 'Descriptive Statistics', 'Histogram', 'Run Chart', 'Hypothesis Testing — 17 Tests',
+  'Pareto Analysis', 'Fishbone Diagrams', 'Multi-Vari Charts', 'Correlation Matrix',
+  'Regression & Multiple Regression', 'Logistic Regression', 'One / Two-Way & RM ANOVA',
+  'Effect Size Calculators', 'Design of Experiments', 'FMEA', 'Value Stream Mapping',
+  'Sigma Level & DPMO', 'Sample Size & Power Calculators',
 ];
 
 function prefersReducedMotion() {
   return typeof window !== 'undefined' && window.matchMedia &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-}
-
-function CountUp({ target, suffix, duration = 1400 }) {
-  const [display, setDisplay] = useState(prefersReducedMotion() ? target : 0);
-
-  useEffect(() => {
-    if (prefersReducedMotion()) { setDisplay(target); return; }
-    let start = null;
-    let raf;
-    const step = (ts) => {
-      if (start === null) start = ts;
-      const progress = Math.min((ts - start) / duration, 1);
-      setDisplay(Math.floor(progress * target));
-      if (progress < 1) raf = requestAnimationFrame(step);
-    };
-    raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf);
-  }, [target, duration]);
-
-  return <>{display}{suffix}</>;
 }
 
 // Signature hero visual — an animated control chart: points draw in,
@@ -125,7 +107,7 @@ function LiveControlChart() {
       <path d={pathD} className="hero-chart-line" />
       {coords.map(([x, y], i) => (
         i === breachIndex ? (
-          <g key={i} style={{ animationDelay: `${1.5 + i * 0.06}s` }} className="hero-chart-breach-group">
+          <g key={i}>
             <circle cx={x} cy={y} r="6" className="hero-chart-breach-ring" style={{ animationDelay: `${2.2 + i * 0.06}s` }} />
             <circle cx={x} cy={y} r="5" className="hero-chart-breach-dot" style={{ animationDelay: `${1.5 + i * 0.06}s` }} />
             <text x={x} y={y - 16} className="hero-chart-flag" style={{ animationDelay: `${1.9 + i * 0.06}s` }}>OUT OF CONTROL</text>
@@ -138,14 +120,25 @@ function LiveControlChart() {
   );
 }
 
-export default function Dashboard() {
-  const { hasData, fileName, rowCount, columns } = useWorksheet();
+function MegaHero({ hasData }) {
+  const visualRef = useRef(null);
+  const [tilt, setTilt] = useState({ rx: 0, ry: 0 });
+
+  const handleMouseMove = useCallback((e) => {
+    if (prefersReducedMotion() || !visualRef.current) return;
+    const rect = visualRef.current.getBoundingClientRect();
+    const px = (e.clientX - rect.left) / rect.width - 0.5;
+    const py = (e.clientY - rect.top) / rect.height - 0.5;
+    setTilt({ rx: px * 10, ry: -py * 10 });
+  }, []);
+
+  const resetTilt = useCallback(() => setTilt({ rx: 0, ry: 0 }), []);
 
   return (
-    <div className="dashboard">
-      {/* Hero */}
-      <section className="dash-hero">
-        <div className="dash-hero-content">
+    <section className="mega-hero">
+      <div className="mega-hero-bg" aria-hidden="true" />
+      <div className="mega-hero-inner">
+        <div className="mega-hero-content">
           <div className="dash-hero-badge hero-fade-item" style={{ animationDelay: '0s' }}>
             Verified against R, Python &amp; SciPy
           </div>
@@ -153,9 +146,9 @@ export default function Dashboard() {
             Catch <span className="hero-accent-word">the point</span> before it breaks the process.
           </h1>
           <p className="hero-fade-item" style={{ animationDelay: '0.16s' }}>
-            The full DMAIC toolkit — 40+ statistical tools, from control charts to logistic
-            regression — each one checked against independent statistical software. No installs,
-            no Minitab license, no waiting on IT.
+            The full DMAIC toolkit — 50+ verified statistical tools and tests, from control
+            charts to logistic regression — each one checked against independent statistical
+            software. No installs, no Minitab license, no waiting on IT.
           </p>
           <div className="dash-hero-actions hero-fade-item" style={{ animationDelay: '0.24s' }}>
             <Link to="/worksheet" className="btn-primary">
@@ -163,98 +156,125 @@ export default function Dashboard() {
             </Link>
             <Link to="/pricing" className="btn-secondary">See Plans &amp; Pricing</Link>
           </div>
-        </div>
-        <div className="hero-chart-wrap hero-fade-item" style={{ animationDelay: '0.1s' }}>
-          <LiveControlChart />
-        </div>
-      </section>
 
-      <div className="dash-stats-grid hero-fade-item" style={{ animationDelay: '0.36s' }}>
-        {STATS.map(s => (
-          <div key={s.label} className="dash-stat">
-            <div className="dash-stat-value">
-              <CountUp target={s.target} suffix={s.suffix} />
-            </div>
-            <div className="dash-stat-label">{s.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Worksheet status banner */}
-      {hasData && (
-        <div className="dash-ws-banner">
-          <span className="dash-ws-icon">📊</span>
-          <div>
-            <strong>{fileName}</strong> is loaded —{' '}
-            <span>{rowCount} rows, {columns.length} columns</span>
-          </div>
-          <Link to="/worksheet" className="btn-ghost">View &amp; Edit →</Link>
-        </div>
-      )}
-
-      {!hasData && (
-        <div className="dash-ws-banner dash-ws-empty">
-          <span className="dash-ws-icon">💡</span>
-          <div>
-            <strong>Start by loading your data</strong> — enter it once in the Worksheet and every tool uses it automatically.
-          </div>
-          <Link to="/worksheet" className="btn-primary" style={{ fontSize: '0.85rem', padding: '0.45rem 1rem' }}>Open Worksheet</Link>
-        </div>
-      )}
-
-      {/* DMAIC phases */}
-      <section className="dash-phases">
-        <h2 className="dash-section-title">Tools by DMAIC Phase</h2>
-        <div className="phases-list">
-          {DMAIC_SECTIONS.map(section => (
-            <div key={section.phase} className="phase-block">
-              <div className="phase-header" style={{ borderLeftColor: section.color }}>
-                <span className="phase-icon">{section.icon}</span>
-                <div>
-                  <h3 className="phase-name" style={{ color: section.color }}>{section.phase}</h3>
-                  <p className="phase-desc">{section.desc}</p>
-                </div>
-              </div>
-              <div className="phase-tools">
-                {section.tools.map(tool => (
-                  <Link key={tool.name} to={tool.path} className="dash-tool-card">
-                    <span className="dash-tool-icon">{tool.icon}</span>
-                    <div>
-                      <div className="dash-tool-name">{tool.name}</div>
-                      <div className="dash-tool-desc">{tool.desc}</div>
-                    </div>
-                  </Link>
+          <div className="hero-ticker hero-fade-item" style={{ animationDelay: '0.32s' }}>
+            <div className="hero-ticker-eyebrow">50+ verified tools &amp; tests</div>
+            <div className="hero-ticker-mask">
+              <div className="hero-ticker-track">
+                {[...TICKER_ITEMS, ...TICKER_ITEMS].map((item, i) => (
+                  <span key={i} className="hero-ticker-pill">{item}</span>
                 ))}
               </div>
             </div>
-          ))}
+          </div>
         </div>
-      </section>
 
-      {/* Value prop footer */}
-      <section className="dash-value-footer">
-        <div className="dash-value-item">
-          <div className="dash-value-icon">🔒</div>
-          <div>
-            <strong>100% Private</strong>
-            <p>All calculations run in your browser. Your data never leaves your computer.</p>
+        <div
+          className="hero-visual hero-fade-item"
+          style={{ animationDelay: '0.1s' }}
+          ref={visualRef}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={resetTilt}
+        >
+          <div className="floating-chip chip-a">50+ Tools</div>
+          <div className="floating-chip chip-b">100% Browser-Based</div>
+          <div className="floating-chip chip-c">$9.99/mo</div>
+          <div
+            className="hero-chart-frame"
+            style={{ transform: `perspective(900px) rotateX(${tilt.ry}deg) rotateY(${tilt.rx}deg)` }}
+          >
+            <LiveControlChart />
           </div>
         </div>
-        <div className="dash-value-item">
-          <div className="dash-value-icon">🌐</div>
-          <div>
-            <strong>No Installation</strong>
-            <p>Works on any device with a browser. No IT approval required.</p>
+      </div>
+    </section>
+  );
+}
+
+export default function Dashboard() {
+  const { hasData, fileName, rowCount, columns } = useWorksheet();
+
+  return (
+    <>
+      <MegaHero hasData={hasData} />
+
+      <div className="dashboard">
+        {/* Worksheet status banner */}
+        {hasData && (
+          <div className="dash-ws-banner">
+            <span className="dash-ws-icon">📊</span>
+            <div>
+              <strong>{fileName}</strong> is loaded —{' '}
+              <span>{rowCount} rows, {columns.length} columns</span>
+            </div>
+            <Link to="/worksheet" className="btn-ghost">View &amp; Edit →</Link>
           </div>
-        </div>
-        <div className="dash-value-item">
-          <div className="dash-value-icon">💸</div>
-          <div>
-            <strong>$9.99/month</strong>
-            <p>Minitab costs $154+/month. Get the same power for 94% less.</p>
+        )}
+
+        {!hasData && (
+          <div className="dash-ws-banner dash-ws-empty">
+            <span className="dash-ws-icon">💡</span>
+            <div>
+              <strong>Start by loading your data</strong> — enter it once in the Worksheet and every tool uses it automatically.
+            </div>
+            <Link to="/worksheet" className="btn-primary" style={{ fontSize: '0.85rem', padding: '0.45rem 1rem' }}>Open Worksheet</Link>
           </div>
-        </div>
-      </section>
-    </div>
+        )}
+
+        {/* DMAIC phases */}
+        <section className="dash-phases">
+          <h2 className="dash-section-title">Tools by DMAIC Phase</h2>
+          <div className="phases-list">
+            {DMAIC_SECTIONS.map(section => (
+              <div key={section.phase} className="phase-block">
+                <div className="phase-header" style={{ borderLeftColor: section.color }}>
+                  <span className="phase-icon">{section.icon}</span>
+                  <div>
+                    <h3 className="phase-name" style={{ color: section.color }}>{section.phase}</h3>
+                    <p className="phase-desc">{section.desc}</p>
+                  </div>
+                </div>
+                <div className="phase-tools">
+                  {section.tools.map(tool => (
+                    <Link key={tool.name} to={tool.path} className="dash-tool-card">
+                      <span className="dash-tool-icon">{tool.icon}</span>
+                      <div>
+                        <div className="dash-tool-name">{tool.name}</div>
+                        <div className="dash-tool-desc">{tool.desc}</div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Value prop footer */}
+        <section className="dash-value-footer">
+          <div className="dash-value-item">
+            <div className="dash-value-icon">🔒</div>
+            <div>
+              <strong>100% Private</strong>
+              <p>All calculations run in your browser. Your data never leaves your computer.</p>
+            </div>
+          </div>
+          <div className="dash-value-item">
+            <div className="dash-value-icon">🌐</div>
+            <div>
+              <strong>No Installation</strong>
+              <p>Works on any device with a browser. No IT approval required.</p>
+            </div>
+          </div>
+          <div className="dash-value-item">
+            <div className="dash-value-icon">💸</div>
+            <div>
+              <strong>$9.99/month</strong>
+              <p>Minitab costs $154+/month. Get the same power for 94% less.</p>
+            </div>
+          </div>
+        </section>
+      </div>
+    </>
   );
 }
