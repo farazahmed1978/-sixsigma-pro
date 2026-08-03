@@ -7,74 +7,67 @@ const NAV = [
   {
     section: 'Workspace',
     items: [
-      { id: 'worksheet', name: 'Data Worksheet', icon: '🗂️', path: '/worksheet' },
-      { id: 'projects', name: 'Project Workspace', icon: '📁', path: '/projects' },
-      { id: 'dashboard', name: 'Classic Dashboard', icon: '🏠', path: '/dashboard' },
+      { id: 'worksheet', name: 'Data Worksheet', path: '/worksheet' },
+      { id: 'projects', name: 'Project Workspace', path: '/projects' },
+      { id: 'dashboard', name: 'Classic Dashboard', path: '/dashboard' },
     ]
   },
   {
     section: 'Define',
     color: 'var(--yellow)',
     items: [
-      { id: 'templates', name: 'Project Templates', icon: '📋', path: '/templates' },
-      { id: 'report', name: 'Report Builder', icon: '📄', path: '/report' },
+      { id: 'templates', name: 'Project Templates', path: '/templates' },
+      { id: 'report', name: 'Report Builder', path: '/report' },
     ]
   },
   {
     section: 'Measure',
     color: 'var(--green)',
     items: [
-      { id: 'control-chart', name: 'Control Chart', icon: '📈', path: '/tool/control-chart' },
-      { id: 'attribute-chart', name: 'Attribute Charts (p/np/c/u)', icon: '🔢', path: '/tool/attribute-chart' },
-      { id: 'run-chart', name: 'Run Chart', icon: '📉', path: '/tool/run-chart' },
-      { id: 'capability', name: 'Capability Analysis', icon: '🎯', path: '/tool/capability' },
-      { id: 'histogram', name: 'Histogram', icon: '📊', path: '/tool/histogram' },
-      { id: 'msa', name: 'MSA / Gage R&R', icon: '📏', path: '/tool/msa' },
-      { id: 'descriptive', name: 'Descriptive Stats', icon: '🔢', path: '/tool/descriptive' },
-      { id: 'sigma-calculator', name: 'Sigma Level / DPMO', icon: '🎚️', path: '/tool/sigma-calculator' },
-      { id: 'sample-size-calculator', name: 'Sample Size Calculator', icon: '🧮', path: '/tool/sample-size-calculator' },
-      { id: 'power-calculator', name: 'Power Calculator', icon: '⚡', path: '/tool/power-calculator' },
+      { id: 'control-chart', name: 'Control Chart', path: '/tool/control-chart' },
+      { id: 'attribute-chart', name: 'Attribute Charts (p/np/c/u)', path: '/tool/attribute-chart' },
+      { id: 'run-chart', name: 'Run Chart', path: '/tool/run-chart' },
+      { id: 'capability', name: 'Capability Analysis', path: '/tool/capability' },
+      { id: 'histogram', name: 'Histogram', path: '/tool/histogram' },
+      { id: 'msa', name: 'Gage R&R (MSA)', path: '/tool/msa' },
+      { id: 'descriptive', name: 'Descriptive Stats', path: '/tool/descriptive' },
+      { id: 'sigma-calculator', name: 'Sigma Level / DPMO', path: '/tool/sigma-calculator' },
+      { id: 'sample-size-calculator', name: 'Sample Size Calculator', path: '/tool/sample-size-calculator' },
+      { id: 'power-calculator', name: 'Power Calculator', path: '/tool/power-calculator' },
     ]
   },
   {
     section: 'Analyze',
     color: 'var(--orange)',
     items: [
-      { id: 'hypothesis', name: 'Hypothesis Testing', icon: '🧪', path: '/hypothesis' },
-      { id: 'pareto', name: 'Pareto Chart', icon: '🏆', path: '/tool/pareto' },
-      { id: 'scatter', name: 'Scatter Plot', icon: '🔵', path: '/tool/scatter' },
-      { id: 'boxplot', name: 'Box Plot', icon: '📦', path: '/tool/boxplot' },
-      { id: 'fishbone', name: 'Fishbone Diagram', icon: '🐟', path: '/tool/fishbone' },
-      { id: 'multivari', name: 'Multi-Vari Chart', icon: '🔀', path: '/tool/multivari' },
-      { id: 'correlation', name: 'Correlation Matrix', icon: '🔗', path: '/tool/correlation' },
-      { id: 'regression', name: 'Regression', icon: '📐', path: '/tool/regression' },
-      { id: 'multiregression', name: 'Multiple Regression', icon: '📊', path: '/tool/multiregression' },
-      { id: 'logistic', name: 'Logistic Regression', icon: '🎲', path: '/tool/logistic' },
-      { id: 'anova', name: 'ANOVA', icon: '📶', path: '/tool/anova' },
-      { id: 'effect-size', name: 'Effect Size Calculators', icon: '📏', path: '/tool/effect-size' },
+      { id: 'hypothesis', name: 'Hypothesis Testing', path: '/hypothesis' },
+      { id: 'pareto', name: 'Pareto Chart', path: '/tool/pareto' },
+      { id: 'scatter', name: 'Scatter Plot', path: '/tool/scatter' },
+      { id: 'boxplot', name: 'Box Plot', path: '/tool/boxplot' },
+      { id: 'fishbone', name: 'Fishbone Diagram', path: '/tool/fishbone' },
+      { id: 'multivari', name: 'Multi-Vari Chart', path: '/tool/multivari' },
+      { id: 'correlation', name: 'Correlation Matrix', path: '/tool/correlation' },
+      { id: 'regression', name: 'Regression', path: '/tool/regression' },
+      { id: 'multiregression', name: 'Multiple Regression', path: '/tool/multiregression' },
+      { id: 'logistic', name: 'Logistic Regression', path: '/tool/logistic' },
+      { id: 'anova', name: 'ANOVA', path: '/tool/anova' },
+      { id: 'effect-size', name: 'Effect Size Calculators', path: '/tool/effect-size' },
     ]
   },
   {
     section: 'Improve',
     color: 'var(--purple)',
     items: [
-      { id: 'doe', name: 'Design of Experiments', icon: '⚗️', path: '/doe' },
-      { id: 'fmea', name: 'FMEA', icon: '⚠️', path: '/tool/fmea' },
-      { id: 'vsm', name: 'Value Stream Map', icon: '🗺️', path: '/tool/vsm' },
-    ]
-  },
-  {
-    section: 'Control',
-    color: 'var(--cyan)',
-    items: [
-      { id: 'gage-rr', name: 'Gage R&R', icon: '🔬', path: '/tool/gage-rr' },
+      { id: 'doe', name: 'Design of Experiments', path: '/doe' },
+      { id: 'fmea', name: 'FMEA', path: '/tool/fmea' },
+      { id: 'vsm', name: 'Value Stream Map', path: '/tool/vsm' },
     ]
   },
   {
     section: 'Resources',
     items: [
-      { id: 'resources', name: 'Guides & References', icon: '📚', path: '/resources' },
-      { id: 'about', name: 'About', icon: 'ℹ️', path: '/about' },
+      { id: 'resources', name: 'Guides & References', path: '/resources' },
+      { id: 'about', name: 'About', path: '/about' },
     ]
   }
 ];
@@ -167,7 +160,6 @@ export default function Layout({ children }) {
                   to={item.path}
                   className={`sidebar-link ${isActive(item.path) ? 'active' : ''}`}
                 >
-                  <span className="tool-icon">{item.icon}</span>
                   <span>{item.name}</span>
                 </Link>
               ))}
