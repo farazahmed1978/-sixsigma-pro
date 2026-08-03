@@ -8,7 +8,6 @@ import Layout from './components/Layout';
 
 // Pages
 import Dashboard from './pages/Dashboard';
-import GuidedHome from './pages/GuidedHome';
 import ProjectsHome from './pages/ProjectsHome';
 import ProjectDetail from './pages/ProjectDetail';
 import Worksheet from './pages/Worksheet';
@@ -94,8 +93,7 @@ function ToolRoute({ toolId }) {
             <Router>
               <Layout>
                 <Routes>
-                  <Route path="/" element={<GuidedHome />} />
-                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/" element={<Dashboard />} />
                   <Route path="/worksheet" element={<Worksheet />} />
                   <Route path="/resources" element={<Resources />} />
                   <Route path="/about" element={<About />} />
