@@ -84,7 +84,7 @@ function useParallax(speed = 0.12) {
         const rect = el.getBoundingClientRect();
         const vh = window.innerHeight || 800;
         const offset = (rect.top - vh / 2) * speed;
-        el.style.transform = `translateY(${offset}px) scale(1.15)`;
+        el.style.transform = `translateY(${offset}px)`;
       }
       raf = null;
     };
