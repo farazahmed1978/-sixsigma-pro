@@ -5,6 +5,7 @@ import heroMain from '../hero-main.jpg';
 import featureEngineers from '../feature-engineers.jpg';
 import featureAnalyze from '../feature-analyze.jpg';
 import featureExcellence from '../feature-excellence.jpg';
+import logoMark from '../logo-mark.png';
 import './Dashboard.css';
 
 const TICKER_ITEMS = [
@@ -22,8 +23,8 @@ const FEATURES = [
     headline: 'Designed for quality engineers, not statisticians.',
     copy: 'Powerful tools. Practical insights. Built for real-world quality challenges.',
     dmaic: [
-      { phase: 'Define', color: 'var(--yellow)', line: 'Align the objective.' },
-      { phase: 'Measure', color: 'var(--green)', line: 'Measure what matters.' },
+      { phase: 'Define', color: 'var(--yellow)', line: 'Align the objective.', examples: ['Project Charter', 'SIPOC', 'CTQ Tree'] },
+      { phase: 'Measure', color: 'var(--green)', line: 'Measure what matters.', examples: ['Control Chart', 'Capability Analysis', 'Gage R&R'] },
     ],
   },
   {
@@ -31,7 +32,7 @@ const FEATURES = [
     headline: 'Analyze with confidence. Improve with intelligence.',
     copy: 'An AI-guided platform built for Lean Six Sigma professionals.',
     dmaic: [
-      { phase: 'Analyze', color: 'var(--orange)', line: 'Transform data into insight.' },
+      { phase: 'Analyze', color: 'var(--orange)', line: 'Transform data into insight.', examples: ['Hypothesis Testing', 'Regression', 'Pareto Chart'] },
     ],
   },
   {
@@ -39,8 +40,8 @@ const FEATURES = [
     headline: 'Designed for excellence.',
     copy: 'From data to decisions — without unnecessary complexity.',
     dmaic: [
-      { phase: 'Improve', color: 'var(--purple)', line: 'Design better processes.' },
-      { phase: 'Control', color: 'var(--cyan)', line: 'Sustain the results.' },
+      { phase: 'Improve', color: 'var(--purple)', line: 'Design better processes.', examples: ['DOE', 'FMEA', 'Value Stream Map'] },
+      { phase: 'Control', color: 'var(--cyan)', line: 'Sustain the results.', examples: ['Control Chart', 'Meeting Minutes'] },
     ],
   },
 ];
@@ -56,10 +57,6 @@ function prefersReducedMotion() {
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-// Reveal-once hook — NO blind timer. Fires only when the element is
-// actually scrolled into view. (A previous version force-fired everything
-// on a timer regardless of scroll position — that was the bug that made
-// every section look "static.")
 function useReveal(threshold = 0.15) {
   const ref = useRef(null);
   const [inView, setInView] = useState(prefersReducedMotion());
@@ -75,9 +72,6 @@ function useReveal(threshold = 0.15) {
   return [ref, inView];
 }
 
-// Subtle parallax on a background layer — attaches to the real scroll
-// container (.main-content), not window, since that's what actually
-// scrolls on this site.
 function useParallax(speed = 0.12) {
   const ref = useRef(null);
   useEffect(() => {
@@ -111,7 +105,10 @@ function Hero() {
       <div className="photo-hero-scrim" />
       <div className="photo-hero-inner">
         <div className={`slide-fade-text slide-fade-slow ${inView ? 'is-active' : ''}`}>
-          <div className="dash-hero-badge">For quality engineers, not statisticians</div>
+          <div className="hero-logo-badge">
+            <img src={logoMark} alt="" className="hero-logo-mark" />
+            <span className="brand-wordmark brand-wordmark-light">SixSigma<b>Pro</b></span>
+          </div>
           <h1>Let us streamline your Six Sigma journey.</h1>
           <p>
             50+ verified tools, project templates, and a workbench that keeps every finding
@@ -139,15 +136,22 @@ function FeatureBlock({ data }) {
     <section className="feature-block" ref={ref}>
       <div className="feature-block-bg" ref={bgRef} style={{ backgroundImage: `url(${data.image})` }} />
       <div className="feature-block-scrim" />
-      <div className={`slide-fade-text feature-block-text ${inView ? 'is-active' : ''}`}>
+      <div className={`slide-fade-text slide-fade-slow feature-block-text ${inView ? 'is-active' : ''}`}>
         <h2>{data.headline}</h2>
         <p>{data.copy}</p>
         <div className="dmaic-tags">
           {data.dmaic.map((d, i) => (
-            <div key={d.phase} className="dmaic-tag" style={{ '--tag-color': d.color, transitionDelay: `${0.15 + i * 0.12}s` }}>
-              <span className="dmaic-tag-dot" />
-              <span className="dmaic-tag-phase">{d.phase}</span>
-              <span className="dmaic-tag-line">{d.line}</span>
+            <div key={d.phase} className="dmaic-tag" style={{ '--tag-color': d.color, transitionDelay: `${0.3 + i * 0.25}s` }}>
+              <div className="dmaic-tag-head">
+                <span className="dmaic-tag-dot" />
+                <span className="dmaic-tag-phase">{d.phase}</span>
+                <span className="dmaic-tag-line">{d.line}</span>
+              </div>
+              <div className="dmaic-tag-examples">
+                {d.examples.map((ex, j) => (
+                  <span key={ex} className="dmaic-example-chip" style={{ transitionDelay: `${0.6 + i * 0.25 + j * 0.15}s` }}>{ex}</span>
+                ))}
+              </div>
             </div>
           ))}
         </div>
@@ -170,54 +174,63 @@ function Testimonials() {
   );
 }
 
-function SigmaRevealChart() {
-  const points = [188, 172, 178, 150, 158, 131, 120, 108, 96, 84, 78, 70];
-  const width = 600, height = 260, padding = 42;
-  const xStep = (width - padding * 2) / (points.length - 1);
-  const coords = points.map((y, i) => [padding + i * xStep, y]);
-  const pathD = coords.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x},${y}`).join(' ');
-  const center = 131;
-  const bands = [
-    { label: '1\u03c3', up: center - 21, down: center + 21, delay: 2.4 },
-    { label: '2\u03c3', up: center - 42, down: center + 42, delay: 2.85 },
-    { label: '3\u03c3', up: center - 63, down: center + 63, delay: 3.3 },
-  ];
+// Gaussian bell curve: dot climbs the left slope to the apex, then
+// pulses continuously once there. Only starts once the chart itself
+// (not just the section) is well into view.
+function GaussianChart({ active }) {
+  const width = 600, height = 260, padding = 40;
+  const baseline = 215, peakY = 50, mu = width / 2, sigmaPx = 62;
+  const amplitude = baseline - peakY;
+  const N = 60;
+  const pts = [];
+  for (let i = 0; i <= N; i++) {
+    const x = padding + (i / N) * (width - padding * 2);
+    const y = baseline - amplitude * Math.exp(-((x - mu) ** 2) / (2 * sigmaPx ** 2));
+    pts.push([x, y]);
+  }
+  const fullPath = pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+  const ascendingPts = pts.filter(([x]) => x <= mu);
+  const climbPath = ascendingPts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+
+  const sigmaLabels = [-3, -2, -1, 0, 1, 2, 3].map(k => ({
+    k, x: mu + k * sigmaPx, label: k === 0 ? '\u03bc' : `${k > 0 ? '+' : ''}${k}\u03c3`,
+  }));
+
   return (
     <div className="sigma-reveal">
       <div className="sigma-reveal-logo">
-        <svg width="30" height="30" viewBox="0 0 30 30" fill="none">
-          <rect width="30" height="30" rx="8" fill="var(--accent)" />
-          <path d="M7 22L11 15L15 19L19 11L22 15" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-          <circle cx="7" cy="22" r="1.8" fill="white" />
-          <circle cx="22" cy="15" r="1.8" fill="white" />
-        </svg>
-        <span>SixSigma<b>Pro</b></span>
+        <img src={logoMark} alt="" className="sigma-logo-mark" />
+        <span className="brand-wordmark">SixSigma<b>Pro</b></span>
       </div>
-      <svg viewBox={`0 0 ${width} ${height}`} className="sigma-reveal-svg" role="img" aria-label="Line chart improving over time with sigma bands">
+      <svg viewBox={`0 0 ${width} ${height}`} className="sigma-reveal-svg" role="img" aria-label="Gaussian distribution curve with sigma markings">
         <defs>
           <linearGradient id="sigmaLineGrad" x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="0%" stopColor="var(--accent)" />
             <stop offset="100%" stopColor="var(--accent-light)" />
           </linearGradient>
         </defs>
-        <line x1={padding} y1={center} x2={width - padding} y2={center} className="sigma-center-line" />
-        {bands.map((b, i) => (
-          <g key={i} className="sigma-band" style={{ animationDelay: `${b.delay}s` }}>
-            <line x1={padding} y1={b.up} x2={width - padding} y2={b.up} className="sigma-band-line" />
-            <line x1={padding} y1={b.down} x2={width - padding} y2={b.down} className="sigma-band-line" />
-            <text x={width - padding + 8} y={b.up + 4} className="sigma-band-label">{b.label}</text>
+        <line x1={padding} y1={baseline} x2={width - padding} y2={baseline} className="sigma-center-line" />
+
+        {active && sigmaLabels.map((s, i) => (
+          <g key={s.k} className="sigma-pop" style={{ animationDelay: `${2.1 + i * 0.15}s` }}>
+            <line x1={s.x} y1={baseline} x2={s.x} y2={baseline + 8} className="sigma-tick" />
+            <text x={s.x} y={baseline + 22} className="sigma-band-label" textAnchor="middle">{s.label}</text>
           </g>
         ))}
-        <path d={pathD} className="sigma-reveal-line-glow" />
-        <path d={pathD} className="sigma-reveal-line" />
-        {[0.26, 0.19, 0.13].map((begin, i) => (
-          <circle key={i} r={5 - i * 1.2} className="sigma-chase-trail" style={{ opacity: 0.35 - i * 0.1 }}>
-            <animateMotion dur="2.2s" begin={`${begin}s`} fill="freeze" path={pathD} />
-          </circle>
-        ))}
-        <circle r="6" className="sigma-chase-dot">
-          <animateMotion dur="2.2s" begin="0.1s" fill="freeze" path={pathD} />
-        </circle>
+
+        <path d={fullPath} className="sigma-reveal-line-glow" style={active ? { animationPlayState: 'running' } : {}} />
+        <path d={fullPath} className="sigma-reveal-line" style={active ? { animationPlayState: 'running' } : {}} />
+
+        {active && (
+          <>
+            <circle r="6" className="sigma-chase-dot">
+              <animateMotion dur="2s" begin="0.1s" fill="freeze" path={climbPath} />
+            </circle>
+            <g className="sigma-apex-pulse" style={{ transform: `translate(${mu}px, ${peakY}px)`, animationDelay: '2.1s' }}>
+              <circle r="10" className="sigma-apex-ring" />
+            </g>
+          </>
+        )}
       </svg>
     </div>
   );
@@ -225,6 +238,7 @@ function SigmaRevealChart() {
 
 function ClosingChapter() {
   const [ref, inView] = useReveal(0.15);
+  const [chartRef, chartActive] = useReveal(0.6);
   return (
     <section ref={ref} className={`closing-chapter ${inView ? 'in-view' : ''}`}>
       <div className="closing-chapter-inner">
@@ -244,8 +258,8 @@ function ClosingChapter() {
             <Link to="/worksheet" className="btn-secondary">Load Your Data</Link>
           </div>
         </div>
-        <div className={`sigma-reveal-wrap ${inView ? 'is-visible' : ''}`}>
-          <SigmaRevealChart />
+        <div className="sigma-reveal-wrap" ref={chartRef}>
+          <GaussianChart active={chartActive} />
         </div>
       </div>
     </section>
