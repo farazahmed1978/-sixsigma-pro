@@ -37,7 +37,7 @@ import ValueStreamMap from './tools/ValueStreamMap';
 import ScatterPlot from './tools/ScatterPlot';
 import BoxPlot from './tools/BoxPlot';
 import RunChart from './tools/RunChart';
-import GageRR from './tools/GageRR';
+
 
 // New tools
 import DescriptiveStats from './tools/DescriptiveStats';
@@ -67,8 +67,7 @@ const toolMeta = {
   'boxplot': { title: 'Box Plot', phase: 'Analyze', component: <BoxPlot /> },
   'fishbone': { title: 'Fishbone Diagram', phase: 'Analyze', component: <FishboneDiagram /> },
   'fmea': { title: 'FMEA', phase: 'Improve', component: <FMEA /> },
-  'msa': { title: 'MSA / Gauge Study', phase: 'Measure', component: <MSA /> },
-  'gage-rr': { title: 'Gage R&R', phase: 'Measure', component: <GageRR /> },
+  'msa': { title: 'Gage R&R (MSA)', phase: 'Measure', component: <MSA /> },
   'vsm': { title: 'Value Stream Map', phase: 'Improve', component: <ValueStreamMap /> },
   'descriptive': { title: 'Descriptive Statistics', phase: 'Measure', component: <DescriptiveStats /> },
   'multivari': { title: 'Multi-Vari Chart', phase: 'Analyze', component: <MultiVariChart /> },
