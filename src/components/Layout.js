@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
+import logoMark from '../logo-mark.png';
 import './Layout.css';
 
 const NAV = [
@@ -9,6 +10,7 @@ const NAV = [
     items: [
       { id: 'worksheet', name: 'Data Worksheet', path: '/worksheet' },
       { id: 'projects', name: 'Project Workspace', path: '/projects' },
+      { id: 'dashboard', name: 'Classic Dashboard', path: '/dashboard' },
     ]
   },
   {
@@ -63,6 +65,14 @@ const NAV = [
     ]
   },
   {
+    section: 'Control',
+    color: 'var(--cyan)',
+    items: [
+      { id: 'control-chart-2', name: 'Control Chart (Ongoing Monitoring)', path: '/tool/control-chart' },
+      { id: 'meeting-minutes', name: 'Meeting Minutes', path: '/templates' },
+    ]
+  },
+  {
     section: 'Resources',
     items: [
       { id: 'resources', name: 'Guides & References', path: '/resources' },
@@ -90,9 +100,6 @@ export default function Layout({ children }) {
   const toggleSection = (section) => setCollapsed(p => ({ ...p, [section]: !p[section] }));
   const isActive = (path) => location.pathname === path || location.pathname.startsWith(path + '/');
 
-  // Desktop: toggle the sidebar's collapsed/expanded state.
-  // Mobile: toggle the slide-in overlay instead — these must NOT both fire from one click,
-  // or the full-screen mobile overlay renders on desktop and blocks the page.
   const handleMenuClick = () => {
     if (isMobile) setMobileOpen(prev => !prev);
     else setSidebarOpen(prev => !prev);
@@ -100,7 +107,6 @@ export default function Layout({ children }) {
 
   return (
     <div className={`layout ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'} theme-${theme}`}>
-      {/* Topbar */}
       <header className="topbar">
         <div className="topbar-left">
           <button className="menu-btn" onClick={handleMenuClick}>
@@ -108,12 +114,7 @@ export default function Layout({ children }) {
           </button>
           <Link to="/" className="logo">
             <div className="logo-icon">
-              <svg width="30" height="30" viewBox="0 0 30 30" fill="none">
-                <rect width="30" height="30" rx="8" fill="var(--accent)" />
-                <path d="M7 22L11 15L15 19L19 11L22 15" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-                <circle cx="7" cy="22" r="1.8" fill="white" />
-                <circle cx="22" cy="15" r="1.8" fill="white" />
-              </svg>
+              <img src={logoMark} alt="SixSigma Pro" style={{ height: 30, width: 'auto', display: 'block' }} />
             </div>
             <div>
               <div className="logo-name">SixSigma<span>Pro</span></div>
@@ -139,7 +140,6 @@ export default function Layout({ children }) {
         </div>
       </header>
 
-      {/* Sidebar */}
       <aside className={`sidebar ${mobileOpen ? 'mobile-open' : ''}`}>
         <div className="sidebar-inner">
           {NAV.map(group => (
