@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useWorksheet } from '../context/WorksheetContext';
-import heroPhoto from '../hero-photo.jpg';
-import analyzePhoto from '../analyze-photo.jpg';
+import heroMain from '../hero-main.jpg';
+import featureEngineers from '../feature-engineers.jpg';
+import featureAnalyze from '../feature-analyze.jpg';
+import featureExcellence from '../feature-excellence.jpg';
 import './Dashboard.css';
 
 const PHASES = [
@@ -43,8 +45,7 @@ const PHASES = [
       { name: 'Box Plot', path: '/tool/boxplot' },
       { name: 'Scatter Plot', path: '/tool/scatter' },
       { name: 'Multi-Vari Chart', path: '/tool/multivari' },
-    ],
-    bgImage: analyzePhoto,
+    ]
   },
   {
     n: '04', phase: 'Improve', color: 'var(--purple)',
@@ -77,17 +78,21 @@ const TICKER_ITEMS = [
   'Sigma Level & DPMO', 'Sample Size & Power Calculators', 'Project Templates', 'Project Workbench',
 ];
 
-const STAGES = [
-  { kind: 'intro' },
+const FEATURES = [
   {
-    kind: 'panel', eyebrow: 'What\u2019s Inside',
-    title: 'Fifty-plus tools. One workspace.',
-    copy: 'Control charts, capability studies, regression, DOE — the instruments a quality team actually reaches for. Every finding saves straight into your project report, automatically.',
+    image: featureEngineers,
+    headline: 'Designed for quality engineers, not statisticians.',
+    copy: 'Powerful tools. Practical insights. Built for real-world quality challenges.',
   },
   {
-    kind: 'panel', eyebrow: 'Where We\u2019re Headed',
-    title: 'An assistant is coming. The rigor is already here.',
-    copy: 'We\u2019re building AI guidance directly into the workflow. For now, every method already follows the same discipline it measures — checked against independent statistical software before it reached you.',
+    image: featureAnalyze,
+    headline: 'Analyze with confidence. Improve with intelligence.',
+    copy: 'An AI-guided platform built for Lean Six Sigma professionals.',
+  },
+  {
+    image: featureExcellence,
+    headline: 'Designed for excellence.',
+    copy: 'From data to decisions — without unnecessary complexity.',
   },
 ];
 
@@ -102,7 +107,7 @@ function prefersReducedMotion() {
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-function useReveal(threshold = 0.16) {
+function useReveal(threshold = 0.2) {
   const ref = useRef(null);
   const [inView, setInView] = useState(prefersReducedMotion());
   useEffect(() => {
@@ -117,152 +122,62 @@ function useReveal(threshold = 0.16) {
   return [ref, inView];
 }
 
-// Toggles both ways (fade in AND out) — used for the chart accent near pricing.
-function useToggleReveal(threshold = 0.2) {
-  const ref = useRef(null);
-  const [inView, setInView] = useState(prefersReducedMotion());
-  useEffect(() => {
-    if (prefersReducedMotion() || !ref.current) return;
-    const el = ref.current;
-    const obs = new IntersectionObserver(([entry]) => setInView(entry.isIntersecting), { threshold });
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [threshold]);
-  return [ref, inView];
-}
-
-function LiveControlChart() {
-  const points = [124, 116, 138, 121, 131, 109, 119, 46, 127, 134, 113, 122];
-  const breachIndex = 7;
-  const width = 600, height = 260, padding = 42;
-  const xStep = (width - padding * 2) / (points.length - 1);
-  const ucl = 72, lcl = 190, center = 131;
-  const coords = points.map((y, i) => [padding + i * xStep, y]);
-  const pathD = coords.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x},${y}`).join(' ');
+function Hero({ hasData }) {
+  const [ref, inView] = useReveal(0.3);
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="hero-chart-svg" role="img"
-      aria-label="Control chart showing a process point breaching the upper control limit">
-      <line x1={padding} y1={ucl} x2={width - padding} y2={ucl} className="hero-chart-limit" />
-      <line x1={padding} y1={lcl} x2={width - padding} y2={lcl} className="hero-chart-limit" />
-      <line x1={padding} y1={center} x2={width - padding} y2={center} className="hero-chart-center" />
-      <text x={width - padding + 8} y={ucl + 4} className="hero-chart-label">UCL</text>
-      <text x={width - padding + 8} y={lcl + 4} className="hero-chart-label">LCL</text>
-      <text x={width - padding + 8} y={center + 4} className="hero-chart-label hero-chart-label-muted">x̄</text>
-      <path d={pathD} className="hero-chart-line" />
-      {coords.map(([x, y], i) => (
-        i === breachIndex ? (
-          <g key={i}>
-            <circle cx={x} cy={y} r="6" className="hero-chart-breach-ring" />
-            <circle cx={x} cy={y} r="5" className="hero-chart-breach-dot" />
-            <text x={x} y={y - 16} className="hero-chart-flag">OUT OF CONTROL</text>
-          </g>
-        ) : <circle key={i} cx={x} cy={y} r="4" className="hero-chart-point" />
-      ))}
-    </svg>
-  );
-}
-
-function PinnedHero({ hasData }) {
-  const containerRef = useRef(null);
-  const [active, setActive] = useState(0);
-  const reduced = prefersReducedMotion();
-
-  useEffect(() => {
-    if (reduced) return;
-    let ticking = false;
-    const onScroll = () => {
-      if (ticking) return;
-      ticking = true;
-      requestAnimationFrame(() => {
-        const el = containerRef.current;
-        if (el) {
-          const rect = el.getBoundingClientRect();
-          const vh = window.innerHeight;
-          const scrollable = el.offsetHeight - vh;
-          const progress = scrollable > 0 ? Math.min(1, Math.max(0, -rect.top / scrollable)) : 0;
-          setActive(Math.min(STAGES.length - 1, Math.floor(progress * STAGES.length)));
-        }
-        ticking = false;
-      });
-    };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    onScroll();
-    return () => window.removeEventListener('scroll', onScroll);
-  }, [reduced]);
-
-  const introPanel = (isActive) => (
-    <div className={`pinned-panel pinned-intro ${isActive ? 'is-active' : ''}`}>
-      <div className="dash-hero-badge">For quality engineers, not statisticians</div>
-      <h1>A quieter way to run Six Sigma.</h1>
-      <p>
-        50+ verified tools, project templates, and a workbench that keeps every finding
-        organized — built for the people running the project, not just reviewing it.
-      </p>
-      <div className="dash-hero-actions">
-        <Link to="/worksheet" className="btn-primary">
-          {hasData ? 'Open Worksheet →' : 'Load Your Data →'}
-        </Link>
-        <Link to="/pricing" className="btn-secondary">See Plans &amp; Pricing</Link>
-      </div>
-      <div className="hero-ticker">
-        <div className="hero-ticker-mask">
-          <div className="hero-ticker-track">
-            {[...TICKER_ITEMS, ...TICKER_ITEMS].map((item, i) => (
-              <span key={i} className="hero-ticker-pill">{item}</span>
-            ))}
-          </div>
+    <section className="photo-hero" ref={ref}>
+      <div className="photo-hero-bg" style={{ backgroundImage: `url(${heroMain})` }} />
+      <div className="photo-hero-scrim" />
+      <div className="photo-hero-inner">
+        <div className={`slide-fade-text ${inView ? 'is-active' : ''}`}>
+          <div className="dash-hero-badge">For quality engineers, not statisticians</div>
+          <h1>A smarter way to run Six Sigma.</h1>
+          <p>
+            50+ verified tools, project templates, and a workbench that keeps every finding
+            organized — built for the people running the project, not just reviewing it.
+          </p>
         </div>
-      </div>
-    </div>
-  );
-
-  if (reduced) {
-    return (
-      <section className="pinned-hero pinned-hero-static">
-        <div className="pinned-photo" style={{ backgroundImage: `url(${heroPhoto})` }} />
-        <div className="pinned-scrim" />
-        <div className="pinned-static-stack">
-          {introPanel(true)}
-          {STAGES.filter(s => s.kind === 'panel').map((s, i) => (
-            <div key={i} className="pinned-panel is-active">
-              <div className="pinned-eyebrow">{s.eyebrow}</div>
-              <h3>{s.title}</h3>
-              <p>{s.copy}</p>
+        <div className="photo-hero-actions">
+          <Link to="/worksheet" className="btn-primary">
+            {hasData ? 'Open Worksheet →' : 'Load Your Data →'}
+          </Link>
+          <Link to="/pricing" className="btn-secondary">See Plans &amp; Pricing</Link>
+        </div>
+        <div className="hero-ticker">
+          <div className="hero-ticker-mask">
+            <div className="hero-ticker-track">
+              {[...TICKER_ITEMS, ...TICKER_ITEMS].map((item, i) => (
+                <span key={i} className="hero-ticker-pill">{item}</span>
+              ))}
             </div>
-          ))}
-        </div>
-      </section>
-    );
-  }
-
-  return (
-    <section className="pinned-hero" ref={containerRef} style={{ height: `${STAGES.length * 100}vh` }}>
-      <div className="pinned-sticky">
-        <div className="pinned-photo" style={{ backgroundImage: `url(${heroPhoto})` }} />
-        <div className="pinned-scrim" />
-        {introPanel(active === 0)}
-        {STAGES.map((s, i) => s.kind === 'panel' ? (
-          <div key={i} className={`pinned-panel ${active === i ? 'is-active' : ''}`}>
-            <div className="pinned-eyebrow">{s.eyebrow}</div>
-            <h3>{s.title}</h3>
-            <p>{s.copy}</p>
           </div>
-        ) : null)}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FeatureBlock({ data }) {
+  const [ref, inView] = useReveal(0.35);
+  return (
+    <section className="feature-block" ref={ref}>
+      <div className="feature-block-bg" style={{ backgroundImage: `url(${data.image})` }} />
+      <div className="feature-block-scrim" />
+      <div className={`slide-fade-text feature-block-text ${inView ? 'is-active' : ''}`}>
+        <h2>{data.headline}</h2>
+        <p>{data.copy}</p>
       </div>
     </section>
   );
 }
 
 function PhaseChapter({ data, index }) {
-  const [ref, inView] = useReveal();
+  const [ref, inView] = useReveal(0.16);
   return (
     <section
       ref={ref}
       className={`phase-chapter ${inView ? 'in-view' : ''} ${index % 2 === 1 ? 'phase-chapter-alt' : ''}`}
-      style={{
-        '--phase-color': data.color,
-        ...(data.bgImage ? { backgroundImage: `linear-gradient(120deg, var(--bg) 30%, rgba(6,13,27,0.75)), url(${data.bgImage})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {})
-      }}
+      style={{ '--phase-color': data.color }}
     >
       <div className="phase-chapter-numeral" aria-hidden="true">{data.n}</div>
       <div className="phase-chapter-inner">
@@ -283,10 +198,10 @@ function PhaseChapter({ data, index }) {
 }
 
 function Testimonials() {
-  const [ref, inView] = useReveal();
+  const [ref, inView] = useReveal(0.16);
   return (
     <section ref={ref} className={`testimonials-section ${inView ? 'in-view' : ''}`}>
-      <div className="testimonials-eyebrow">Why Teams Choose This</div>
+      <div className="testimonials-eyebrow">Why Teams Choose Us!</div>
       <div className="testimonials-grid">
         {PULL_QUOTES.map((q, i) => (
           <div key={i} className="pull-quote-card">
@@ -298,9 +213,52 @@ function Testimonials() {
   );
 }
 
+// Closing signature: line draws in with a chasing dot, sigma bands flash
+// in sequence, then the logo fades in above the chart.
+function SigmaRevealChart() {
+  const points = [188, 172, 178, 150, 158, 131, 120, 108, 96, 84, 78, 70];
+  const width = 600, height = 260, padding = 42;
+  const xStep = (width - padding * 2) / (points.length - 1);
+  const coords = points.map((y, i) => [padding + i * xStep, y]);
+  const pathD = coords.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x},${y}`).join(' ');
+  const center = 131;
+  const bands = [
+    { label: '1\u03c3', up: center - 21, down: center + 21, delay: 2.4 },
+    { label: '2\u03c3', up: center - 42, down: center + 42, delay: 2.85 },
+    { label: '3\u03c3', up: center - 63, down: center + 63, delay: 3.3 },
+  ];
+
+  return (
+    <div className="sigma-reveal">
+      <div className="sigma-reveal-logo">
+        <svg width="30" height="30" viewBox="0 0 30 30" fill="none">
+          <rect width="30" height="30" rx="8" fill="var(--accent)" />
+          <path d="M7 22L11 15L15 19L19 11L22 15" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+          <circle cx="7" cy="22" r="1.8" fill="white" />
+          <circle cx="22" cy="15" r="1.8" fill="white" />
+        </svg>
+        <span>SixSigma<b>Pro</b></span>
+      </div>
+      <svg viewBox={`0 0 ${width} ${height}`} className="sigma-reveal-svg" role="img" aria-label="Line chart improving over time with sigma bands">
+        <line x1={padding} y1={center} x2={width - padding} y2={center} className="sigma-center-line" />
+        {bands.map((b, i) => (
+          <g key={i} className="sigma-band" style={{ animationDelay: `${b.delay}s` }}>
+            <line x1={padding} y1={b.up} x2={width - padding} y2={b.up} className="sigma-band-line" />
+            <line x1={padding} y1={b.down} x2={width - padding} y2={b.down} className="sigma-band-line" />
+            <text x={width - padding + 8} y={b.up + 4} className="sigma-band-label">{b.label}</text>
+          </g>
+        ))}
+        <path d={pathD} className="sigma-reveal-line" />
+        <circle r="6" className="sigma-chase-dot">
+          <animateMotion dur="2.2s" begin="0.1s" fill="freeze" path={pathD} />
+        </circle>
+      </svg>
+    </div>
+  );
+}
+
 function ClosingChapter() {
-  const [ref, inView] = useReveal();
-  const [chartRef, chartVisible] = useToggleReveal();
+  const [ref, inView] = useReveal(0.2);
   return (
     <section ref={ref} className={`closing-chapter ${inView ? 'in-view' : ''}`}>
       <div className="closing-chapter-inner">
@@ -320,8 +278,8 @@ function ClosingChapter() {
             <Link to="/worksheet" className="btn-secondary">Load Your Data</Link>
           </div>
         </div>
-        <div ref={chartRef} className={`closing-chart-accent ${chartVisible ? 'is-visible' : ''}`}>
-          <LiveControlChart />
+        <div className={`sigma-reveal-wrap ${inView ? 'is-visible' : ''}`}>
+          <SigmaRevealChart />
         </div>
       </div>
     </section>
@@ -333,7 +291,7 @@ export default function Dashboard() {
 
   return (
     <>
-      <PinnedHero hasData={hasData} />
+      <Hero hasData={hasData} />
 
       <div className="sticky-ws-banner">
         {hasData ? (
@@ -352,6 +310,8 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      {FEATURES.map((f, i) => <FeatureBlock key={i} data={f} />)}
 
       <div className="phase-chapters">
         {PHASES.map((p, i) => <PhaseChapter key={p.phase} data={p} index={i} />)}
