@@ -37,7 +37,7 @@ const FEATURES = [
   },
   {
     image: featureExcellence,
-    headline: 'Designed for excellence.',
+    headline: 'Excellence, without the overhead.',
     copy: 'From data to decisions — without unnecessary complexity.',
     dmaic: [
       { phase: 'Improve', color: 'var(--purple)', line: 'Design better processes.', examples: ['DOE', 'FMEA', 'Value Stream Map'] },
