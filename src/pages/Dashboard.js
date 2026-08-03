@@ -7,63 +7,6 @@ import featureAnalyze from '../feature-analyze.jpg';
 import featureExcellence from '../feature-excellence.jpg';
 import './Dashboard.css';
 
-const PHASES = [
-  {
-    n: '01', phase: 'Define', color: 'var(--yellow)',
-    headline: 'Align the objective.',
-    tools: [
-      { name: 'Project Charter', path: '/templates' },
-      { name: 'SIPOC Diagram', path: '/templates' },
-      { name: 'CTQ Tree', path: '/templates' },
-      { name: 'Cost-Benefit Analysis', path: '/templates' },
-    ]
-  },
-  {
-    n: '02', phase: 'Measure', color: 'var(--green)',
-    headline: 'Measure what matters.',
-    tools: [
-      { name: 'Control Chart', path: '/tool/control-chart' },
-      { name: 'Capability Analysis', path: '/tool/capability' },
-      { name: 'Descriptive Statistics', path: '/tool/descriptive' },
-      { name: 'Gage R&R (MSA)', path: '/tool/msa' },
-      { name: 'Histogram', path: '/tool/histogram' },
-      { name: 'Run Chart', path: '/tool/run-chart' },
-    ]
-  },
-  {
-    n: '03', phase: 'Analyze', color: 'var(--orange)',
-    headline: 'Transform data into insight.',
-    tools: [
-      { name: 'Hypothesis Testing', path: '/hypothesis' },
-      { name: 'Regression Analysis', path: '/tool/regression' },
-      { name: 'Correlation Matrix', path: '/tool/correlation' },
-      { name: 'Pareto Chart', path: '/tool/pareto' },
-      { name: 'Fishbone Diagram', path: '/tool/fishbone' },
-      { name: 'Box Plot', path: '/tool/boxplot' },
-      { name: 'Scatter Plot', path: '/tool/scatter' },
-      { name: 'Multi-Vari Chart', path: '/tool/multivari' },
-    ]
-  },
-  {
-    n: '04', phase: 'Improve', color: 'var(--purple)',
-    headline: 'Design better processes.',
-    tools: [
-      { name: 'Design of Experiments', path: '/doe' },
-      { name: 'FMEA', path: '/tool/fmea' },
-      { name: 'Value Stream Map', path: '/tool/vsm' },
-      { name: 'DOE Experiment Plan', path: '/templates' },
-    ]
-  },
-  {
-    n: '05', phase: 'Control', color: 'var(--cyan)',
-    headline: 'Sustain the results.',
-    tools: [
-      { name: 'Control Chart', path: '/tool/control-chart' },
-      { name: 'Meeting Minutes', path: '/templates' },
-    ]
-  },
-];
-
 const TICKER_ITEMS = [
   'Control Charts (I-MR / X-bar-R / CUSUM / EWMA)', 'Attribute Charts (p/np/c/u)', 'Capability Analysis',
   'Gage R&R (MSA)', 'Descriptive Statistics', 'Histogram', 'Run Chart', 'Hypothesis Testing — 17 Tests',
@@ -74,12 +17,32 @@ const TICKER_ITEMS = [
 ];
 
 const FEATURES = [
-  { image: featureEngineers, headline: 'Designed for quality engineers, not statisticians.',
-    copy: 'Powerful tools. Practical insights. Built for real-world quality challenges.' },
-  { image: featureAnalyze, headline: 'Analyze with confidence. Improve with intelligence.',
-    copy: 'An AI-guided platform built for Lean Six Sigma professionals.' },
-  { image: featureExcellence, headline: 'Designed for excellence.',
-    copy: 'From data to decisions — without unnecessary complexity.' },
+  {
+    image: featureEngineers,
+    headline: 'Designed for quality engineers, not statisticians.',
+    copy: 'Powerful tools. Practical insights. Built for real-world quality challenges.',
+    dmaic: [
+      { phase: 'Define', color: 'var(--yellow)', line: 'Align the objective.' },
+      { phase: 'Measure', color: 'var(--green)', line: 'Measure what matters.' },
+    ],
+  },
+  {
+    image: featureAnalyze,
+    headline: 'Analyze with confidence. Improve with intelligence.',
+    copy: 'An AI-guided platform built for Lean Six Sigma professionals.',
+    dmaic: [
+      { phase: 'Analyze', color: 'var(--orange)', line: 'Transform data into insight.' },
+    ],
+  },
+  {
+    image: featureExcellence,
+    headline: 'Designed for excellence.',
+    copy: 'From data to decisions — without unnecessary complexity.',
+    dmaic: [
+      { phase: 'Improve', color: 'var(--purple)', line: 'Design better processes.' },
+      { phase: 'Control', color: 'var(--cyan)', line: 'Sustain the results.' },
+    ],
+  },
 ];
 
 const PULL_QUOTES = [
@@ -93,10 +56,11 @@ function prefersReducedMotion() {
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-// Reveal-once hook with a safety fallback: if the IntersectionObserver
-// never fires (layout quirk, slow paint, etc.) it forces visibility after
-// 1.8s regardless, so content can never get stuck permanently hidden.
-function useReveal(threshold = 0.12) {
+// Reveal-once hook — NO blind timer. Fires only when the element is
+// actually scrolled into view. (A previous version force-fired everything
+// on a timer regardless of scroll position — that was the bug that made
+// every section look "static.")
+function useReveal(threshold = 0.15) {
   const ref = useRef(null);
   const [inView, setInView] = useState(prefersReducedMotion());
   useEffect(() => {
@@ -106,20 +70,47 @@ function useReveal(threshold = 0.12) {
       if (entry.isIntersecting) { setInView(true); obs.unobserve(el); }
     }, { threshold });
     obs.observe(el);
-    const fallback = setTimeout(() => setInView(true), 1800);
-    return () => { obs.disconnect(); clearTimeout(fallback); };
+    return () => obs.disconnect();
   }, [threshold]);
   return [ref, inView];
 }
 
+// Subtle parallax on a background layer — attaches to the real scroll
+// container (.main-content), not window, since that's what actually
+// scrolls on this site.
+function useParallax(speed = 0.12) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (prefersReducedMotion()) return;
+    const scrollEl = document.querySelector('.main-content') || window;
+    let raf = null;
+    const update = () => {
+      const el = ref.current;
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        const vh = window.innerHeight || 800;
+        const offset = (rect.top - vh / 2) * speed;
+        el.style.transform = `translateY(${offset}px) scale(1.15)`;
+      }
+      raf = null;
+    };
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(update); };
+    scrollEl.addEventListener('scroll', onScroll, { passive: true });
+    update();
+    return () => scrollEl.removeEventListener('scroll', onScroll);
+  }, [speed]);
+  return ref;
+}
+
 function Hero() {
   const [ref, inView] = useReveal(0.2);
+  const bgRef = useParallax(0.08);
   return (
     <section className="photo-hero" ref={ref}>
-      <div className="photo-hero-bg" style={{ backgroundImage: `url(${heroMain})` }} />
+      <div className="photo-hero-bg" ref={bgRef} style={{ backgroundImage: `url(${heroMain})` }} />
       <div className="photo-hero-scrim" />
       <div className="photo-hero-inner">
-        <div className={`slide-fade-text ${inView ? 'is-active' : ''}`}>
+        <div className={`slide-fade-text slide-fade-slow ${inView ? 'is-active' : ''}`}>
           <div className="dash-hero-badge">For quality engineers, not statisticians</div>
           <h1>Let us streamline your Six Sigma journey.</h1>
           <p>
@@ -143,36 +134,21 @@ function Hero() {
 
 function FeatureBlock({ data }) {
   const [ref, inView] = useReveal(0.25);
+  const bgRef = useParallax(0.1);
   return (
     <section className="feature-block" ref={ref}>
-      <div className="feature-block-bg" style={{ backgroundImage: `url(${data.image})` }} />
+      <div className="feature-block-bg" ref={bgRef} style={{ backgroundImage: `url(${data.image})` }} />
       <div className="feature-block-scrim" />
       <div className={`slide-fade-text feature-block-text ${inView ? 'is-active' : ''}`}>
         <h2>{data.headline}</h2>
         <p>{data.copy}</p>
-      </div>
-    </section>
-  );
-}
-
-function PhaseChapter({ data, index }) {
-  const [ref, inView] = useReveal(0.12);
-  return (
-    <section
-      ref={ref}
-      className={`phase-chapter ${inView ? 'in-view' : ''} ${index % 2 === 1 ? 'phase-chapter-alt' : ''}`}
-      style={{ '--phase-color': data.color }}
-    >
-      <div className="phase-chapter-numeral" aria-hidden="true">{data.n}</div>
-      <div className="phase-chapter-inner">
-        <div className="phase-chapter-eyebrow">
-          <span className="phase-chapter-dot" />
-          {data.phase}
-        </div>
-        <h2 className="phase-chapter-headline">{data.headline}</h2>
-        <div className="phase-chapter-tools">
-          {data.tools.map(t => (
-            <Link key={t.name} to={t.path} className="phase-chapter-pill">{t.name}</Link>
+        <div className="dmaic-tags">
+          {data.dmaic.map((d, i) => (
+            <div key={d.phase} className="dmaic-tag" style={{ '--tag-color': d.color, transitionDelay: `${0.15 + i * 0.12}s` }}>
+              <span className="dmaic-tag-dot" />
+              <span className="dmaic-tag-phase">{d.phase}</span>
+              <span className="dmaic-tag-line">{d.line}</span>
+            </div>
           ))}
         </div>
       </div>
@@ -181,7 +157,7 @@ function PhaseChapter({ data, index }) {
 }
 
 function Testimonials() {
-  const [ref, inView] = useReveal(0.12);
+  const [ref, inView] = useReveal(0.15);
   return (
     <section ref={ref} className={`testimonials-section ${inView ? 'in-view' : ''}`}>
       <div className="testimonials-eyebrow">Why Teams Choose Us!</div>
@@ -218,6 +194,12 @@ function SigmaRevealChart() {
         <span>SixSigma<b>Pro</b></span>
       </div>
       <svg viewBox={`0 0 ${width} ${height}`} className="sigma-reveal-svg" role="img" aria-label="Line chart improving over time with sigma bands">
+        <defs>
+          <linearGradient id="sigmaLineGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="var(--accent)" />
+            <stop offset="100%" stopColor="var(--accent-light)" />
+          </linearGradient>
+        </defs>
         <line x1={padding} y1={center} x2={width - padding} y2={center} className="sigma-center-line" />
         {bands.map((b, i) => (
           <g key={i} className="sigma-band" style={{ animationDelay: `${b.delay}s` }}>
@@ -226,7 +208,13 @@ function SigmaRevealChart() {
             <text x={width - padding + 8} y={b.up + 4} className="sigma-band-label">{b.label}</text>
           </g>
         ))}
+        <path d={pathD} className="sigma-reveal-line-glow" />
         <path d={pathD} className="sigma-reveal-line" />
+        {[0.26, 0.19, 0.13].map((begin, i) => (
+          <circle key={i} r={5 - i * 1.2} className="sigma-chase-trail" style={{ opacity: 0.35 - i * 0.1 }}>
+            <animateMotion dur="2.2s" begin={`${begin}s`} fill="freeze" path={pathD} />
+          </circle>
+        ))}
         <circle r="6" className="sigma-chase-dot">
           <animateMotion dur="2.2s" begin="0.1s" fill="freeze" path={pathD} />
         </circle>
@@ -289,10 +277,6 @@ export default function Dashboard() {
       </div>
 
       {FEATURES.map((f, i) => <FeatureBlock key={i} data={f} />)}
-
-      <div className="phase-chapters">
-        {PHASES.map((p, i) => <PhaseChapter key={p.phase} data={p} index={i} />)}
-      </div>
 
       <Testimonials />
       <ClosingChapter />
