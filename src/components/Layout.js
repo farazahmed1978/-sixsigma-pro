@@ -9,7 +9,6 @@ const NAV = [
     items: [
       { id: 'worksheet', name: 'Data Worksheet', path: '/worksheet' },
       { id: 'projects', name: 'Project Workspace', path: '/projects' },
-      { id: 'dashboard', name: 'Classic Dashboard', path: '/dashboard' },
     ]
   },
   {
