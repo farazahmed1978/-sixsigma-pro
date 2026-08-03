@@ -10,8 +10,8 @@
 .dash-hero-content p { color: var(--text-secondary); font-size: 0.97rem; line-height: 1.65; max-width: 500px; margin-bottom: 1.5rem; }
 .dash-hero-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; }
 
-.dash-stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
-.dash-stat { background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.25rem; text-align: center; min-width: 100px; }
+.dash-stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 2rem; }
+.dash-stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.25rem; text-align: center; }
 .dash-stat-value { font-family: var(--font-display); font-size: 1.75rem; font-weight: 700; color: var(--accent-light); }
 .dash-stat-label { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0.2rem; }
 
@@ -76,4 +76,110 @@
   .dash-hero-content h1 { font-size: 1.3rem; }
   .dash-stats-grid { grid-template-columns: 1fr 1fr; }
   .dash-stat-value { font-size: 1.2rem; }
+}
+
+/* ============================================================
+   HERO 2.0 — animated signature control chart + entrance motion
+   ============================================================ */
+
+.dash-hero { position: relative; overflow: hidden; }
+
+.hero-fade-item {
+  opacity: 0;
+  transform: translateY(14px);
+  animation: heroFadeUp 0.7s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+@keyframes heroFadeUp {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.hero-accent-word { color: var(--accent-light); }
+
+.hero-chart-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 320px;
+}
+.hero-chart-svg { width: 100%; height: auto; max-width: 460px; }
+
+.hero-chart-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1400;
+  stroke-dashoffset: 1400;
+  animation: heroDrawLine 1.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+@keyframes heroDrawLine { to { stroke-dashoffset: 0; } }
+
+.hero-chart-limit { stroke: var(--text-muted); stroke-width: 1; stroke-dasharray: 4 4; opacity: 0.5; }
+.hero-chart-center { stroke: var(--text-muted); stroke-width: 1; stroke-dasharray: 2 3; opacity: 0.35; }
+.hero-chart-label { font-family: var(--font-mono); font-size: 10px; fill: var(--text-muted); }
+.hero-chart-label-muted { opacity: 0.7; }
+
+.hero-chart-point {
+  fill: var(--accent-light);
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: heroPointIn 0.4s ease forwards;
+}
+.hero-chart-breach-dot {
+  fill: var(--red);
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: heroPointIn 0.4s ease forwards;
+}
+@keyframes heroPointIn {
+  from { opacity: 0; transform: scale(0); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.hero-chart-breach-ring {
+  fill: none;
+  stroke: var(--red);
+  stroke-width: 1.5;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: heroRingPulse 2.4s ease-in-out infinite;
+}
+@keyframes heroRingPulse {
+  0% { opacity: 0.7; transform: scale(1); }
+  70% { opacity: 0; transform: scale(2.4); }
+  100% { opacity: 0; transform: scale(2.4); }
+}
+
+.hero-chart-flag {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  fill: var(--red);
+  text-anchor: middle;
+  opacity: 0;
+  animation: heroFlagIn 0.5s ease forwards;
+}
+@keyframes heroFlagIn { to { opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-fade-item,
+  .hero-chart-line,
+  .hero-chart-point,
+  .hero-chart-breach-dot,
+  .hero-chart-breach-ring,
+  .hero-chart-flag {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    stroke-dashoffset: 0 !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .hero-chart-wrap { min-width: 0; margin-top: 1rem; }
 }
