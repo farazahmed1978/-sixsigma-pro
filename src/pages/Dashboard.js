@@ -3,69 +3,74 @@ import { Link } from 'react-router-dom';
 import { useWorksheet } from '../context/WorksheetContext';
 import './Dashboard.css';
 
-const DMAIC_SECTIONS = [
+const PHASES = [
   {
+    n: '01',
     phase: 'Define',
     color: 'var(--yellow)',
-    icon: '🎯',
-    desc: 'Clarify the problem, scope the project, and identify customer requirements.',
+    headline: 'Say the problem out loud before you touch a single chart.',
+    copy: "A project scoped honestly saves you from solving the wrong thing beautifully. Charter it, map it, and know exactly who it's for before the analysis begins.",
     tools: [
-      { name: 'Project Charter', path: '/templates', icon: '📋', desc: 'Define project scope and goals' },
-      { name: 'SIPOC Diagram', path: '/templates', icon: '🗺️', desc: 'Map suppliers, inputs, process, outputs, customers' },
-      { name: 'CTQ Tree', path: '/templates', icon: '🌳', desc: 'Translate customer needs to measurable specs' },
-      { name: 'Cost-Benefit Analysis', path: '/templates', icon: '💰', desc: 'Justify the project financially' },
+      { name: 'Project Charter', path: '/templates' },
+      { name: 'SIPOC Diagram', path: '/templates' },
+      { name: 'CTQ Tree', path: '/templates' },
+      { name: 'Cost-Benefit Analysis', path: '/templates' },
     ]
   },
   {
+    n: '02',
     phase: 'Measure',
     color: 'var(--green)',
-    icon: '📏',
-    desc: 'Quantify the current state, validate your measurement system, and establish a baseline.',
+    headline: 'You can\u2019t fix what you haven\u2019t measured honestly.',
+    copy: 'Before you trust a number, prove the number can be trusted. Baseline the process, validate the gauge, then start watching for what actually moves.',
     tools: [
-      { name: 'Control Chart', path: '/tool/control-chart', icon: '📈', desc: 'Detect special cause variation' },
-      { name: 'Capability Analysis', path: '/tool/capability', icon: '🎯', desc: 'Calculate Cp, Cpk, Pp, Ppk, sigma level' },
-      { name: 'Descriptive Statistics', path: '/tool/descriptive', icon: '🔢', desc: 'Mean, median, std dev, CI, skewness, kurtosis' },
-      { name: 'Gage R&R (MSA)', path: '/tool/msa', icon: '📏', desc: 'Validate your measurement system' },
-      { name: 'Histogram', path: '/tool/histogram', icon: '📊', desc: 'Visualize data distribution' },
-      { name: 'Run Chart', path: '/tool/run-chart', icon: '📉', desc: 'Spot trends and shifts over time' },
+      { name: 'Control Chart', path: '/tool/control-chart' },
+      { name: 'Capability Analysis', path: '/tool/capability' },
+      { name: 'Descriptive Statistics', path: '/tool/descriptive' },
+      { name: 'Gage R&R (MSA)', path: '/tool/msa' },
+      { name: 'Histogram', path: '/tool/histogram' },
+      { name: 'Run Chart', path: '/tool/run-chart' },
     ]
   },
   {
+    n: '03',
     phase: 'Analyze',
     color: 'var(--orange)',
-    icon: '🔬',
-    desc: 'Identify root causes using data — not assumptions.',
+    headline: 'Data doesn\u2019t lie. It just waits for someone to ask it the right question.',
+    copy: '17 hypothesis tests, full regression, and every root-cause tool you need for the moment you stop guessing and start proving it.',
     tools: [
-      { name: 'Hypothesis Testing', path: '/hypothesis', icon: '🧪', desc: '17 tests: t-tests, ANOVA, chi-square, nonparametric' },
-      { name: 'Regression Analysis', path: '/tool/regression', icon: '📐', desc: 'Model relationships between variables' },
-      { name: 'Correlation Matrix', path: '/tool/correlation', icon: '🔗', desc: 'Pearson r across all variable pairs' },
-      { name: 'Pareto Chart', path: '/tool/pareto', icon: '🏆', desc: 'Identify the vital few causes' },
-      { name: 'Fishbone Diagram', path: '/tool/fishbone', icon: '🐟', desc: 'Structured root cause brainstorming' },
-      { name: 'Box Plot', path: '/tool/boxplot', icon: '📦', desc: 'Compare distributions across groups' },
-      { name: 'Scatter Plot', path: '/tool/scatter', icon: '🔵', desc: 'Visualize relationships between two variables' },
-      { name: 'Multi-Vari Chart', path: '/tool/multivari', icon: '🔀', desc: 'Separate positional, cyclical, temporal variation' },
+      { name: 'Hypothesis Testing', path: '/hypothesis' },
+      { name: 'Regression Analysis', path: '/tool/regression' },
+      { name: 'Correlation Matrix', path: '/tool/correlation' },
+      { name: 'Pareto Chart', path: '/tool/pareto' },
+      { name: 'Fishbone Diagram', path: '/tool/fishbone' },
+      { name: 'Box Plot', path: '/tool/boxplot' },
+      { name: 'Scatter Plot', path: '/tool/scatter' },
+      { name: 'Multi-Vari Chart', path: '/tool/multivari' },
     ]
   },
   {
+    n: '04',
     phase: 'Improve',
     color: 'var(--purple)',
-    icon: '⚡',
-    desc: 'Develop, test, and implement solutions that eliminate root causes.',
+    headline: 'The moment insight turns into something that actually changes.',
+    copy: 'Design the experiment, catch the failure modes before they happen, and build the fix on evidence instead of instinct.',
     tools: [
-      { name: 'Design of Experiments', path: '/doe', icon: '⚗️', desc: 'Full/fractional factorial + response analysis' },
-      { name: 'FMEA', path: '/tool/fmea', icon: '⚠️', desc: 'Failure Mode and Effects Analysis' },
-      { name: 'Value Stream Map', path: '/tool/vsm', icon: '🗺️', desc: 'Identify waste and flow improvements' },
-      { name: 'DOE Experiment Plan', path: '/templates', icon: '📋', desc: 'Document your experiment design' },
+      { name: 'Design of Experiments', path: '/doe' },
+      { name: 'FMEA', path: '/tool/fmea' },
+      { name: 'Value Stream Map', path: '/tool/vsm' },
+      { name: 'DOE Experiment Plan', path: '/templates' },
     ]
   },
   {
+    n: '05',
     phase: 'Control',
     color: 'var(--cyan)',
-    icon: '🔒',
-    desc: 'Sustain the gains — monitor, document, and hand off.',
+    headline: 'A win that doesn\u2019t hold isn\u2019t a win. It\u2019s a delay.',
+    copy: 'Keep watching after the applause stops. Document the decision, hand it off clean, and make the gain permanent.',
     tools: [
-      { name: 'Control Chart', path: '/tool/control-chart', icon: '📈', desc: 'Ongoing process monitoring' },
-      { name: 'Meeting Minutes', path: '/templates', icon: '📝', desc: 'Document project decisions and actions' },
+      { name: 'Control Chart', path: '/tool/control-chart' },
+      { name: 'Meeting Minutes', path: '/templates' },
     ]
   },
 ];
@@ -84,8 +89,29 @@ function prefersReducedMotion() {
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-// Signature hero visual — an animated control chart: points draw in,
-// one point breaches the upper control limit and gets flagged.
+// Scroll-reveal hook — content fades/rises into place the first time it
+// enters the viewport, Apple-product-page style. Fires once, then stops
+// observing (cheap, and avoids re-triggering on scroll-back).
+function useReveal(threshold = 0.16) {
+  const ref = useRef(null);
+  const [inView, setInView] = useState(prefersReducedMotion());
+
+  useEffect(() => {
+    if (prefersReducedMotion() || !ref.current) { setInView(true); return; }
+    const el = ref.current;
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) { setInView(true); obs.unobserve(el); }
+      },
+      { threshold }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [threshold]);
+
+  return [ref, inView];
+}
+
 function LiveControlChart() {
   const points = [124, 116, 138, 121, 131, 109, 119, 46, 127, 134, 113, 122];
   const breachIndex = 7;
@@ -191,6 +217,46 @@ function MegaHero({ hasData }) {
   );
 }
 
+function PhaseChapter({ data, index }) {
+  const [ref, inView] = useReveal();
+  return (
+    <section
+      ref={ref}
+      className={`phase-chapter ${inView ? 'in-view' : ''} ${index % 2 === 1 ? 'phase-chapter-alt' : ''}`}
+      style={{ '--phase-color': data.color }}
+    >
+      <div className="phase-chapter-numeral" aria-hidden="true">{data.n}</div>
+      <div className="phase-chapter-inner">
+        <div className="phase-chapter-eyebrow">
+          <span className="phase-chapter-dot" />
+          {data.phase}
+        </div>
+        <h2 className="phase-chapter-headline">{data.headline}</h2>
+        <p className="phase-chapter-copy">{data.copy}</p>
+        <div className="phase-chapter-tools">
+          {data.tools.map(t => (
+            <Link key={t.name} to={t.path} className="phase-chapter-pill">{t.name}</Link>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ClosingChapter() {
+  const [ref, inView] = useReveal();
+  return (
+    <section ref={ref} className={`closing-chapter ${inView ? 'in-view' : ''}`}>
+      <h2>Minitab charges $154 a month to tell you the process is broken. We charge $9.99.</h2>
+      <p>Everything runs in your browser. Your data never leaves your machine. No installs, no IT tickets, no waiting on a license key.</p>
+      <div className="closing-chapter-actions">
+        <Link to="/pricing" className="btn-primary">Start Free Trial</Link>
+        <Link to="/worksheet" className="btn-secondary">Load Your Data</Link>
+      </div>
+    </section>
+  );
+}
+
 export default function Dashboard() {
   const { hasData, fileName, rowCount, columns } = useWorksheet();
 
@@ -199,7 +265,6 @@ export default function Dashboard() {
       <MegaHero hasData={hasData} />
 
       <div className="dashboard">
-        {/* Worksheet status banner */}
         {hasData && (
           <div className="dash-ws-banner">
             <span className="dash-ws-icon">📊</span>
@@ -210,7 +275,6 @@ export default function Dashboard() {
             <Link to="/worksheet" className="btn-ghost">View &amp; Edit →</Link>
           </div>
         )}
-
         {!hasData && (
           <div className="dash-ws-banner dash-ws-empty">
             <span className="dash-ws-icon">💡</span>
@@ -220,61 +284,13 @@ export default function Dashboard() {
             <Link to="/worksheet" className="btn-primary" style={{ fontSize: '0.85rem', padding: '0.45rem 1rem' }}>Open Worksheet</Link>
           </div>
         )}
-
-        {/* DMAIC phases */}
-        <section className="dash-phases">
-          <h2 className="dash-section-title">Tools by DMAIC Phase</h2>
-          <div className="phases-list">
-            {DMAIC_SECTIONS.map(section => (
-              <div key={section.phase} className="phase-block">
-                <div className="phase-header" style={{ borderLeftColor: section.color }}>
-                  <span className="phase-icon">{section.icon}</span>
-                  <div>
-                    <h3 className="phase-name" style={{ color: section.color }}>{section.phase}</h3>
-                    <p className="phase-desc">{section.desc}</p>
-                  </div>
-                </div>
-                <div className="phase-tools">
-                  {section.tools.map(tool => (
-                    <Link key={tool.name} to={tool.path} className="dash-tool-card">
-                      <span className="dash-tool-icon">{tool.icon}</span>
-                      <div>
-                        <div className="dash-tool-name">{tool.name}</div>
-                        <div className="dash-tool-desc">{tool.desc}</div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Value prop footer */}
-        <section className="dash-value-footer">
-          <div className="dash-value-item">
-            <div className="dash-value-icon">🔒</div>
-            <div>
-              <strong>100% Private</strong>
-              <p>All calculations run in your browser. Your data never leaves your computer.</p>
-            </div>
-          </div>
-          <div className="dash-value-item">
-            <div className="dash-value-icon">🌐</div>
-            <div>
-              <strong>No Installation</strong>
-              <p>Works on any device with a browser. No IT approval required.</p>
-            </div>
-          </div>
-          <div className="dash-value-item">
-            <div className="dash-value-icon">💸</div>
-            <div>
-              <strong>$9.99/month</strong>
-              <p>Minitab costs $154+/month. Get the same power for 94% less.</p>
-            </div>
-          </div>
-        </section>
       </div>
+
+      <div className="phase-chapters">
+        {PHASES.map((p, i) => <PhaseChapter key={p.phase} data={p} index={i} />)}
+      </div>
+
+      <ClosingChapter />
     </>
   );
 }
