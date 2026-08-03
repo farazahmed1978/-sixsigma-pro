@@ -212,7 +212,7 @@ function GaussianChart({ active }) {
         <line x1={padding} y1={baseline} x2={width - padding} y2={baseline} className="sigma-center-line" />
 
         {active && sigmaLabels.map((s, i) => (
-          <g key={s.k} className="sigma-pop" style={{ animationDelay: `${2.1 + i * 0.15}s` }}>
+          <g key={s.k} className="sigma-pop" style={{ animationDelay: `${4.8 + i * 0.22}s` }}>
             <line x1={s.x} y1={baseline} x2={s.x} y2={baseline + 8} className="sigma-tick" />
             <text x={s.x} y={baseline + 22} className="sigma-band-label" textAnchor="middle">{s.label}</text>
           </g>
@@ -224,9 +224,9 @@ function GaussianChart({ active }) {
         {active && (
           <>
             <circle r="6" className="sigma-chase-dot">
-              <animateMotion dur="2s" begin="0.1s" fill="freeze" path={climbPath} />
+              <animateMotion dur="3.6s" begin="0.1s" fill="freeze" path={climbPath} />
             </circle>
-            <g className="sigma-apex-pulse" style={{ transform: `translate(${mu}px, ${peakY}px)`, animationDelay: '2.1s' }}>
+            <g className="sigma-apex-pulse" style={{ transform: `translate(${mu}px, ${peakY}px)`, animationDelay: '3.7s' }}>
               <circle r="10" className="sigma-apex-ring" />
             </g>
           </>
