@@ -10,8 +10,7 @@ import './Dashboard.css';
 const PHASES = [
   {
     n: '01', phase: 'Define', color: 'var(--yellow)',
-    headline: 'A clear problem statement, before anything else.',
-    copy: 'Charter the project, map the process, and know exactly who this is for.',
+    headline: 'Align the objective.',
     tools: [
       { name: 'Project Charter', path: '/templates' },
       { name: 'SIPOC Diagram', path: '/templates' },
@@ -21,8 +20,7 @@ const PHASES = [
   },
   {
     n: '02', phase: 'Measure', color: 'var(--green)',
-    headline: 'Measurement you can actually trust.',
-    copy: 'Validate the gauge, baseline the process, and start watching what really moves.',
+    headline: 'Measure what matters.',
     tools: [
       { name: 'Control Chart', path: '/tool/control-chart' },
       { name: 'Capability Analysis', path: '/tool/capability' },
@@ -34,8 +32,7 @@ const PHASES = [
   },
   {
     n: '03', phase: 'Analyze', color: 'var(--orange)',
-    headline: 'Let the data answer. Not assumptions.',
-    copy: '17 hypothesis tests, full regression, and the root-cause tools to know instead of guess.',
+    headline: 'Transform data into insight.',
     tools: [
       { name: 'Hypothesis Testing', path: '/hypothesis' },
       { name: 'Regression Analysis', path: '/tool/regression' },
@@ -49,8 +46,7 @@ const PHASES = [
   },
   {
     n: '04', phase: 'Improve', color: 'var(--purple)',
-    headline: 'Evidence, put into motion.',
-    copy: 'Design the experiment, catch failure modes early, and build the fix on what the data actually shows.',
+    headline: 'Design better processes.',
     tools: [
       { name: 'Design of Experiments', path: '/doe' },
       { name: 'FMEA', path: '/tool/fmea' },
@@ -60,8 +56,7 @@ const PHASES = [
   },
   {
     n: '05', phase: 'Control', color: 'var(--cyan)',
-    headline: 'Make the gain permanent.',
-    copy: 'Keep watching after the project ends. Document it, hand it off, and hold the line.',
+    headline: 'Sustain the results.',
     tools: [
       { name: 'Control Chart', path: '/tool/control-chart' },
       { name: 'Meeting Minutes', path: '/templates' },
@@ -79,21 +74,12 @@ const TICKER_ITEMS = [
 ];
 
 const FEATURES = [
-  {
-    image: featureEngineers,
-    headline: 'Designed for quality engineers, not statisticians.',
-    copy: 'Powerful tools. Practical insights. Built for real-world quality challenges.',
-  },
-  {
-    image: featureAnalyze,
-    headline: 'Analyze with confidence. Improve with intelligence.',
-    copy: 'An AI-guided platform built for Lean Six Sigma professionals.',
-  },
-  {
-    image: featureExcellence,
-    headline: 'Designed for excellence.',
-    copy: 'From data to decisions — without unnecessary complexity.',
-  },
+  { image: featureEngineers, headline: 'Designed for quality engineers, not statisticians.',
+    copy: 'Powerful tools. Practical insights. Built for real-world quality challenges.' },
+  { image: featureAnalyze, headline: 'Analyze with confidence. Improve with intelligence.',
+    copy: 'An AI-guided platform built for Lean Six Sigma professionals.' },
+  { image: featureExcellence, headline: 'Designed for excellence.',
+    copy: 'From data to decisions — without unnecessary complexity.' },
 ];
 
 const PULL_QUOTES = [
@@ -107,7 +93,10 @@ function prefersReducedMotion() {
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-function useReveal(threshold = 0.2) {
+// Reveal-once hook with a safety fallback: if the IntersectionObserver
+// never fires (layout quirk, slow paint, etc.) it forces visibility after
+// 1.8s regardless, so content can never get stuck permanently hidden.
+function useReveal(threshold = 0.12) {
   const ref = useRef(null);
   const [inView, setInView] = useState(prefersReducedMotion());
   useEffect(() => {
@@ -117,13 +106,14 @@ function useReveal(threshold = 0.2) {
       if (entry.isIntersecting) { setInView(true); obs.unobserve(el); }
     }, { threshold });
     obs.observe(el);
-    return () => obs.disconnect();
+    const fallback = setTimeout(() => setInView(true), 1800);
+    return () => { obs.disconnect(); clearTimeout(fallback); };
   }, [threshold]);
   return [ref, inView];
 }
 
-function Hero({ hasData }) {
-  const [ref, inView] = useReveal(0.3);
+function Hero() {
+  const [ref, inView] = useReveal(0.2);
   return (
     <section className="photo-hero" ref={ref}>
       <div className="photo-hero-bg" style={{ backgroundImage: `url(${heroMain})` }} />
@@ -131,17 +121,11 @@ function Hero({ hasData }) {
       <div className="photo-hero-inner">
         <div className={`slide-fade-text ${inView ? 'is-active' : ''}`}>
           <div className="dash-hero-badge">For quality engineers, not statisticians</div>
-          <h1>A smarter way to run Six Sigma.</h1>
+          <h1>Let us streamline your Six Sigma journey.</h1>
           <p>
             50+ verified tools, project templates, and a workbench that keeps every finding
             organized — built for the people running the project, not just reviewing it.
           </p>
-        </div>
-        <div className="photo-hero-actions">
-          <Link to="/worksheet" className="btn-primary">
-            {hasData ? 'Open Worksheet →' : 'Load Your Data →'}
-          </Link>
-          <Link to="/pricing" className="btn-secondary">See Plans &amp; Pricing</Link>
         </div>
         <div className="hero-ticker">
           <div className="hero-ticker-mask">
@@ -158,7 +142,7 @@ function Hero({ hasData }) {
 }
 
 function FeatureBlock({ data }) {
-  const [ref, inView] = useReveal(0.35);
+  const [ref, inView] = useReveal(0.25);
   return (
     <section className="feature-block" ref={ref}>
       <div className="feature-block-bg" style={{ backgroundImage: `url(${data.image})` }} />
@@ -172,7 +156,7 @@ function FeatureBlock({ data }) {
 }
 
 function PhaseChapter({ data, index }) {
-  const [ref, inView] = useReveal(0.16);
+  const [ref, inView] = useReveal(0.12);
   return (
     <section
       ref={ref}
@@ -186,7 +170,6 @@ function PhaseChapter({ data, index }) {
           {data.phase}
         </div>
         <h2 className="phase-chapter-headline">{data.headline}</h2>
-        <p className="phase-chapter-copy">{data.copy}</p>
         <div className="phase-chapter-tools">
           {data.tools.map(t => (
             <Link key={t.name} to={t.path} className="phase-chapter-pill">{t.name}</Link>
@@ -198,23 +181,19 @@ function PhaseChapter({ data, index }) {
 }
 
 function Testimonials() {
-  const [ref, inView] = useReveal(0.16);
+  const [ref, inView] = useReveal(0.12);
   return (
     <section ref={ref} className={`testimonials-section ${inView ? 'in-view' : ''}`}>
       <div className="testimonials-eyebrow">Why Teams Choose Us!</div>
       <div className="testimonials-grid">
         {PULL_QUOTES.map((q, i) => (
-          <div key={i} className="pull-quote-card">
-            <p>&ldquo;{q}&rdquo;</p>
-          </div>
+          <div key={i} className="pull-quote-card"><p>&ldquo;{q}&rdquo;</p></div>
         ))}
       </div>
     </section>
   );
 }
 
-// Closing signature: line draws in with a chasing dot, sigma bands flash
-// in sequence, then the logo fades in above the chart.
 function SigmaRevealChart() {
   const points = [188, 172, 178, 150, 158, 131, 120, 108, 96, 84, 78, 70];
   const width = 600, height = 260, padding = 42;
@@ -227,7 +206,6 @@ function SigmaRevealChart() {
     { label: '2\u03c3', up: center - 42, down: center + 42, delay: 2.85 },
     { label: '3\u03c3', up: center - 63, down: center + 63, delay: 3.3 },
   ];
-
   return (
     <div className="sigma-reveal">
       <div className="sigma-reveal-logo">
@@ -258,7 +236,7 @@ function SigmaRevealChart() {
 }
 
 function ClosingChapter() {
-  const [ref, inView] = useReveal(0.2);
+  const [ref, inView] = useReveal(0.15);
   return (
     <section ref={ref} className={`closing-chapter ${inView ? 'in-view' : ''}`}>
       <div className="closing-chapter-inner">
@@ -288,10 +266,9 @@ function ClosingChapter() {
 
 export default function Dashboard() {
   const { hasData, fileName, rowCount, columns } = useWorksheet();
-
   return (
-    <>
-      <Hero hasData={hasData} />
+    <div data-theme="light" className="dashboard-light-scope">
+      <Hero />
 
       <div className="sticky-ws-banner">
         {hasData ? (
@@ -319,6 +296,6 @@ export default function Dashboard() {
 
       <Testimonials />
       <ClosingChapter />
-    </>
+    </div>
   );
 }
