@@ -92,13 +92,14 @@ function Hero() {
             <img src={logoMark} alt="" className="hero-logo-mark" />
             <span className="brand-wordmark brand-wordmark-light">SixSigma<b>Pro</b></span>
           </div>
-          <h1>Let us streamline your Six Sigma journey.</h1>
+          <h1>Streamline your Six Sigma journey.</h1>
           <p>
             50+ verified tools, project templates, and a workbench that keeps every finding
             organized — built for the people running the project, not just reviewing it.
           </p>
         </div>
         <div className="hero-ticker">
+          <div className="hero-ticker-eyebrow">50+ Verified Tools &amp; Tests</div>
           <div className="hero-ticker-mask">
             <div className="hero-ticker-track">
               {[...TICKER_ITEMS, ...TICKER_ITEMS].map((item, i) => (
@@ -144,7 +145,7 @@ function FeatureBlock({ data }) {
 }
 
 function Testimonials() {
-  const [ref, inView] = useReveal(0.15);
+  const [ref, inView] = useReveal(0.06);
   return (
     <section ref={ref} className={`testimonials-section ${inView ? 'in-view' : ''}`}>
       <div className="testimonials-eyebrow">Why Teams Choose Us!</div>
@@ -220,7 +221,7 @@ function GaussianChart({ active }) {
 }
 
 function ClosingChapter() {
-  const [ref, inView] = useReveal(0.15);
+  const [ref, inView] = useReveal(0.06);
   const [chartRef, chartActive] = useReveal(0.6);
   return (
     <section ref={ref} className={`closing-chapter ${inView ? 'in-view' : ''}`}>
@@ -229,13 +230,14 @@ function ClosingChapter() {
           <h2>The same rigor. A fraction of the cost.</h2>
           <p>
             SixSigma Pro runs entirely in your browser — no installs, no IT approval, no
-            per-seat license. Compared to $154+/month for Minitab, it&rsquo;s $9.99.
+            per-seat license.
           </p>
           <div className="closing-value-list">
             <div><strong>100% Private</strong><span>Every calculation runs locally. Data never leaves your machine.</span></div>
             <div><strong>No Installation</strong><span>Works on any device with a browser. No IT ticket required.</span></div>
-            <div><strong>$9.99/month</strong><span>Compared to $154+ for the incumbent tools most teams already pay for.</span></div>
+            <div><strong>90%+ Less</strong><span>Than legacy Six Sigma software — starting at $9.99/month.</span></div>
           </div>
+          <p className="closing-footnote">Based on Minitab's published list price of $154+/month.</p>
           <div className="closing-chapter-actions">
             <Link to="/pricing" className="btn-primary">Start Free Trial</Link>
             <Link to="/worksheet" className="btn-secondary">Load Your Data</Link>
