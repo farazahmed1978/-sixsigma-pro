@@ -1,15 +1,15 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useWorksheet } from '../context/WorksheetContext';
+import heroPhoto from '../hero-photo.jpg';
+import analyzePhoto from '../analyze-photo.jpg';
 import './Dashboard.css';
 
 const PHASES = [
   {
-    n: '01',
-    phase: 'Define',
-    color: 'var(--yellow)',
-    headline: 'Say the problem out loud before you touch a single chart.',
-    copy: "A project scoped honestly saves you from solving the wrong thing beautifully. Charter it, map it, and know exactly who it's for before the analysis begins.",
+    n: '01', phase: 'Define', color: 'var(--yellow)',
+    headline: 'A clear problem statement, before anything else.',
+    copy: 'Charter the project, map the process, and know exactly who this is for.',
     tools: [
       { name: 'Project Charter', path: '/templates' },
       { name: 'SIPOC Diagram', path: '/templates' },
@@ -18,11 +18,9 @@ const PHASES = [
     ]
   },
   {
-    n: '02',
-    phase: 'Measure',
-    color: 'var(--green)',
-    headline: 'You can\u2019t fix what you haven\u2019t measured honestly.',
-    copy: 'Before you trust a number, prove the number can be trusted. Baseline the process, validate the gauge, then start watching for what actually moves.',
+    n: '02', phase: 'Measure', color: 'var(--green)',
+    headline: 'Measurement you can actually trust.',
+    copy: 'Validate the gauge, baseline the process, and start watching what really moves.',
     tools: [
       { name: 'Control Chart', path: '/tool/control-chart' },
       { name: 'Capability Analysis', path: '/tool/capability' },
@@ -33,11 +31,9 @@ const PHASES = [
     ]
   },
   {
-    n: '03',
-    phase: 'Analyze',
-    color: 'var(--orange)',
-    headline: 'Data doesn\u2019t lie. It just waits for someone to ask it the right question.',
-    copy: '17 hypothesis tests, full regression, and every root-cause tool you need for the moment you stop guessing and start proving it.',
+    n: '03', phase: 'Analyze', color: 'var(--orange)',
+    headline: 'Let the data answer. Not assumptions.',
+    copy: '17 hypothesis tests, full regression, and the root-cause tools to know instead of guess.',
     tools: [
       { name: 'Hypothesis Testing', path: '/hypothesis' },
       { name: 'Regression Analysis', path: '/tool/regression' },
@@ -47,14 +43,13 @@ const PHASES = [
       { name: 'Box Plot', path: '/tool/boxplot' },
       { name: 'Scatter Plot', path: '/tool/scatter' },
       { name: 'Multi-Vari Chart', path: '/tool/multivari' },
-    ]
+    ],
+    bgImage: analyzePhoto,
   },
   {
-    n: '04',
-    phase: 'Improve',
-    color: 'var(--purple)',
-    headline: 'The moment insight turns into something that actually changes.',
-    copy: 'Design the experiment, catch the failure modes before they happen, and build the fix on evidence instead of instinct.',
+    n: '04', phase: 'Improve', color: 'var(--purple)',
+    headline: 'Evidence, put into motion.',
+    copy: 'Design the experiment, catch failure modes early, and build the fix on what the data actually shows.',
     tools: [
       { name: 'Design of Experiments', path: '/doe' },
       { name: 'FMEA', path: '/tool/fmea' },
@@ -63,11 +58,9 @@ const PHASES = [
     ]
   },
   {
-    n: '05',
-    phase: 'Control',
-    color: 'var(--cyan)',
-    headline: 'A win that doesn\u2019t hold isn\u2019t a win. It\u2019s a delay.',
-    copy: 'Keep watching after the applause stops. Document the decision, hand it off clean, and make the gain permanent.',
+    n: '05', phase: 'Control', color: 'var(--cyan)',
+    headline: 'Make the gain permanent.',
+    copy: 'Keep watching after the project ends. Document it, hand it off, and hold the line.',
     tools: [
       { name: 'Control Chart', path: '/tool/control-chart' },
       { name: 'Meeting Minutes', path: '/templates' },
@@ -81,7 +74,27 @@ const TICKER_ITEMS = [
   'Pareto Analysis', 'Fishbone Diagrams', 'Multi-Vari Charts', 'Correlation Matrix',
   'Regression & Multiple Regression', 'Logistic Regression', 'One / Two-Way & RM ANOVA',
   'Effect Size Calculators', 'Design of Experiments', 'FMEA', 'Value Stream Mapping',
-  'Sigma Level & DPMO', 'Sample Size & Power Calculators',
+  'Sigma Level & DPMO', 'Sample Size & Power Calculators', 'Project Templates', 'Project Workbench',
+];
+
+const STAGES = [
+  { kind: 'intro' },
+  {
+    kind: 'panel', eyebrow: 'What\u2019s Inside',
+    title: 'Fifty-plus tools. One workspace.',
+    copy: 'Control charts, capability studies, regression, DOE — the instruments a quality team actually reaches for. Every finding saves straight into your project report, automatically.',
+  },
+  {
+    kind: 'panel', eyebrow: 'Where We\u2019re Headed',
+    title: 'An assistant is coming. The rigor is already here.',
+    copy: 'We\u2019re building AI guidance directly into the workflow. For now, every method already follows the same discipline it measures — checked against independent statistical software before it reached you.',
+  },
+];
+
+const PULL_QUOTES = [
+  'Templates and a project workbench mean the same report structure doesn\u2019t get rebuilt from scratch every time.',
+  'Running a real hypothesis test shouldn\u2019t require decoding a statistics textbook first.',
+  'One DMAIC report, synced automatically — instead of stitching four tools\u2019 screenshots together by hand.',
 ];
 
 function prefersReducedMotion() {
@@ -89,26 +102,32 @@ function prefersReducedMotion() {
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-// Scroll-reveal hook — content fades/rises into place the first time it
-// enters the viewport, Apple-product-page style. Fires once, then stops
-// observing (cheap, and avoids re-triggering on scroll-back).
 function useReveal(threshold = 0.16) {
   const ref = useRef(null);
   const [inView, setInView] = useState(prefersReducedMotion());
-
   useEffect(() => {
     if (prefersReducedMotion() || !ref.current) { setInView(true); return; }
     const el = ref.current;
-    const obs = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) { setInView(true); obs.unobserve(el); }
-      },
-      { threshold }
-    );
+    const obs = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) { setInView(true); obs.unobserve(el); }
+    }, { threshold });
     obs.observe(el);
     return () => obs.disconnect();
   }, [threshold]);
+  return [ref, inView];
+}
 
+// Toggles both ways (fade in AND out) — used for the chart accent near pricing.
+function useToggleReveal(threshold = 0.2) {
+  const ref = useRef(null);
+  const [inView, setInView] = useState(prefersReducedMotion());
+  useEffect(() => {
+    if (prefersReducedMotion() || !ref.current) return;
+    const el = ref.current;
+    const obs = new IntersectionObserver(([entry]) => setInView(entry.isIntersecting), { threshold });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [threshold]);
   return [ref, inView];
 }
 
@@ -120,10 +139,9 @@ function LiveControlChart() {
   const ucl = 72, lcl = 190, center = 131;
   const coords = points.map((y, i) => [padding + i * xStep, y]);
   const pathD = coords.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x},${y}`).join(' ');
-
   return (
     <svg viewBox={`0 0 ${width} ${height}`} className="hero-chart-svg" role="img"
-      aria-label="Animated control chart: a process point breaches the upper control limit and is flagged out of control">
+      aria-label="Control chart showing a process point breaching the upper control limit">
       <line x1={padding} y1={ucl} x2={width - padding} y2={ucl} className="hero-chart-limit" />
       <line x1={padding} y1={lcl} x2={width - padding} y2={lcl} className="hero-chart-limit" />
       <line x1={padding} y1={center} x2={width - padding} y2={center} className="hero-chart-center" />
@@ -134,84 +152,102 @@ function LiveControlChart() {
       {coords.map(([x, y], i) => (
         i === breachIndex ? (
           <g key={i}>
-            <circle cx={x} cy={y} r="6" className="hero-chart-breach-ring" style={{ animationDelay: `${2.2 + i * 0.06}s` }} />
-            <circle cx={x} cy={y} r="5" className="hero-chart-breach-dot" style={{ animationDelay: `${1.5 + i * 0.06}s` }} />
-            <text x={x} y={y - 16} className="hero-chart-flag" style={{ animationDelay: `${1.9 + i * 0.06}s` }}>OUT OF CONTROL</text>
+            <circle cx={x} cy={y} r="6" className="hero-chart-breach-ring" />
+            <circle cx={x} cy={y} r="5" className="hero-chart-breach-dot" />
+            <text x={x} y={y - 16} className="hero-chart-flag">OUT OF CONTROL</text>
           </g>
-        ) : (
-          <circle key={i} cx={x} cy={y} r="4" className="hero-chart-point" style={{ animationDelay: `${1.5 + i * 0.06}s` }} />
-        )
+        ) : <circle key={i} cx={x} cy={y} r="4" className="hero-chart-point" />
       ))}
     </svg>
   );
 }
 
-function MegaHero({ hasData }) {
-  const visualRef = useRef(null);
-  const [tilt, setTilt] = useState({ rx: 0, ry: 0 });
+function PinnedHero({ hasData }) {
+  const containerRef = useRef(null);
+  const [active, setActive] = useState(0);
+  const reduced = prefersReducedMotion();
 
-  const handleMouseMove = useCallback((e) => {
-    if (prefersReducedMotion() || !visualRef.current) return;
-    const rect = visualRef.current.getBoundingClientRect();
-    const px = (e.clientX - rect.left) / rect.width - 0.5;
-    const py = (e.clientY - rect.top) / rect.height - 0.5;
-    setTilt({ rx: px * 10, ry: -py * 10 });
-  }, []);
+  useEffect(() => {
+    if (reduced) return;
+    let ticking = false;
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        const el = containerRef.current;
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          const vh = window.innerHeight;
+          const scrollable = el.offsetHeight - vh;
+          const progress = scrollable > 0 ? Math.min(1, Math.max(0, -rect.top / scrollable)) : 0;
+          setActive(Math.min(STAGES.length - 1, Math.floor(progress * STAGES.length)));
+        }
+        ticking = false;
+      });
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [reduced]);
 
-  const resetTilt = useCallback(() => setTilt({ rx: 0, ry: 0 }), []);
+  const introPanel = (isActive) => (
+    <div className={`pinned-panel pinned-intro ${isActive ? 'is-active' : ''}`}>
+      <div className="dash-hero-badge">For quality engineers, not statisticians</div>
+      <h1>A quieter way to run Six Sigma.</h1>
+      <p>
+        50+ verified tools, project templates, and a workbench that keeps every finding
+        organized — built for the people running the project, not just reviewing it.
+      </p>
+      <div className="dash-hero-actions">
+        <Link to="/worksheet" className="btn-primary">
+          {hasData ? 'Open Worksheet →' : 'Load Your Data →'}
+        </Link>
+        <Link to="/pricing" className="btn-secondary">See Plans &amp; Pricing</Link>
+      </div>
+      <div className="hero-ticker">
+        <div className="hero-ticker-mask">
+          <div className="hero-ticker-track">
+            {[...TICKER_ITEMS, ...TICKER_ITEMS].map((item, i) => (
+              <span key={i} className="hero-ticker-pill">{item}</span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (reduced) {
+    return (
+      <section className="pinned-hero pinned-hero-static">
+        <div className="pinned-photo" style={{ backgroundImage: `url(${heroPhoto})` }} />
+        <div className="pinned-scrim" />
+        <div className="pinned-static-stack">
+          {introPanel(true)}
+          {STAGES.filter(s => s.kind === 'panel').map((s, i) => (
+            <div key={i} className="pinned-panel is-active">
+              <div className="pinned-eyebrow">{s.eyebrow}</div>
+              <h3>{s.title}</h3>
+              <p>{s.copy}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+    );
+  }
 
   return (
-    <section className="mega-hero">
-      <div className="mega-hero-bg" aria-hidden="true" />
-      <div className="mega-hero-inner">
-        <div className="mega-hero-content">
-          <div className="dash-hero-badge hero-fade-item" style={{ animationDelay: '0s' }}>
-            Verified against R, Python &amp; SciPy
+    <section className="pinned-hero" ref={containerRef} style={{ height: `${STAGES.length * 100}vh` }}>
+      <div className="pinned-sticky">
+        <div className="pinned-photo" style={{ backgroundImage: `url(${heroPhoto})` }} />
+        <div className="pinned-scrim" />
+        {introPanel(active === 0)}
+        {STAGES.map((s, i) => s.kind === 'panel' ? (
+          <div key={i} className={`pinned-panel ${active === i ? 'is-active' : ''}`}>
+            <div className="pinned-eyebrow">{s.eyebrow}</div>
+            <h3>{s.title}</h3>
+            <p>{s.copy}</p>
           </div>
-          <h1 className="hero-fade-item" style={{ animationDelay: '0.08s' }}>
-            Catch <span className="hero-accent-word">the point</span> before it breaks the process.
-          </h1>
-          <p className="hero-fade-item" style={{ animationDelay: '0.16s' }}>
-            The full DMAIC toolkit — 50+ verified statistical tools and tests, from control
-            charts to logistic regression — each one checked against independent statistical
-            software. No installs, no Minitab license, no waiting on IT.
-          </p>
-          <div className="dash-hero-actions hero-fade-item" style={{ animationDelay: '0.24s' }}>
-            <Link to="/worksheet" className="btn-primary">
-              {hasData ? 'Open Worksheet →' : 'Load Your Data →'}
-            </Link>
-            <Link to="/pricing" className="btn-secondary">See Plans &amp; Pricing</Link>
-          </div>
-
-          <div className="hero-ticker hero-fade-item" style={{ animationDelay: '0.32s' }}>
-            <div className="hero-ticker-eyebrow">50+ verified tools &amp; tests</div>
-            <div className="hero-ticker-mask">
-              <div className="hero-ticker-track">
-                {[...TICKER_ITEMS, ...TICKER_ITEMS].map((item, i) => (
-                  <span key={i} className="hero-ticker-pill">{item}</span>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div
-          className="hero-visual hero-fade-item"
-          style={{ animationDelay: '0.1s' }}
-          ref={visualRef}
-          onMouseMove={handleMouseMove}
-          onMouseLeave={resetTilt}
-        >
-          <div className="floating-chip chip-a">50+ Tools</div>
-          <div className="floating-chip chip-b">100% Browser-Based</div>
-          <div className="floating-chip chip-c">$9.99/mo</div>
-          <div
-            className="hero-chart-frame"
-            style={{ transform: `perspective(900px) rotateX(${tilt.ry}deg) rotateY(${tilt.rx}deg)` }}
-          >
-            <LiveControlChart />
-          </div>
-        </div>
+        ) : null)}
       </div>
     </section>
   );
@@ -223,7 +259,10 @@ function PhaseChapter({ data, index }) {
     <section
       ref={ref}
       className={`phase-chapter ${inView ? 'in-view' : ''} ${index % 2 === 1 ? 'phase-chapter-alt' : ''}`}
-      style={{ '--phase-color': data.color }}
+      style={{
+        '--phase-color': data.color,
+        ...(data.bgImage ? { backgroundImage: `linear-gradient(120deg, var(--bg) 30%, rgba(6,13,27,0.75)), url(${data.bgImage})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {})
+      }}
     >
       <div className="phase-chapter-numeral" aria-hidden="true">{data.n}</div>
       <div className="phase-chapter-inner">
@@ -243,15 +282,47 @@ function PhaseChapter({ data, index }) {
   );
 }
 
-function ClosingChapter() {
+function Testimonials() {
   const [ref, inView] = useReveal();
   return (
+    <section ref={ref} className={`testimonials-section ${inView ? 'in-view' : ''}`}>
+      <div className="testimonials-eyebrow">Why Teams Choose This</div>
+      <div className="testimonials-grid">
+        {PULL_QUOTES.map((q, i) => (
+          <div key={i} className="pull-quote-card">
+            <p>&ldquo;{q}&rdquo;</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ClosingChapter() {
+  const [ref, inView] = useReveal();
+  const [chartRef, chartVisible] = useToggleReveal();
+  return (
     <section ref={ref} className={`closing-chapter ${inView ? 'in-view' : ''}`}>
-      <h2>Minitab charges $154 a month to tell you the process is broken. We charge $9.99.</h2>
-      <p>Everything runs in your browser. Your data never leaves your machine. No installs, no IT tickets, no waiting on a license key.</p>
-      <div className="closing-chapter-actions">
-        <Link to="/pricing" className="btn-primary">Start Free Trial</Link>
-        <Link to="/worksheet" className="btn-secondary">Load Your Data</Link>
+      <div className="closing-chapter-inner">
+        <div className="closing-chapter-text">
+          <h2>The same rigor. A fraction of the cost.</h2>
+          <p>
+            SixSigma Pro runs entirely in your browser — no installs, no IT approval, no
+            per-seat license. Compared to $154+/month for Minitab, it&rsquo;s $9.99.
+          </p>
+          <div className="closing-value-list">
+            <div><strong>100% Private</strong><span>Every calculation runs locally. Data never leaves your machine.</span></div>
+            <div><strong>No Installation</strong><span>Works on any device with a browser. No IT ticket required.</span></div>
+            <div><strong>$9.99/month</strong><span>Compared to $154+ for the incumbent tools most teams already pay for.</span></div>
+          </div>
+          <div className="closing-chapter-actions">
+            <Link to="/pricing" className="btn-primary">Start Free Trial</Link>
+            <Link to="/worksheet" className="btn-secondary">Load Your Data</Link>
+          </div>
+        </div>
+        <div ref={chartRef} className={`closing-chart-accent ${chartVisible ? 'is-visible' : ''}`}>
+          <LiveControlChart />
+        </div>
       </div>
     </section>
   );
@@ -262,25 +333,21 @@ export default function Dashboard() {
 
   return (
     <>
-      <MegaHero hasData={hasData} />
+      <PinnedHero hasData={hasData} />
 
-      <div className="dashboard">
-        {hasData && (
+      <div className="sticky-ws-banner">
+        {hasData ? (
           <div className="dash-ws-banner">
             <span className="dash-ws-icon">📊</span>
             <div>
-              <strong>{fileName}</strong> is loaded —{' '}
-              <span>{rowCount} rows, {columns.length} columns</span>
+              <strong>{fileName}</strong> is loaded — <span>{rowCount} rows, {columns.length} columns</span>
             </div>
             <Link to="/worksheet" className="btn-ghost">View &amp; Edit →</Link>
           </div>
-        )}
-        {!hasData && (
+        ) : (
           <div className="dash-ws-banner dash-ws-empty">
             <span className="dash-ws-icon">💡</span>
-            <div>
-              <strong>Start by loading your data</strong> — enter it once in the Worksheet and every tool uses it automatically.
-            </div>
+            <div><strong>Start by loading your data</strong> — enter it once in the Worksheet and every tool uses it automatically.</div>
             <Link to="/worksheet" className="btn-primary" style={{ fontSize: '0.85rem', padding: '0.45rem 1rem' }}>Open Worksheet</Link>
           </div>
         )}
@@ -290,6 +357,7 @@ export default function Dashboard() {
         {PHASES.map((p, i) => <PhaseChapter key={p.phase} data={p} index={i} />)}
       </div>
 
+      <Testimonials />
       <ClosingChapter />
     </>
   );
