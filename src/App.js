@@ -18,6 +18,8 @@ import HypothesisTesting from './pages/HypothesisTesting';
 import DOEPage from './pages/DOEPage';
 import Templates from './pages/Templates';
 import ReportBuilder from './pages/ReportBuilder';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
 
 // Tool wrapper
 import ToolPage from './pages/ToolPage';
@@ -36,7 +38,6 @@ import ValueStreamMap from './tools/ValueStreamMap';
 import ScatterPlot from './tools/ScatterPlot';
 import BoxPlot from './tools/BoxPlot';
 import RunChart from './tools/RunChart';
-
 
 // New tools
 import DescriptiveStats from './tools/DescriptiveStats';
@@ -84,7 +85,9 @@ function ToolRoute({ toolId }) {
   const meta = toolMeta[toolId];
   if (!meta) return <div style={{ padding: '2rem' }}>Tool not found.</div>;
   return <ToolPage tool={toolId}>{meta.component}</ToolPage>;
-}export default function App() {
+}
+
+export default function App() {
   return (
     <ThemeProvider>
       <WorksheetProvider>
@@ -98,6 +101,8 @@ function ToolRoute({ toolId }) {
                   <Route path="/resources" element={<Resources />} />
                   <Route path="/about" element={<About />} />
                   <Route path="/pricing" element={<Pricing />} />
+                  <Route path="/privacy" element={<PrivacyPolicy />} />
+                  <Route path="/terms" element={<TermsOfService />} />
                   <Route path="/hypothesis" element={<HypothesisTesting />} />
                   <Route path="/doe" element={<DOEPage />} />
                   <Route path="/templates" element={<Templates />} />
