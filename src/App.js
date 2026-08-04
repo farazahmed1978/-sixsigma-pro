@@ -6,6 +6,7 @@ import { ReportProvider } from './context/ReportContext';
 import { ProjectsProvider } from './context/ProjectsContext';
 import Layout from './components/Layout';
 
+
 // Pages
 import Dashboard from './pages/Dashboard';
 import ProjectsHome from './pages/ProjectsHome';
