@@ -78,6 +78,13 @@ const NAV = [
       { id: 'resources', name: 'Guides & References', path: '/resources' },
       { id: 'about', name: 'About', path: '/about' },
     ]
+  },
+  {
+    section: 'Legal',
+    items: [
+      { id: 'privacy', name: 'Privacy Policy', path: '/privacy' },
+      { id: 'terms', name: 'Terms of Service', path: '/terms' },
+    ]
   }
 ];
 
