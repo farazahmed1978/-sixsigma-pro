@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useWorksheet } from '../context/WorksheetContext';
-import heroMain from '../hero-main.jpg';
 import featureEngineers from '../feature-engineers.jpg';
 import featureAnalyze from '../feature-analyze.jpg';
 import featureExcellence from '../feature-excellence.jpg';
 import logoMark from '../logo-mark.png';
 import './Dashboard.css';
+
+const heroMain = '/hero-main.jpg';
 
 const TICKER_ITEMS = [
   'Control Charts (I-MR / X-bar-R / CUSUM / EWMA)', 'Attribute Charts (p/np/c/u)', 'Capability Analysis',
