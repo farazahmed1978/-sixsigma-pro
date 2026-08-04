@@ -72,19 +72,11 @@ function useReveal(threshold = 0.15) {
   return [ref, inView];
 }
 
-function useParallax() {
-  // Parallax removed — it required oversizing the image, which kept
-  // reading as unwanted zoom. Background photos now sit static at their
-  // correct, uncropped-feeling size.
-  return useRef(null);
-}
-
 function Hero() {
   const [ref, inView] = useReveal(0.2);
-  const bgRef = useParallax(0.08);
   return (
     <section className="photo-hero" ref={ref}>
-      <div className="photo-hero-bg" ref={bgRef} style={{ backgroundImage: `url(${heroMain})` }} />
+      <img className="photo-hero-bg" src={heroMain} alt="" loading="eager" decoding="async" fetchpriority="high" />
       <div className="photo-hero-scrim" />
       <div className="photo-hero-inner">
         <div className={`slide-fade-text slide-fade-slow ${inView ? 'is-active' : ''}`}>
@@ -115,10 +107,9 @@ function Hero() {
 
 function FeatureBlock({ data }) {
   const [ref, inView] = useReveal(0.25);
-  const bgRef = useParallax(0.1);
   return (
     <section className="feature-block" ref={ref}>
-      <div className="feature-block-bg" ref={bgRef} style={{ backgroundImage: `url(${data.image})` }} />
+      <img className="feature-block-bg" src={data.image} alt="" loading="lazy" decoding="async" />
       <div className="feature-block-scrim" />
       <div className={`slide-fade-text slide-fade-slow feature-block-text ${inView ? 'is-active' : ''}`}>
         <h2>{data.headline}</h2>
