@@ -59,6 +59,7 @@ const FAQS = [
     q: 'How does the AI help my projects?',
     a: 'The AI is designed to assist — not replace — your professional judgment. It can help explain statistical output, suggest appropriate analyses, summarize findings, generate project documentation, draft executive reports, and guide users through each DMAIC phase. Final decisions always remain with your team.'
   },
+  
   {
     q: 'Can I manage multiple Six Sigma projects?',
     a: 'Yes. SixSigma Pro is built as a complete project workspace. Organize multiple improvement initiatives, store datasets, generate reports, maintain project history, and keep all analyses and documentation connected in one secure location.'
