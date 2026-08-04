@@ -76,7 +76,7 @@ function Hero() {
   const [ref, inView] = useReveal(0.2);
   return (
     <section className="photo-hero" ref={ref}>
-      <img className="photo-hero-bg" src={heroMain} alt="" loading="eager" decoding="async" fetchpriority="high" />
+      <div className="photo-hero-bg" style={{ backgroundImage: `url(${heroMain})` }} />
       <div className="photo-hero-scrim" />
       <div className="photo-hero-inner">
         <div className={`slide-fade-text slide-fade-slow ${inView ? 'is-active' : ''}`}>
@@ -109,7 +109,7 @@ function FeatureBlock({ data }) {
   const [ref, inView] = useReveal(0.25);
   return (
     <section className="feature-block" ref={ref}>
-      <img className="feature-block-bg" src={data.image} alt="" loading="lazy" decoding="async" />
+      <div className="feature-block-bg" style={{ backgroundImage: `url(${data.image})` }} />
       <div className="feature-block-scrim" />
       <div className={`slide-fade-text slide-fade-slow feature-block-text ${inView ? 'is-active' : ''}`}>
         <h2>{data.headline}</h2>
