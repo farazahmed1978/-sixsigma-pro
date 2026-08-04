@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import './About.css';
 
+
 const tools = [
   { name: 'Control Chart', path: '/tool/control-chart', phase: 'Measure' },
   { name: 'Attribute Charts (p/np/c/u)', path: '/tool/attribute-chart', phase: 'Measure' },
