@@ -26,11 +26,33 @@ const EMPTY = { schemaVersion: PROJECT_CHARTER_SCHEMA_VERSION, projectSummary: '
 const plain = value => String(value || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
 const rowId = prefix => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
+function ExpandedEditor({ label, value, onChange, rich = false, onClose }) {
+  const editorRef = useRef(null);
+  useEffect(() => {
+    const onKeyDown = event => { if (event.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKeyDown);
+    document.body.style.overflow = 'hidden';
+    return () => { document.removeEventListener('keydown', onKeyDown); document.body.style.overflow = ''; };
+  }, [onClose]);
+  useEffect(() => {
+    if (rich && editorRef.current && editorRef.current.innerHTML !== (value || '')) editorRef.current.innerHTML = value || '';
+    window.setTimeout(() => editorRef.current?.focus(), 0);
+  }, [rich, value]);
+  const format = command => { editorRef.current?.focus(); document.execCommand(command, false); onChange(editorRef.current?.innerHTML || ''); };
+  return <div className="pc-focus-modal" role="dialog" aria-modal="true" aria-label={`${label} expanded editor`}><button type="button" className="pc-focus-backdrop" onClick={onClose} aria-label="Close expanded editor" /><div className="pc-focus-shell"><header><div><span>FOCUSED EDITOR</span><h2>{label}</h2></div><div><button type="button" className="btn-secondary" onClick={onClose}>Close</button><button type="button" className="btn-primary" onClick={onClose}>Save / Done</button></div></header>{rich ? <div className="pc-focus-rich"><div className="pc-toolbar"><button type="button" onClick={() => format('bold')}><strong>B</strong></button><button type="button" onClick={() => format('italic')}><em>I</em></button><button type="button" onClick={() => format('insertUnorderedList')}>• List</button><button type="button" onClick={() => format('insertOrderedList')}>1. List</button></div><div ref={editorRef} contentEditable role="textbox" aria-label={`${label} expanded`} aria-multiline="true" data-placeholder="Add charter detail…" onInput={event => onChange(event.currentTarget.innerHTML)} suppressContentEditableWarning /></div> : <textarea ref={editorRef} value={value || ''} onChange={event => onChange(event.target.value)} aria-label={`${label} expanded`} placeholder="Add charter detail…" /> }<footer><span>Changes sync immediately · Press Esc to close</span><button type="button" className="btn-primary" onClick={onClose}>Save / Done</button></footer></div></div>;
+}
+
+function MultilineField({ label, required, value, onChange, placeholder }) {
+  const [expanded, setExpanded] = useState(false);
+  return <div className="pc-control pc-span-2 pc-expandable"><div className="pc-multiline-head"><label>{label}{required && <i>Required</i>}</label><button type="button" className="pc-expand-btn" onClick={() => setExpanded(true)} aria-label={`Expand ${label}`} title="Expand editor">⛶</button></div><textarea rows="5" value={value} onChange={event => onChange(event.target.value)} placeholder={placeholder} />{expanded && <ExpandedEditor label={label} value={value} onChange={onChange} onClose={() => setExpanded(false)} />}</div>;
+}
+
 function RichField({ label, required, hint, value, onChange }) {
   const ref = useRef(null);
+  const [expanded, setExpanded] = useState(false);
   useEffect(() => { if (ref.current && ref.current.innerHTML !== (value || '')) ref.current.innerHTML = value || ''; }, [value]);
   const format = command => { ref.current?.focus(); document.execCommand(command, false); onChange(ref.current?.innerHTML || ''); };
-  return <div className="pc-field"><div className="pc-label"><label>{label}{required && <i>Required</i>}</label><span>{hint}</span></div><div className="pc-editor"><div className="pc-toolbar"><button type="button" onClick={() => format('bold')}><strong>B</strong></button><button type="button" onClick={() => format('italic')}><em>I</em></button><button type="button" onClick={() => format('insertUnorderedList')}>• List</button><button type="button" onClick={() => format('insertOrderedList')}>1. List</button></div><div ref={ref} contentEditable role="textbox" aria-label={label} aria-multiline="true" data-placeholder="Add charter detail…" onInput={e => onChange(e.currentTarget.innerHTML)} onBlur={e => onChange(e.currentTarget.innerHTML)} suppressContentEditableWarning /></div></div>;
+  return <div className="pc-field pc-expandable"><div className="pc-label"><label>{label}{required && <i>Required</i>}</label><span>{hint}</span><button type="button" className="pc-expand-btn" onClick={() => setExpanded(true)} aria-label={`Expand ${label}`} title="Expand editor">⛶</button></div><div className="pc-editor"><div className="pc-toolbar"><button type="button" onClick={() => format('bold')}><strong>B</strong></button><button type="button" onClick={() => format('italic')}><em>I</em></button><button type="button" onClick={() => format('insertUnorderedList')}>• List</button><button type="button" onClick={() => format('insertOrderedList')}>1. List</button></div><div ref={ref} contentEditable role="textbox" aria-label={label} aria-multiline="true" data-placeholder="Add charter detail…" onInput={e => onChange(e.currentTarget.innerHTML)} onBlur={e => onChange(e.currentTarget.innerHTML)} suppressContentEditableWarning /></div>{expanded && <ExpandedEditor label={label} value={value} onChange={onChange} rich onClose={() => setExpanded(false)} />}</div>;
 }
 
 function EditableTable({ title, description, columns, rows, onChange, addLabel }) {
@@ -83,7 +105,7 @@ export default function ProjectCharter() {
 
   const renderActiveSection = () => {
     switch (current.id) {
-      case 'overview': return <div className="pc-form-grid"><div className="pc-control pc-span-2"><label>Executive summary <i>Required</i></label><textarea rows="5" value={charter.projectSummary} onChange={e => update('projectSummary', e.target.value)} placeholder="Summarize the opportunity, intended outcome, and organizational value." /></div><div className="pc-control"><label>Project owner</label><input value={project.owner || ''} readOnly /></div><div className="pc-control"><label>Target completion date <i>Required</i></label><input type="date" value={charter.targetDate} onChange={e => update('targetDate', e.target.value)} /></div></div>;
+      case 'overview': return <div className="pc-form-grid"><MultilineField label="Executive summary" required value={charter.projectSummary} onChange={value => update('projectSummary', value)} placeholder="Summarize the opportunity, intended outcome, and organizational value." /><div className="pc-control"><label>Project owner</label><input value={project.owner || ''} readOnly /></div><div className="pc-control"><label>Target completion date <i>Required</i></label><input type="date" value={charter.targetDate} onChange={e => update('targetDate', e.target.value)} /></div></div>;
       case 'need': return <div className="pc-stack"><RichField label="Business Case" required hint="Strategic, customer, financial, or compliance rationale." value={charter.businessCase} onChange={v => update('businessCase', v)} /><RichField label="Problem Statement" required hint="Current-state gap with baseline, location, and timeframe." value={charter.problemStatement} onChange={v => update('problemStatement', v)} /></div>;
       case 'goals': return <RichField label="Goal Statement" required hint="Baseline, target, metric, and deadline." value={charter.goalStatement} onChange={v => update('goalStatement', v)} />;
       case 'scope': return <div className="pc-form-grid"><RichField label="In Scope" required hint="Processes, locations, products, and segments included." value={charter.scopeIn} onChange={v => update('scopeIn', v)} /><RichField label="Out of Scope" required hint="Adjacent work intentionally excluded." value={charter.scopeOut} onChange={v => update('scopeOut', v)} /></div>;
