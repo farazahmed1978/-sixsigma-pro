@@ -11,6 +11,7 @@ import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import ProjectsHome from './pages/ProjectsHome';
 import ProjectDetail from './pages/ProjectDetail';
+import ProjectCharter from './pages/ProjectCharter';
 import Worksheet from './pages/Worksheet';
 import Resources from './pages/Resources';
 import About from './pages/About';
@@ -110,6 +111,7 @@ export default function App() {
                   <Route path="/report" element={<ReportBuilder />} />
                   <Route path="/projects" element={<ProjectsHome />} />
                   <Route path="/projects/:id" element={<ProjectDetail />} />
+                  <Route path="/projects/:id/charter" element={<ProjectCharter />} />
                   {Object.keys(toolMeta).map(id => (
                     <Route key={id} path={`/tool/${id}`} element={<ToolRoute toolId={id} />} />
                   ))}

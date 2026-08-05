@@ -118,7 +118,10 @@ export default function ProjectsHome() {
                   <span className="badge">{phase === 'Complete' ? '✓ Complete' : `${phase} Phase`}</span>
                   <span className="pw-progress-label">{progress}% populated</span>
                 </div>
-                <Link to={`/projects/${project.id}`} className="btn-secondary pw-open-btn">Open →</Link>
+                <div className="pw-project-actions">
+                  <Link to={`/projects/${project.id}/charter`} className="btn-primary pw-open-btn">Project Charter</Link>
+                  <Link to={`/projects/${project.id}`} className="btn-secondary pw-open-btn">Open →</Link>
+                </div>
               </div>
             );
           })}

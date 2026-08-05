@@ -119,6 +119,23 @@
   text-decoration: none;
 }
 
+.pw-project-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+  margin-top: auto;
+}
+
+.pw-project-actions .pw-open-btn {
+  justify-content: center;
+  margin-top: 0;
+  padding-inline: 0.8rem;
+}
+
+@media (max-width: 420px) {
+  .pw-project-actions { grid-template-columns: 1fr; }
+}
+
 /* ── Project detail header ── */
 .pw-header-card {
   padding: 1.5rem;
