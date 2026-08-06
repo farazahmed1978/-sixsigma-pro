@@ -10,6 +10,15 @@
 .template-card:hover { border-color: rgba(0,102,255,0.3); transform: translateY(-2px); box-shadow: var(--shadow); }
 .template-card:disabled { cursor:not-allowed; opacity:.6; transform:none; box-shadow:none; }
 .templates-not-found { max-width:640px; margin:5rem auto; padding:2rem; text-align:center; }
+.document-launcher { min-height:calc(100vh - 60px); display:grid; place-items:center; padding:2rem; background:radial-gradient(circle at 50% 15%,var(--accent-dim),transparent 40%); }
+.document-launcher-card { width:min(620px,100%); padding:clamp(2rem,5vw,3.5rem); border:1px solid var(--border); border-radius:var(--radius-lg); background:var(--surface); box-shadow:var(--shadow); text-align:center; }
+.document-launcher-card>span { color:var(--accent); font-size:.68rem; font-weight:800; letter-spacing:.12em; }
+.document-launcher-card>div { margin:1.25rem 0 .5rem; font-size:2rem; }
+.document-launcher-card h1 { margin:.4rem 0; font-size:2rem; }
+.document-launcher-card p { color:var(--text-secondary); line-height:1.6; }
+.document-launcher-card label { display:block; max-width:380px; margin:1.5rem auto; color:var(--text-muted); font-size:.7rem; font-weight:800; text-align:left; text-transform:uppercase; }
+.document-launcher-card select { display:block; width:100%; margin-top:.4rem; }
+.document-launcher-card>.btn-primary,.document-launcher-card>.btn-ghost { margin:.25rem; }
 .template-icon { font-size: 1.8rem; margin-bottom: 0.25rem; }
 .template-phase-badge { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
 .template-card h3 { font-family: var(--font-display); font-size: 1rem; font-weight: 600; color: var(--text-primary); }

@@ -23,6 +23,7 @@ import Templates from './pages/Templates';
 import ReportBuilder from './pages/ReportBuilder';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
+import ComingSoon from './pages/ComingSoon';
 
 // Tool wrapper
 import ToolPage from './pages/ToolPage';
@@ -110,7 +111,9 @@ export default function App() {
                   <Route path="/hypothesis" element={<HypothesisTesting />} />
                   <Route path="/doe" element={<DOEPage />} />
                   <Route path="/templates" element={<Templates />} />
+                  <Route path="/documents/:templateId" element={<Templates />} />
                   <Route path="/projects/:projectId/documents/:templateId" element={<Templates />} />
+                  <Route path="/project-management/:stage/:documentId" element={<ComingSoon />} />
                   <Route path="/report" element={<ReportBuilder />} />
                   <Route path="/projects" element={<ProjectsHome />} />
                   <Route path="/projects/:id" element={<ProjectDetail />} />

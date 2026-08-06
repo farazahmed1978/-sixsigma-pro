@@ -4,6 +4,7 @@ import { useProjects } from '../context/ProjectsContext';
 import DocumentWorkspace from '../components/DocumentWorkspace';
 import logoMark from '../logo-mark.png';
 import { DEFINE_TEMPLATES } from '../config/defineTemplates';
+import { MEASURE_TEMPLATES } from '../config/measureTemplates';
 import './Templates.css';
 
 const LEGACY_TEMPLATES = [
@@ -266,7 +267,7 @@ const LEGACY_TEMPLATES = [
   },
 ];
 
-export const TEMPLATES = [...DEFINE_TEMPLATES, ...LEGACY_TEMPLATES.filter(template => template.phase !== 'Define')];
+export const TEMPLATES = [...DEFINE_TEMPLATES, ...MEASURE_TEMPLATES, ...LEGACY_TEMPLATES.filter(template => !['Define','Measure'].includes(template.phase))];
 
 const phaseColor = {
   Define: '#1a56a0', Measure: '#00875a', Analyze: '#c05500',
@@ -526,8 +527,14 @@ export default function Templates() {
   const [selected, setSelected] = useState(null);
   const [filter, setFilter] = useState('All');
   const [activeProjectId, setActiveProjectId] = useState(() => projectId || projects[0]?.id || '');
-  const phases = ['All', 'Define', 'Measure', 'Analyze', 'Improve'];
+  const phases = ['All', 'Define', 'Measure', 'Analyze', 'Improve', 'Control'];
   const filtered = TEMPLATES.filter(t => filter === 'All' || t.phase === filter);
+
+  if (templateId && !projectId) {
+    const template = TEMPLATES.find(item => item.id === templateId);
+    if (!template) return <div className="templates-not-found"><h1>Document not found</h1><p>This document is not registered in the library.</p><button className="btn-primary" onClick={() => navigate('/templates')}>Open Document Library</button></div>;
+    return <div className="document-launcher"><div className="document-launcher-card"><span>{template.phase.toUpperCase()} DOCUMENT</span><div>{template.icon}</div><h1>{template.name}</h1><p>{template.desc}</p><label>Active project<select value={activeProjectId} onChange={event => setActiveProjectId(event.target.value)}><option value="">Select a project</option>{projects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>{projects.length ? <button className="btn-primary" disabled={!activeProjectId} onClick={() => navigate(template.id === 'charter' ? `/projects/${activeProjectId}/charter` : `/projects/${activeProjectId}/documents/${template.id}`)}>Open Workspace →</button> : <><p>Create a project before opening this workspace.</p><button className="btn-primary" onClick={() => navigate('/projects')}>Create Project</button></>}<button className="btn-ghost" onClick={() => navigate('/templates')}>Browse Document Library</button></div></div>;
+  }
 
   if (projectId && templateId) {
     const project = getProject(projectId);
@@ -545,7 +552,7 @@ export default function Templates() {
   return (
     <div className="templates-page">
       <div className="templates-header no-print">
-        <h1>Project Templates</h1>
+        <h1>Document Library</h1>
         <label className="templates-project-select">Active project<select value={activeProjectId} onChange={event => setActiveProjectId(event.target.value)}><option value="">Select a project</option>{projects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
         <p>Professional DMAIC templates — fill in the form, preview, then print or save as PDF.</p>
       </div>

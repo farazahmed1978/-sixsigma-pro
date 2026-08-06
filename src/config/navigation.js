@@ -1,0 +1,30 @@
+const doc=(id,name)=>({id:`doc-${id}`,name,path:`/documents/${id}`});
+const tool=(id,name,path)=>({id:`tool-${id}`,name,path:path||`/tool/${id}`});
+const soon=(stage,name)=>({id:`pmp-${stage}-${name.toLowerCase().replace(/[^a-z0-9]+/g,'-')}`,name,path:`/project-management/${stage}/${name.toLowerCase().replace(/[^a-z0-9]+/g,'-')}`});
+const lifecycle=(id,name,names,shared={})=>({id,name,subgroups:[{label:'Documents',items:names.map(item=>shared[item]?doc(shared[item],item):soon(id,item))}]});
+
+const DEFINE_DOCS=[doc('charter','Project Charter'),doc('sipoc','SIPOC'),doc('voc','Voice of the Customer (VOC)'),doc('ctq-tree','CTQ Tree'),doc('business-case','Business Case'),doc('stakeholder-register','Stakeholder Register')];
+const MEASURE_DOCS=['data-collection-plan','process-map','swimlane-process-map','value-stream-map','msa-workspace','sampling-plan','operational-definitions','baseline-metrics','process-capability-study','measurement-plan'];
+const MEASURE_NAMES=['Data Collection Plan','Process Map','Swimlane Process Map','Value Stream Map','MSA Workspace','Sampling Plan','Operational Definitions','Baseline Metrics','Process Capability Study','Measurement Plan'];
+
+export const NAVIGATION=[
+ {section:'Workspace',items:[{id:'projects',name:'Projects',path:'/projects'},{id:'worksheet',name:'Data Worksheet',path:'/worksheet'},{id:'reports',name:'Reports',path:'/report'}]},
+ {section:'Lean Six Sigma',groups:[
+  {id:'define',name:'Define',color:'var(--yellow)',subgroups:[{label:'Documents',items:DEFINE_DOCS},{label:'Tools',items:[]}]},
+  {id:'measure',name:'Measure',color:'var(--green)',subgroups:[{label:'Documents',items:MEASURE_DOCS.map((id,index)=>doc(id,MEASURE_NAMES[index]))},{label:'Tools',items:[tool('control-chart','Control Chart'),tool('attribute-chart','Attribute Charts'),tool('run-chart','Run Chart'),tool('capability','Capability Analysis'),tool('histogram','Histogram'),tool('msa','Gage R&R'),tool('descriptive','Descriptive Statistics'),tool('sigma-calculator','Sigma Level / DPMO'),tool('sample-size-calculator','Sample Size Calculator'),tool('power-calculator','Power Calculator')]}]},
+  {id:'analyze',name:'Analyze',color:'var(--orange)',subgroups:[{label:'Documents',items:[doc('hypothesis-plan','Hypothesis Test Plan')]},{label:'Tools',items:[tool('hypothesis','Hypothesis Testing','/hypothesis'),tool('pareto','Pareto Chart'),tool('scatter','Scatter Plot'),tool('boxplot','Box Plot'),tool('fishbone','Fishbone Diagram'),tool('multivari','Multi-Vari Chart'),tool('correlation','Correlation Matrix'),tool('regression','Regression'),tool('multiregression','Multiple Regression'),tool('logistic','Logistic Regression'),tool('anova','ANOVA'),tool('effect-size','Effect Size Calculators')]}]},
+  {id:'improve',name:'Improve',color:'var(--purple)',subgroups:[{label:'Documents',items:[doc('factorial-plan','DOE Experiment Plan')]},{label:'Tools',items:[tool('doe','Design of Experiments','/doe'),tool('fmea','FMEA'),tool('vsm','Value Stream Map Analysis')]}]},
+  {id:'control',name:'Control',color:'var(--cyan)',subgroups:[{label:'Documents',items:[doc('minutes','Meeting Minutes')]},{label:'Tools',items:[tool('control-chart-control','Control Chart','/tool/control-chart'),tool('attribute-chart-control','Attribute Charts','/tool/attribute-chart'),tool('run-chart-control','Run Chart','/tool/run-chart')]}]},
+ ]},
+ {section:'Project Management',groups:[
+  lifecycle('initiation','Initiation',['Business Case','Project Charter','Benefits Management Plan','Stakeholder Register','Assumption Log'],{'Business Case':'business-case','Project Charter':'charter','Stakeholder Register':'stakeholder-register'}),
+  lifecycle('planning','Planning',['Project Management Plan','Scope Management Plan','Scope Statement','WBS','WBS Dictionary','Requirements Management Plan','Requirements Traceability Matrix','Schedule Management Plan','Schedule Baseline','Cost Management Plan','Cost Baseline','Resource Management Plan','Resource Calendar','Communications Management Plan','Stakeholder Engagement Plan','Risk Management Plan','Risk Register','Risk Report','Procurement Management Plan','Quality Management Plan','Configuration Management Plan','Change Management Plan']),
+  lifecycle('execution','Execution',['Issue Log','Decision Log','Action Item Log','RAID Log','Meeting Minutes','Change Request','Procurement Documents','Vendor Evaluation','Lessons Learned Register','Team Performance Reviews'],{'Meeting Minutes':'minutes'}),
+  lifecycle('monitoring-controlling','Monitoring & Controlling',['Status Report','Executive Dashboard','Variance Report','EVM Dashboard','Milestone Report','Change Log','Quality Audit','Risk Review','KPI Dashboard']),
+  lifecycle('closing','Closing',['Final Project Report','Lessons Learned Report','Project Closure Report','Transition Plan','Acceptance Signoff','Benefits Realization Review','Archive Checklist']),
+ ]},
+ {section:'Resources',items:[{id:'resources',name:'Guides & References',path:'/resources'},{id:'about',name:'About',path:'/about'}]},
+ {section:'Legal',items:[{id:'privacy',name:'Privacy Policy',path:'/privacy'},{id:'terms',name:'Terms of Service',path:'/terms'}]},
+];
+
+export const PMP_STAGE_LABELS={initiation:'Initiation',planning:'Planning',execution:'Execution','monitoring-controlling':'Monitoring & Controlling',closing:'Closing'};
