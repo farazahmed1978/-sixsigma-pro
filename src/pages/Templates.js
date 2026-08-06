@@ -3,9 +3,10 @@ import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useProjects } from '../context/ProjectsContext';
 import DocumentWorkspace from '../components/DocumentWorkspace';
 import logoMark from '../logo-mark.png';
+import { DEFINE_TEMPLATES } from '../config/defineTemplates';
 import './Templates.css';
 
-export const TEMPLATES = [
+const LEGACY_TEMPLATES = [
   {
     id: 'charter', name: 'Project Charter', phase: 'Define', icon: '📋',
     desc: 'Define project scope, goals, team, timeline, and business case.',
@@ -264,6 +265,8 @@ export const TEMPLATES = [
     ]
   },
 ];
+
+export const TEMPLATES = [...DEFINE_TEMPLATES, ...LEGACY_TEMPLATES.filter(template => template.phase !== 'Define')];
 
 const phaseColor = {
   Define: '#1a56a0', Measure: '#00875a', Analyze: '#c05500',
