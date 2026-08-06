@@ -1,18 +1,18 @@
 .worksheet-page { min-height: calc(100vh - 60px); background: var(--bg); }
-body.worksheet-maximized { overflow: hidden; }
-.worksheet-page.maximized { position: fixed; z-index: 80; inset: 60px 0 0; overflow: hidden; background: var(--bg); }
-.worksheet-page.maximized .ws-executive { display: grid; grid-template-columns: auto minmax(340px,520px) 1fr; align-items: end; gap: .75rem 1.25rem; padding: .65rem 1rem; }
-.worksheet-page.maximized .ws-title > span,.worksheet-page.maximized .ws-title > p { display: none; }
-.worksheet-page.maximized .ws-title h1 { margin: 0; font-size: 1.25rem; }
-.worksheet-page.maximized .ws-selectors,.worksheet-page.maximized .ws-metrics,.worksheet-page.maximized .ws-header-actions { margin: 0; }
-.worksheet-page.maximized .ws-metrics { display: flex; justify-content: flex-end; }
-.worksheet-page.maximized .ws-metrics > div { min-width: 72px; padding: .45rem .55rem; }
-.worksheet-page.maximized .ws-header-actions { grid-column: 1/-1; }
-.worksheet-page.maximized .ws-hub { display: block; min-height: 0; height: calc(100vh - 194px); }
-.worksheet-page.maximized .ws-explorer,.worksheet-page.maximized .ws-analysis { display: none; }
-.worksheet-page.maximized .ws-center { height: 100%; padding: .5rem; }
-.worksheet-page.maximized .ws-tabs { margin-bottom: .4rem; }
-.worksheet-page.maximized .ws-table-wrapper { max-height: calc(100vh - 245px); height: calc(100vh - 245px); }
+.worksheet-page.workspace-mode-minimized .ws-hub,.worksheet-page.workspace-mode-maximized .ws-hub { display: block; min-height: 0; }
+.worksheet-page.workspace-mode-minimized .ws-explorer,.worksheet-page.workspace-mode-minimized .ws-analysis,.worksheet-page.workspace-mode-maximized .ws-explorer,.worksheet-page.workspace-mode-maximized .ws-analysis { display: none; }
+.worksheet-page.workspace-mode-minimized .ws-center { padding-inline: .75rem; }
+.worksheet-page.workspace-mode-maximized .ws-executive { display: grid; grid-template-columns: auto minmax(340px,520px) 1fr; align-items: end; gap: .75rem 1.25rem; padding: .65rem 1rem; }
+.worksheet-page.workspace-mode-maximized .ws-title > span,.worksheet-page.workspace-mode-maximized .ws-title > p { display: none; }
+.worksheet-page.workspace-mode-maximized .ws-title h1 { margin: 0; font-size: 1.25rem; }
+.worksheet-page.workspace-mode-maximized .ws-selectors,.worksheet-page.workspace-mode-maximized .ws-metrics,.worksheet-page.workspace-mode-maximized .ws-header-actions { margin: 0; }
+.worksheet-page.workspace-mode-maximized .ws-metrics { display: flex; justify-content: flex-end; }
+.worksheet-page.workspace-mode-maximized .ws-metrics > div { min-width: 72px; padding: .45rem .55rem; }
+.worksheet-page.workspace-mode-maximized .ws-header-actions { grid-column: 1/-1; }
+.worksheet-page.workspace-mode-maximized .ws-hub { height: calc(100vh - 238px); }
+.worksheet-page.workspace-mode-maximized .ws-center { height: 100%; padding: .5rem; }
+.worksheet-page.workspace-mode-maximized .ws-tabs { margin-bottom: .4rem; }
+.worksheet-page.workspace-mode-maximized .ws-table-wrapper { max-height: calc(100vh - 289px); height: calc(100vh - 289px); }
 .ws-executive { padding: 1.2rem clamp(1.25rem,2.5vw,2.5rem) 1rem; background: var(--surface); border-bottom: 1px solid var(--border); }
 .ws-title > span,.ws-analysis > span,.ws-upload-card > span,.ws-modal-card header span { color: var(--accent-light); font-size: .62rem; font-weight: 700; letter-spacing: .1em; }
 .ws-title h1 { margin: .15rem 0; font-size: clamp(1.7rem,2.5vw,2.25rem); letter-spacing: -.04em; }
@@ -108,4 +108,4 @@ body.worksheet-maximized { overflow: hidden; }
 @media (max-width:1200px) { .ws-hub,.ws-hub.explorer-closed { grid-template-columns: 190px minmax(480px,1fr); }.ws-analysis { position: static; grid-column: 1/-1; min-height: 0; border: 1px solid var(--border); display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }.ws-analysis > span { grid-column: 1/-1; } }
 @media (max-width:850px) { .ws-metrics { grid-template-columns: repeat(3,1fr); }.ws-hub,.ws-hub.explorer-closed { display: block; }.ws-explorer { position: relative; top: 0; min-height: 0; border-right: 0; border-bottom: 1px solid var(--border); }.ws-explorer nav { flex-direction: row; overflow-x: auto; }.ws-explorer nav button { min-width: 170px; }.ws-collapse { display: none; }.ws-analysis { display: block; margin: 0 1rem 1rem; }.ws-summary-list { display: grid; grid-template-columns: 1fr 1fr; gap: 0 .75rem; }.ws-table-wrapper { max-height: 65vh; }.ws-selectors { grid-template-columns: 1fr 1fr; } }
 @media (max-width:600px) { .ws-executive { padding: 1rem; }.ws-selectors,.ws-metrics { grid-template-columns: 1fr 1fr; }.ws-header-actions { justify-content: flex-start; }.ws-upload-card > div:nth-of-type(2) { flex-direction: column; }.ws-upload-card > div:nth-of-type(2) button { justify-content: center; }.ws-center { padding: .75rem; }.ws-profile-stats { grid-template-columns: 1fr 1fr; }.ws-analysis { margin: 0 .75rem .75rem; }.ws-modal-card { padding: 1rem; } }
-@media (max-width:850px) { .worksheet-page.maximized { inset: 56px 0 0; }.worksheet-page.maximized .ws-executive { display: block; padding: .55rem .75rem; }.worksheet-page.maximized .ws-title { display: none; }.worksheet-page.maximized .ws-selectors { display: grid; }.worksheet-page.maximized .ws-metrics { display: none; }.worksheet-page.maximized .ws-header-actions { margin-top: .45rem; }.worksheet-page.maximized .ws-hub { height: calc(100vh - 194px); }.worksheet-page.maximized .ws-center { padding: .35rem; }.worksheet-page.maximized .ws-table-wrapper { height: calc(100vh - 235px); max-height: calc(100vh - 235px); } }
+@media (max-width:850px) { .worksheet-page.workspace-mode-maximized .ws-executive { display: block; padding: .55rem .75rem; }.worksheet-page.workspace-mode-maximized .ws-title { display: none; }.worksheet-page.workspace-mode-maximized .ws-selectors { display: grid; }.worksheet-page.workspace-mode-maximized .ws-metrics { display: none; }.worksheet-page.workspace-mode-maximized .ws-header-actions { margin-top: .45rem; }.worksheet-page.workspace-mode-maximized .ws-hub { height: calc(100vh - 194px); }.worksheet-page.workspace-mode-maximized .ws-center { padding: .35rem; }.worksheet-page.workspace-mode-maximized .ws-table-wrapper { height: calc(100vh - 235px); max-height: calc(100vh - 235px); } }

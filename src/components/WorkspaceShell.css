@@ -1,0 +1,21 @@
+.workspace-shell { min-height: calc(100vh - 60px); background: var(--bg); }
+.workspace-shell-locked { overflow: hidden; }
+.workspace-shell-bar { min-height: 44px; display: flex; align-items: center; gap: .75rem; padding: .45rem clamp(1rem,2vw,1.5rem); background: var(--surface); border-bottom: 1px solid var(--border); }
+.workspace-shell-bar a,.workspace-shell-bar button { display: inline-flex; align-items: center; justify-content: center; gap: .3rem; min-height: 30px; padding: .35rem .6rem; border: 1px solid var(--border); border-radius: 7px; background: var(--bg-2); color: var(--text-secondary); font: inherit; font-size: .68rem; font-weight: 600; cursor: pointer; transition: all var(--transition); white-space: nowrap; }
+.workspace-shell-bar a:hover,.workspace-shell-bar button:hover { border-color: var(--border-active); color: var(--text-primary); background: var(--accent-dim); }
+.workspace-shell-bar button:disabled { opacity: .35; pointer-events: none; }
+.workspace-shell-bar button.primary { border-color: var(--accent); background: var(--accent); color: #fff; }
+.workspace-shell-back { margin-right: auto; }
+.workspace-shell-navigation,.workspace-shell-display { display: flex; gap: .35rem; }
+.workspace-mode-maximized { position: fixed; z-index: 80; inset: 60px 0 0; overflow: hidden; }
+.workspace-mode-maximized .workspace-shell-bar { padding-block: .35rem; }
+.workspace-mode-maximized .workspace-shell-content { height: calc(100vh - 104px); overflow: hidden; }
+@media (max-width:768px) {
+  .workspace-mode-maximized { inset: 56px 0 0; }
+  .workspace-shell-bar { min-height: 42px; padding: .35rem .55rem; gap: .35rem; overflow-x: auto; }
+  .workspace-shell-back { margin-right: 0; }
+  .workspace-shell-navigation { margin-left: auto; }
+  .workspace-shell-bar a span,.workspace-shell-display button span { display: none; }
+  .workspace-shell-bar a,.workspace-shell-bar button { min-height: 29px; padding: .32rem .5rem; }
+  .workspace-mode-maximized .workspace-shell-content { height: calc(100vh - 98px); }
+}
