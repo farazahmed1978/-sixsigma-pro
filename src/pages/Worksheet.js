@@ -1,346 +1,104 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import Papa from 'papaparse';
 import { useWorksheet } from '../context/WorksheetContext';
+import { useProjects } from '../context/ProjectsContext';
 import './Worksheet.css';
 
-const QUICK_TOOLS = [
-  { name: 'Control Chart', path: '/tool/control-chart', icon: '📈' },
-  { name: 'Histogram', path: '/tool/histogram', icon: '📊' },
-  { name: 'Capability', path: '/tool/capability', icon: '🎯' },
-  { name: 'Pareto', path: '/tool/pareto', icon: '🏆' },
-  { name: 'Scatter Plot', path: '/tool/scatter', icon: '🔵' },
-  { name: 'Box Plot', path: '/tool/boxplot', icon: '📦' },
-  { name: 'MSA / Gage R&R', path: '/tool/msa', icon: '📏' },
-  { name: 'Hypothesis Tests', path: '/hypothesis', icon: '🧪' },
+const TOOLS = [
+  { name: 'Control Chart', path: '/tool/control-chart', id: 'control', icon: '⌁' },
+  { name: 'Histogram', path: '/tool/histogram', id: 'histogram', icon: '▥' },
+  { name: 'Capability Analysis', path: '/tool/capability', id: 'capability', icon: '◎' },
+  { name: 'Pareto Chart', path: '/tool/pareto', id: 'pareto', icon: '▤' },
+  { name: 'Scatter Plot', path: '/tool/scatter', id: 'scatter', icon: '∴' },
+  { name: 'Box Plot', path: '/tool/boxplot', id: 'boxplot', icon: '⊞' },
+  { name: 'MSA / Gage R&R', path: '/tool/msa', id: 'msa', icon: '⌖' },
+  { name: 'Hypothesis Tests', path: '/hypothesis', id: 'hypothesis', icon: 'H₀' },
 ];
+const WORKSHEET_TABS = ['Worksheet', 'Summary', 'Column Profile', 'Missing Data', 'Outliers', 'History'];
+const GRID_ROW_CAP = 200;
 
-const GRID_ROW_CAP = 200; // editable rows shown at once — large CSVs should still be imported, not hand-typed
+const isBlank = value => value === '' || value === null || value === undefined;
+const isDateValue = value => !isBlank(value) && /[-/]/.test(String(value)) && !Number.isNaN(Date.parse(value));
+function detectType(column) {
+  if (column.type && column.type !== 'auto') return column.type;
+  const values = column.data.filter(value => !isBlank(value));
+  if (!values.length) return 'unknown';
+  if (values.filter(value => !Number.isNaN(Number(value))).length / values.length >= .8) return 'numeric';
+  if (values.filter(isDateValue).length / values.length >= .8) return 'date';
+  return 'categorical';
+}
+function statsFor(column) {
+  const values = column.data.filter(value => !isBlank(value));
+  const nums = values.map(Number).filter(value => !Number.isNaN(value));
+  const sorted = [...nums].sort((a, b) => a - b);
+  const quantile = q => sorted.length ? sorted[Math.floor((sorted.length - 1) * q)] : null;
+  const mean = nums.length ? nums.reduce((sum, value) => sum + value, 0) / nums.length : null;
+  return { count: values.length, missing: column.data.length - values.length, unique: new Set(values.map(String)).size, nums, min: nums.length ? Math.min(...nums) : null, max: nums.length ? Math.max(...nums) : null, mean, q1: quantile(.25), q3: quantile(.75) };
+}
 
-function DataGrid() {
-  const {
-    columns, rowCount, hasData,
-    updateCell, renameColumn, deleteColumn, addBlankColumn, addBlankRow, deleteRow,
-  } = useWorksheet();
+function DataGrid({ filters, setFilters, onProfile, onManualColumn }) {
+  const { columns, rowCount, updateCell, renameColumn, deleteColumn, addBlankColumn, addBlankRow, deleteRow, changeColumnType, sortColumn } = useWorksheet();
+  const [menuIndex, setMenuIndex] = useState(null);
+  const rows = useMemo(() => Array.from({ length: Math.min(rowCount, GRID_ROW_CAP) }, (_, rowIndex) => rowIndex).filter(rowIndex => Object.entries(filters).every(([index, query]) => String(columns[Number(index)]?.data[rowIndex] ?? '').toLowerCase().includes(query.toLowerCase()))), [columns, filters, rowCount]);
+  const rename = index => { const name = window.prompt('Rename column', columns[index].name); if (name?.trim()) renameColumn(index, name.trim()); setMenuIndex(null); };
+  const filter = index => { const query = window.prompt(`Filter ${columns[index].name} (contains)`, filters[index] || ''); if (query !== null) setFilters(current => ({ ...current, [index]: query })); setMenuIndex(null); };
+  const remove = index => { if (window.confirm(`Delete column “${columns[index].name}”?`)) deleteColumn(index); setMenuIndex(null); };
+  return <div className="ws-grid-shell"><div className="ws-table-wrapper"><table className="ws-data-grid"><thead><tr><th className="ws-row-index">#</th>{columns.map((column, colIndex) => <th key={`${column.name}-${colIndex}`}><div className="ws-column-head"><div><input value={column.name} onChange={event => renameColumn(colIndex, event.target.value)} /><span className={`ws-type ${detectType(column)}`}>{detectType(column)}</span></div><button type="button" onClick={() => setMenuIndex(menuIndex === colIndex ? null : colIndex)} aria-label={`Open ${column.name} menu`}>•••</button>{menuIndex === colIndex && <div className="ws-column-menu"><button onClick={() => rename(colIndex)}>Rename</button><label>Data type<select value={column.type || 'auto'} onChange={event => { changeColumnType(colIndex, event.target.value); setMenuIndex(null); }}><option value="auto">Auto detect</option><option value="numeric">Numeric</option><option value="categorical">Categorical</option><option value="date">Date</option></select></label><button onClick={() => { sortColumn(colIndex, 'asc'); setMenuIndex(null); }}>Sort ascending</button><button onClick={() => { sortColumn(colIndex, 'desc'); setMenuIndex(null); }}>Sort descending</button><button onClick={() => filter(colIndex)}>Filter{filters[colIndex] ? ' ✓' : ''}</button><button onClick={() => { onProfile(colIndex, 'summary'); setMenuIndex(null); }}>Summary statistics</button><button onClick={() => { onProfile(colIndex, 'distribution'); setMenuIndex(null); }}>Distribution</button><button onClick={() => { onProfile(colIndex, 'missing'); setMenuIndex(null); }}>Missing values</button><button className="danger" onClick={() => remove(colIndex)}>Delete column</button></div>}</div></th>)}<th><button className="ws-add-column" onClick={addBlankColumn}>+ Column</button></th></tr></thead><tbody>{rows.map(rowIndex => <tr key={rowIndex}><td className="ws-row-index">{rowIndex + 1}<button aria-label={`Delete row ${rowIndex + 1}`} onClick={() => deleteRow(rowIndex)}>×</button></td>{columns.map((column, colIndex) => <td key={colIndex}><input data-row={rowIndex} data-col={colIndex} value={column.data[rowIndex] ?? ''} onChange={event => updateCell(colIndex, rowIndex, event.target.value)} onKeyDown={event => { if (event.key !== 'Enter') return; event.preventDefault(); const nextRow = rowIndex + 1; if (nextRow >= rowCount) addBlankRow(); window.setTimeout(() => document.querySelector(`input[data-row="${nextRow}"][data-col="${colIndex}"]`)?.focus(), 0); }} /></td>)}<td /></tr>)}<tr><td colSpan={columns.length + 2}><button className="ws-add-row" onClick={addBlankRow}>+ Add row</button><button className="ws-add-row" onClick={onManualColumn}>+ Add column data</button>{rowCount > GRID_ROW_CAP && <span>Showing first {GRID_ROW_CAP} of {rowCount} rows</span>}</td></tr></tbody></table></div>{Object.values(filters).some(Boolean) && <div className="ws-filter-bar"><span>Filtered view · {rows.length} rows visible</span><button onClick={() => setFilters({})}>Clear filters</button></div>}</div>;
+}
 
-  const isNumeric = (col) => col.data.filter(v => v !== '').every(v => !isNaN(parseFloat(v)));
-  const visibleRows = Math.min(rowCount, GRID_ROW_CAP);
-
-  const cellInputStyle = {
-    width: '100%', minWidth: '70px', border: '1px solid transparent', background: 'transparent',
-    color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: '0.85rem', padding: '0.3rem 0.4rem',
-    borderRadius: '4px', outline: 'none',
-  };
-  const headerInputStyle = {
-    border: 'none', background: 'transparent', color: 'inherit', fontWeight: 600, fontSize: '0.85rem',
-    outline: 'none', width: '100%', minWidth: '60px', padding: '0.15rem 0.25rem', borderRadius: '4px',
-  };
-  const deleteBtnStyle = {
-    background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.9rem',
-    lineHeight: 1, padding: '0 0.2rem', flexShrink: 0,
-  };
-  const addBtnStyle = {
-    background: 'var(--input-bg, transparent)', border: '1px dashed var(--border)', borderRadius: '6px',
-    color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.8rem', padding: '0.35rem 0.75rem',
-  };
-
-  if (!hasData) return null;
-
-  return (
-    <div className="ws-table-wrapper">
-      <table className="data-table ws-table">
-        <thead>
-          <tr>
-            <th style={{ width: 36 }}>#</th>
-            {columns.map((c, colIndex) => (
-              <th key={colIndex}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                  <input
-                    style={headerInputStyle}
-                    value={c.name}
-                    onChange={e => renameColumn(colIndex, e.target.value)}
-                    onFocus={e => e.target.style.border = '1px solid var(--accent)'}
-                    onBlur={e => e.target.style.border = 'none'}
-                  />
-                  <span className="col-type">{isNumeric(c) ? 'NUM' : 'TEXT'}</span>
-                  <button style={deleteBtnStyle} title="Delete column" onClick={() => deleteColumn(colIndex)}>×</button>
-                </div>
-              </th>
-            ))}
-            <th style={{ verticalAlign: 'middle' }}>
-              <button style={addBtnStyle} onClick={addBlankColumn} title="Add column">+ Column</button>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {Array.from({ length: visibleRows }).map((_, rowIndex) => (
-            <tr key={rowIndex}>
-              <td className="row-num" style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', whiteSpace: 'nowrap' }}>
-                {rowIndex + 1}
-                <button style={{ ...deleteBtnStyle, fontSize: '0.75rem' }} title="Delete row" onClick={() => deleteRow(rowIndex)}>×</button>
-              </td>
-              {columns.map((c, colIndex) => (
-                <td key={colIndex}>
-                  <input
-                    style={cellInputStyle}
-                    data-row={rowIndex}
-                    data-col={colIndex}
-                    value={c.data[rowIndex] ?? ''}
-                    onChange={e => updateCell(colIndex, rowIndex, e.target.value)}
-                    onFocus={e => e.target.style.border = '1px solid var(--accent)'}
-                    onBlur={e => e.target.style.border = '1px solid transparent'}
-                    onKeyDown={e => {
-                      if (e.key !== 'Enter') return;
-                      e.preventDefault();
-                      const nextRow = rowIndex + 1;
-                      const focusNext = () => {
-                        const next = document.querySelector(`input[data-row="${nextRow}"][data-col="${colIndex}"]`);
-                        if (next) next.focus();
-                      };
-                      if (nextRow < visibleRows) {
-                        focusNext();
-                      } else {
-                        addBlankRow();
-                        setTimeout(focusNext, 0);
-                      }
-                    }}
-                  />
-                </td>
-              ))}
-              <td />
-            </tr>
-          ))}
-          <tr>
-            <td colSpan={columns.length + 2} style={{ padding: '0.5rem' }}>
-              <button style={addBtnStyle} onClick={addBlankRow}>+ Row</button>
-              {rowCount > GRID_ROW_CAP && (
-                <span style={{ marginLeft: '0.75rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>Showing first {GRID_ROW_CAP} of {rowCount} rows — import large datasets via CSV rather than editing them all by hand here.
-                </span>
-              )}
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  );
+function DatasetViews({ tab, columns, rowCount, activeDataset, selectedColumn, profileMode, metrics }) {
+  if (tab === 'Summary') return <div className="ws-view-grid">{columns.map(column => { const stats = statsFor(column); return <article className="ws-view-card" key={column.name}><div><h3>{column.name}</h3><span className={`ws-type ${detectType(column)}`}>{detectType(column)}</span></div><dl><div><dt>Valid</dt><dd>{stats.count}</dd></div><div><dt>Missing</dt><dd>{stats.missing}</dd></div><div><dt>Unique</dt><dd>{stats.unique}</dd></div>{stats.mean !== null && <><div><dt>Mean</dt><dd>{stats.mean.toFixed(3)}</dd></div><div><dt>Min</dt><dd>{stats.min}</dd></div><div><dt>Max</dt><dd>{stats.max}</dd></div></>}</dl></article>; })}</div>;
+  if (tab === 'Column Profile') { const column = columns[selectedColumn] || columns[0]; if (!column) return null; const stats = statsFor(column); const frequencies = Object.entries(column.data.filter(value => !isBlank(value)).reduce((map, value) => ({ ...map, [value]: (map[value] || 0) + 1 }), {})).sort((a, b) => b[1] - a[1]).slice(0, 12); const max = Math.max(1, ...frequencies.map(([, count]) => count)); return <div className="ws-profile"><header><div><span>Column profile</span><h2>{column.name}</h2></div><span className={`ws-type ${detectType(column)}`}>{detectType(column)}</span></header><div className="ws-profile-stats"><div><span>Valid</span><strong>{stats.count}</strong></div><div><span>Missing</span><strong>{stats.missing}</strong></div><div><span>Unique</span><strong>{stats.unique}</strong></div>{stats.mean !== null && <div><span>Mean</span><strong>{stats.mean.toFixed(3)}</strong></div>}</div><h3>{profileMode === 'missing' ? 'Missing-value assessment' : profileMode === 'distribution' ? 'Distribution' : 'Most frequent values'}</h3>{profileMode === 'missing' ? <div className="ws-missing-meter"><i style={{ width: `${rowCount ? stats.missing / rowCount * 100 : 0}%` }} /><p>{stats.missing} missing values ({rowCount ? (stats.missing / rowCount * 100).toFixed(1) : 0}%)</p></div> : <div className="ws-frequency">{frequencies.map(([value, count]) => <div key={value}><span title={value}>{value}</span><i><b style={{ width: `${count / max * 100}%` }} /></i><strong>{count}</strong></div>)}</div>}</div>; }
+  if (tab === 'Missing Data') return <div className="ws-view-card ws-wide"><h2>Missing Data</h2><p>{metrics.missing} missing values across the active dataset.</p><table><thead><tr><th>Column</th><th>Missing</th><th>Percent</th></tr></thead><tbody>{columns.map(column => { const missing = statsFor(column).missing; return <tr key={column.name}><td>{column.name}</td><td>{missing}</td><td>{rowCount ? (missing / rowCount * 100).toFixed(1) : 0}%</td></tr>; })}</tbody></table></div>;
+  if (tab === 'Outliers') return <div className="ws-view-grid">{columns.filter(column => detectType(column) === 'numeric').map(column => { const stats = statsFor(column); const iqr = stats.q3 - stats.q1; const low = stats.q1 - 1.5 * iqr, high = stats.q3 + 1.5 * iqr; const outliers = stats.nums.filter(value => value < low || value > high); return <article className="ws-view-card" key={column.name}><h3>{column.name}</h3><strong className="ws-outlier-count">{outliers.length}</strong><p>potential IQR outliers</p><small>Expected range: {low.toFixed(2)} – {high.toFixed(2)}</small></article>; })}</div>;
+  if (tab === 'History') return <div className="ws-history">{activeDataset?.history?.length ? activeDataset.history.map(item => <div key={item.id}><i /><span><strong>{item.action}</strong><small>{new Date(item.at).toLocaleString()}</small></span></div>) : <p>No dataset activity recorded yet.</p>}</div>;
+  return null;
 }
 
 export default function Worksheet() {
-  const { columns, fileName, rowCount, loadData, clearData, addColumn, startBlankSheet, hasData } = useWorksheet();
-  const [dragOver, setDragOver] = useState(false);
+  const worksheet = useWorksheet();
+  const { projects } = useProjects();
+  const { columns, fileName, rowCount, loadData, clearData, addColumn, startBlankSheet, hasData, datasets, activeDataset, activeDatasetId, switchDataset, renameDataset, duplicateDataset, deleteDataset, assignDatasetProject } = worksheet;
+  const [activeProjectId, setActiveProjectId] = useState(() => activeDataset?.projectId || projects[0]?.id || '');
+  const [dialog, setDialog] = useState(null);
+  const [pasteText, setPasteText] = useState('');
   const [newColName, setNewColName] = useState('');
   const [newColData, setNewColData] = useState('');
-  const [pasteText, setPasteText] = useState('');
-  const [activeTab, setActiveTab] = useState('import');
-  const fileRef = useRef();
+  const [dragOver, setDragOver] = useState(false);
+  const [explorerOpen, setExplorerOpen] = useState(true);
+  const [activeTab, setActiveTab] = useState('Worksheet');
+  const [filters, setFilters] = useState({});
+  const [selectedColumn, setSelectedColumn] = useState(0);
+  const [profileMode, setProfileMode] = useState('summary');
+  const [recentTools, setRecentTools] = useState(() => JSON.parse(localStorage.getItem('sixsigmapro_recent_tools') || '[]'));
+  const fileRef = useRef(null);
+  const projectDatasets = datasets.filter(dataset => dataset.projectId === activeProjectId);
+  const activeProject = projects.find(project => project.id === activeProjectId);
 
-  const handleFile = (file) => {
+  const handleFile = useCallback(file => {
     if (!file) return;
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      dynamicTyping: false,
-      complete: ({ data, meta }) => {
-        if (!data.length) return;
-        const cols = meta.fields.map(f => ({
-          name: f,
-          data: data.map(row => row[f] ?? '')
-        }));
-        loadData(cols, file.name);
-        setActiveTab('data');
-      }
-    });
-  };
+    Papa.parse(file, { header: true, skipEmptyLines: true, dynamicTyping: false, complete: ({ data, meta }) => { if (!data.length) return; loadData(meta.fields.map(field => ({ name: field, data: data.map(row => row[field] ?? ''), type: 'auto' })), file.name, { projectId: activeProjectId }); setDialog(null); setActiveTab('Worksheet'); } });
+  }, [activeProjectId, loadData]);
+  const handleDrop = useCallback(event => { event.preventDefault(); setDragOver(false); handleFile(event.dataTransfer.files[0]); }, [handleFile]);
+  const handlePaste = () => { const lines = pasteText.trim().split('\n').map(line => line.split(/\t|,/)); if (!lines.length) return; const headers = lines[0]; const rows = lines.slice(1); loadData(headers.map((header, index) => ({ name: header.trim() || `Column${index + 1}`, data: rows.map(row => (row[index] || '').trim()), type: 'auto' })), 'Pasted Data', { projectId: activeProjectId }); setPasteText(''); setDialog(null); setActiveTab('Worksheet'); };
+  const handleBlank = () => { startBlankSheet(5, 15, { projectId: activeProjectId }); setDialog(null); setActiveTab('Worksheet'); };
+  const handleAddColumn = () => { if (!newColName.trim()) return; addColumn(newColName.trim(), newColData.split('\n').map(value => value.trim()).filter(Boolean)); setNewColName(''); setNewColData(''); setDialog(null); };
+  const changeProject = projectId => { setActiveProjectId(projectId); const first = datasets.find(dataset => dataset.projectId === projectId); switchDataset(first?.id || ''); setFilters({}); };
+  const openProfile = (index, mode) => { setSelectedColumn(index); setProfileMode(mode); setActiveTab('Column Profile'); };
 
-  const handleDrop = useCallback((e) => {
-    e.preventDefault();
-    setDragOver(false);
-    const file = e.dataTransfer.files[0];
-    if (file) handleFile(file);
-  }, []);
+  const metrics = useMemo(() => { const missing = columns.reduce((sum, column) => sum + Array.from({ length: rowCount }, (_, index) => column.data[index]).filter(isBlank).length, 0); const rowKeys = Array.from({ length: rowCount }, (_, rowIndex) => JSON.stringify(columns.map(column => column.data[rowIndex] ?? ''))); return { missing, duplicates: rowKeys.length - new Set(rowKeys).size, numeric: columns.filter(column => detectType(column) === 'numeric').length, categorical: columns.filter(column => detectType(column) === 'categorical').length, date: columns.filter(column => detectType(column) === 'date').length }; }, [columns, rowCount]);
+  const recommendations = useMemo(() => { const ids = new Set(); if (metrics.numeric) ['histogram', 'control', 'capability', 'boxplot'].forEach(id => ids.add(id)); if (metrics.numeric >= 2) ids.add('scatter'); if (metrics.categorical) { ids.add('pareto'); ids.add('hypothesis'); } if (columns.some(column => /operator|appraiser|part/i.test(column.name))) ids.add('msa'); return TOOLS.filter(tool => ids.has(tool.id)).slice(0, 5); }, [columns, metrics]);
+  const launchTool = tool => { const next = [tool.id, ...recentTools.filter(id => id !== tool.id)].slice(0, 4); setRecentTools(next); localStorage.setItem('sixsigmapro_recent_tools', JSON.stringify(next)); };
 
-  const handlePaste = () => {
-    const lines = pasteText.trim().split('\n').map(l => l.split(/\t|,/));
-    if (!lines.length) return;
-    const headers = lines[0];
-    const rows = lines.slice(1);
-    const cols = headers.map((h, i) => ({
-      name: h.trim() || `Column${i + 1}`,
-      data: rows.map(r => (r[i] || '').trim())
-    }));
-    loadData(cols, 'Pasted Data');
-    setPasteText('');
-    setActiveTab('data');
-  };
+  return <div className={`worksheet-page ${hasData ? 'loaded' : 'empty'}`}>
+    <header className="ws-executive"><div className="ws-title"><span>DATA COMMAND CENTER</span><h1>Data Worksheet</h1><p>Prepare, understand, and launch analysis from one project-connected workspace.</p></div><div className="ws-selectors"><label>Active project<select value={activeProjectId} onChange={event => changeProject(event.target.value)}><option value="">Select a project</option>{projects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label><label>Active dataset<select value={activeDatasetId} onChange={event => switchDataset(event.target.value)}><option value="">No dataset selected</option>{projectDatasets.map(dataset => <option key={dataset.id} value={dataset.id}>{dataset.name}</option>)}</select></label></div>{hasData && <div className="ws-metrics"><div><span>Rows</span><strong>{rowCount.toLocaleString()}</strong></div><div><span>Columns</span><strong>{columns.length}</strong></div><div><span>Missing</span><strong>{metrics.missing}</strong></div><div><span>Duplicates</span><strong>{metrics.duplicates}</strong></div><div><span>Last updated</span><strong>{activeDataset ? new Date(activeDataset.updatedAt).toLocaleDateString() : '—'}</strong></div></div>}<div className="ws-header-actions"><button className="btn-secondary" onClick={() => fileRef.current?.click()}>Import CSV</button><button className="btn-secondary" onClick={() => setDialog('paste')}>Paste Data</button><button className="btn-secondary" onClick={handleBlank}>Start Blank Worksheet</button><button className="btn-primary" disabled={!activeDataset || !activeProjectId} onClick={() => assignDatasetProject(activeDatasetId, activeProjectId)}>Save Dataset to Project</button><input ref={fileRef} type="file" accept=".csv" hidden onChange={event => handleFile(event.target.files[0])} /></div></header>
 
-  const handleAddColumn = () => {
-    if (!newColName.trim()) return;
-    const data = newColData.split('\n').map(v => v.trim()).filter(v => v !== '');
-    addColumn(newColName.trim(), data);
-    setNewColName('');
-    setNewColData('');
-    setActiveTab('data');
-  };
+    {!hasData ? <main className="ws-empty-state"><div className={`ws-upload-card ${dragOver ? 'dragging' : ''}`} onDragOver={event => { event.preventDefault(); setDragOver(true); }} onDragLeave={() => setDragOver(false)} onDrop={handleDrop}><div className="ws-upload-icon">⇧</div><span>START WITH DATA</span><h2>Bring your process data into focus</h2><p>Drag and drop a CSV here, or choose how you want to begin.</p><div><button className="btn-primary" onClick={() => fileRef.current?.click()}>Import CSV</button><button className="btn-secondary" onClick={() => setDialog('paste')}>Paste Data</button><button className="btn-secondary" onClick={handleBlank}>Blank Worksheet</button></div><small>CSV files with headers in the first row · Numeric, categorical, and date values supported</small></div></main> :
+      <div className={`ws-hub ${explorerOpen ? '' : 'explorer-closed'}`}><aside className="ws-explorer"><button className="ws-collapse" onClick={() => setExplorerOpen(open => !open)}>{explorerOpen ? '‹' : '›'}</button>{explorerOpen && <><span>Current project</span><h3>{activeProject?.name || 'Unassigned workspace'}</h3><div className="ws-explorer-title"><span>Datasets</span><button onClick={handleBlank}>+ New</button></div><nav>{projectDatasets.map(dataset => <button key={dataset.id} className={dataset.id === activeDatasetId ? 'active' : ''} onClick={() => switchDataset(dataset.id)}><i>▦</i><span>{dataset.name}<small>{rowCountForDataset(dataset)} rows · {dataset.columns.length} cols</small></span></button>)}</nav><div className="ws-dataset-actions"><button onClick={() => { const name = window.prompt('Rename dataset', fileName); if (name) renameDataset(activeDatasetId, name); }}>Rename</button><button onClick={() => duplicateDataset(activeDatasetId)}>Duplicate</button><button onClick={() => { if (window.confirm(`Clear all data from “${fileName}”?`)) clearData(); }}>Clear</button><button className="danger" onClick={() => { if (window.confirm(`Delete “${fileName}”? This cannot be undone.`)) deleteDataset(activeDatasetId); }}>Delete</button></div></>}</aside><main className="ws-center"><div className="ws-tabs">{WORKSHEET_TABS.map(tab => <button key={tab} className={activeTab === tab ? 'active' : ''} onClick={() => setActiveTab(tab)}>{tab}</button>)}</div>{activeTab === 'Worksheet' ? <DataGrid filters={filters} setFilters={setFilters} onProfile={openProfile} onManualColumn={() => setDialog('manual')} /> : <DatasetViews tab={activeTab} columns={columns} rowCount={rowCount} activeDataset={activeDataset} selectedColumn={selectedColumn} profileMode={profileMode} metrics={metrics} />}</main><aside className="ws-analysis"><span>DATASET SUMMARY</span><div className="ws-summary-list"><div><span>Rows</span><strong>{rowCount}</strong></div><div><span>Columns</span><strong>{columns.length}</strong></div><div><span>Numeric variables</span><strong>{metrics.numeric}</strong></div><div><span>Categorical variables</span><strong>{metrics.categorical}</strong></div><div><span>Date variables</span><strong>{metrics.date}</strong></div><div><span>Missing values</span><strong>{metrics.missing}</strong></div><div><span>Duplicate rows</span><strong>{metrics.duplicates}</strong></div></div><section><h3>Recommended analyses</h3><p>Based on detected column types</p><div className="ws-analysis-links">{recommendations.map(tool => <Link key={tool.id} to={tool.path} onClick={() => launchTool(tool)}><i>{tool.icon}</i><span>{tool.name}</span><b>→</b></Link>)}</div></section><section><h3>Recently used</h3><div className="ws-recent">{recentTools.length ? recentTools.map(id => { const tool = TOOLS.find(item => item.id === id); return tool && <Link key={id} to={tool.path} onClick={() => launchTool(tool)}>{tool.name}</Link>; }) : <p>Tools you launch will appear here.</p>}</div></section></aside></div>}
 
-  const handleStartBlank = () => {
-    startBlankSheet();
-    setActiveTab('data');
-  };
-
-  return (
-    <div className="worksheet-page">
-      <div className="worksheet-header">
-        <div>
-          <h1>Data Worksheet</h1>
-          <p>Enter your data once — it's available in every analysis tool automatically.</p>
-        </div>
-        <div className="worksheet-meta">
-          {hasData ? (
-            <>
-              <span className="ws-badge">{fileName}</span>
-              <span className="ws-badge">{rowCount} rows</span>
-              <span className="ws-badge">{columns.length} columns</span>
-              <button className="btn-ghost" onClick={clearData}>✕ Clear</button>
-            </>
-          ) : (
-            <button className="btn-primary" onClick={handleStartBlank}>🗒️ Start Blank Grid</button>
-          )}
-        </div>
-      </div>
-
-      <div className="worksheet-body">
-        {/* Left: import panel */}
-        <div className="ws-panel">
-          <div className="tab-bar">
-            {['import', 'paste', 'manual'].map(t => (
-              <button key={t} className={`tab-btn ${activeTab === t ? 'active' : ''}`} onClick={() => setActiveTab(t)}>{t === 'import' ? '📁 Import CSV' : t === 'paste' ? '📋 Paste Data' : '✏️ Add Column'}
-              </button>
-            ))}
-            {hasData && (
-              <button className={`tab-btn ${activeTab === 'data' ? 'active' : ''}`} onClick={() => setActiveTab('data')}>
-                📊 Data Grid
-              </button>
-            )}
-          </div>
-
-          {activeTab === 'import' && (
-            <div>
-              <div
-                className={`dropzone ${dragOver ? 'active' : ''}`}
-                onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-                onDragLeave={() => setDragOver(false)}
-                onDrop={handleDrop}
-                onClick={() => fileRef.current.click()}
-              >
-                <div className="dropzone-icon">📂</div>
-                <div className="dropzone-text">Drop your CSV file here or click to browse</div>
-                <div className="dropzone-hint">Supports .csv files — headers in first row</div>
-                <input ref={fileRef} type="file" accept=".csv" style={{ display: 'none' }}
-                  onChange={e => handleFile(e.target.files[0])} />
-              </div>
-              <div className="ws-format-tip">
-                <strong>CSV Format:</strong> First row = column names. Each column = one variable.
-                Numbers and text are both supported. Example:
-                <pre className="ws-example">Part,Measurement,Operator{'\n'}A,12.3,Op1{'\n'}A,12.1,Op1{'\n'}B,15.4,Op2</pre>
-              </div>
-              <div style={{ marginTop: '1rem', textAlign: 'center' }}>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>— or —</span>
-                <div style={{ marginTop: '0.5rem' }}>
-                  <button className="btn-secondary" onClick={handleStartBlank}>🗒️ Start a Blank Grid Instead</button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'paste' && (
-            <div>
-              <p className="ws-hint">Paste data copied from Excel or any spreadsheet. First row should be column names.</p>
-              <textarea
-                className="ws-textarea"
-                placeholder="Paste data here (tab or comma separated)..."
-                value={pasteText}
-                onChange={e => setPasteText(e.target.value)}
-                rows={12}
-              />
-              <button className="btn-primary" onClick={handlePaste} style={{ marginTop: '0.75rem' }}>
-                Import Pasted Data
-              </button>
-            </div>
-          )}
-
-          {activeTab === 'manual' && (
-            <div>
-              <p className="ws-hint">
-                Add one column at a time by pasting or typing values below — or, for a real spreadsheet-style
-                grid you can type directly into cell by cell, use <strong>Start Blank Grid</strong> above and
-                edit it in the <strong>Data Grid</strong> tab.
-              </p>
-              <div className="form-group" style={{ marginBottom: '0.75rem' }}>
-                <label>Column Name</label>
-                <input type="text" value={newColName} onChange={e => setNewColName(e.target.value)} placeholder="e.g. Measurement, Defects, Group" />
-              </div>
-              <div className="form-group" style={{ marginBottom: '0.75rem' }}>
-                <label>Values (one per line)</label>
-                <textarea className="ws-textarea" rows={10} value={newColData}
-                  onChange={e => setNewColData(e.target.value)}
-                  placeholder={"12.3\n14.1\n11.8\n13.2\n..."} />
-              </div>
-              <button className="btn-primary" onClick={handleAddColumn}>Add Column</button>
-            </div>
-          )}
-
-          {activeTab === 'data' && hasData && <DataGrid />}
-        </div>
-
-        {/* Right: column summary + quick launch */}<div className="ws-sidebar">
-          {hasData && (
-            <div className="card ws-columns-card">
-              <h3 className="section-title" style={{ marginBottom: '1rem' }}>Columns</h3>
-              {columns.map(col => {
-                const nums = col.data.map(parseFloat).filter(v => !isNaN(v));
-                const numeric = nums.length > col.data.filter(v => v !== '').length / 2;
-                return (
-                  <div key={col.name} className="ws-col-item">
-                    <div className="ws-col-header">
-                      <span className="ws-col-name">{col.name}</span>
-                      <span className={`ws-col-type ${numeric ? 'numeric' : 'text'}`}>{numeric ? 'Numeric' : 'Text'}</span>
-                    </div>
-                    {numeric && nums.length > 0 && (
-                      <div className="ws-col-stats">
-                        <span>n={nums.length}</span>
-                        <span>x̄={(nums.reduce((a,b)=>a+b,0)/nums.length).toFixed(3)}</span>
-                        <span>min={Math.min(...nums).toFixed(2)}</span>
-                        <span>max={Math.max(...nums).toFixed(2)}</span>
-                      </div>
-                    )}
-                    {!numeric && (
-                      <div className="ws-col-stats">
-                        <span>n={col.data.filter(v=>v!=='').length}</span>
-                        <span>{[...new Set(col.data.filter(v=>v!==''))].length} unique</span>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          <div className="card ws-tools-card">
-            <h3 className="section-title" style={{ marginBottom: '1rem' }}>
-              {hasData ? 'Send to Tool' : 'Available Tools'}
-            </h3>
-            {!hasData && <p className="ws-hint" style={{ marginBottom: '1rem' }}>Import data first, then select a tool to analyze it.</p>}
-            <div className="ws-tools-grid">
-              {QUICK_TOOLS.map(t => (
-                <Link key={t.path} to={t.path} className={`ws-tool-btn ${!hasData ? 'disabled' : ''}`}>
-                  <span>{t.icon}</span>
-                  <span>{t.name}</span>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+    {dialog && <div className="ws-modal" role="dialog" aria-modal="true" aria-label={dialog === 'paste' ? 'Paste data' : 'Add column'}><button className="ws-modal-backdrop" onClick={() => setDialog(null)} aria-label="Close" /><div className="ws-modal-card"><header><div><span>DATA INPUT</span><h2>{dialog === 'paste' ? 'Paste spreadsheet data' : 'Add a column'}</h2></div><button onClick={() => setDialog(null)}>×</button></header>{dialog === 'paste' ? <><p>Paste tab- or comma-separated data. The first row becomes column names.</p><textarea rows="14" value={pasteText} onChange={event => setPasteText(event.target.value)} placeholder={'Part\tMeasurement\tOperator\nA\t12.3\tOp1'} /><button className="btn-primary" onClick={handlePaste}>Import Pasted Data</button></> : <><input value={newColName} onChange={event => setNewColName(event.target.value)} placeholder="Column name" /><textarea rows="12" value={newColData} onChange={event => setNewColData(event.target.value)} placeholder={'One value per line\n12.3\n14.1'} /><button className="btn-primary" onClick={handleAddColumn}>Add Column</button></>}</div></div>}
+  </div>;
 }
+
+function rowCountForDataset(dataset) { return Math.max(0, ...dataset.columns.map(column => column.data.length)); }
