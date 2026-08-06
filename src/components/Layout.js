@@ -10,7 +10,6 @@ const NAV = [
     items: [
       { id: 'worksheet', name: 'Data Worksheet', path: '/worksheet' },
       { id: 'projects', name: 'Project Workspace', path: '/projects' },
-      { id: 'dashboard', name: 'Classic Dashboard', path: '/dashboard' },
     ]
   },
   {
@@ -63,14 +62,6 @@ const NAV = [
       { id: 'doe', name: 'Design of Experiments', path: '/doe' },
       { id: 'fmea', name: 'FMEA', path: '/tool/fmea' },
       { id: 'vsm', name: 'Value Stream Map', path: '/tool/vsm' },
-    ]
-  },
-  {
-    section: 'Control',
-    color: 'var(--cyan)',
-    items: [
-      { id: 'control-chart-2', name: 'Control Chart (Ongoing Monitoring)', path: '/tool/control-chart' },
-      { id: 'meeting-minutes', name: 'Meeting Minutes', path: '/templates' },
     ]
   },
   {
