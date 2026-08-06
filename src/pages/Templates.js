@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
+import { Navigate, useNavigate, useParams } from 'react-router-dom';
+import { useProjects } from '../context/ProjectsContext';
+import DocumentWorkspace from '../components/DocumentWorkspace';
+import logoMark from '../logo-mark.png';
 import './Templates.css';
 
-const TEMPLATES = [
+export const TEMPLATES = [
   {
     id: 'charter', name: 'Project Charter', phase: 'Define', icon: '📋',
     desc: 'Define project scope, goals, team, timeline, and business case.',
@@ -332,7 +336,7 @@ function PrintableDoc({ template, values, computed }) {
     <div className="printable-doc">
       <div className="doc-header" style={{ background: phaseCol }}>
         <div className="doc-logo-block">
-          <div className="doc-logo-box">LOGO</div>
+          <div className="doc-logo-box"><img src={logoMark} alt="SixSigma Pro" /></div>
           <div className="doc-brand">SixSigma Pro</div>
         </div>
         <div className="doc-header-center">
@@ -405,6 +409,7 @@ function TemplateForm({ template }) {
         .doc-header{display:grid;grid-template-columns:140px 1fr 140px;align-items:center;padding:16px 24px;gap:16px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
         .doc-logo-block{display:flex;flex-direction:column;align-items:center;gap:4px;}
         .doc-logo-box{width:60px;height:42px;border:2px dashed rgba(255,255,255,0.5);border-radius:4px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.7);font-size:9pt;}
+        .doc-logo-box img{max-width:100%;max-height:100%;object-fit:contain;}
         .doc-brand{color:white;font-size:9pt;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;}
         .doc-header-center{text-align:center;}
         .doc-phase-label{color:rgba(255,255,255,0.75);font-size:8pt;text-transform:uppercase;margin-bottom:4px;}
@@ -512,15 +517,33 @@ function TemplateForm({ template }) {
 }
 
 export default function Templates() {
+  const { projectId, templateId } = useParams();
+  const navigate = useNavigate();
+  const { projects, getProject, updateProject } = useProjects();
   const [selected, setSelected] = useState(null);
   const [filter, setFilter] = useState('All');
+  const [activeProjectId, setActiveProjectId] = useState(() => projectId || projects[0]?.id || '');
   const phases = ['All', 'Define', 'Measure', 'Analyze', 'Improve'];
   const filtered = TEMPLATES.filter(t => filter === 'All' || t.phase === filter);
+
+  if (projectId && templateId) {
+    const project = getProject(projectId);
+    const template = TEMPLATES.find(item => item.id === templateId);
+    if (!project || !template) return <div className="templates-not-found"><h1>Document workspace not found</h1><p>Select a valid project and template from the document library.</p><button className="btn-primary" onClick={() => navigate('/templates')}>Return to templates</button></div>;
+    if (template.id === 'charter') return <Navigate to={`/projects/${project.id}/charter`} replace />;
+    return <DocumentWorkspace template={template} project={project} updateProject={updateProject} />;
+  }
+
+  const openTemplate = template => {
+    if (!activeProjectId) return;
+    navigate(template.id === 'charter' ? `/projects/${activeProjectId}/charter` : `/projects/${activeProjectId}/documents/${template.id}`);
+  };
 
   return (
     <div className="templates-page">
       <div className="templates-header no-print">
         <h1>Project Templates</h1>
+        <label className="templates-project-select">Active project<select value={activeProjectId} onChange={event => setActiveProjectId(event.target.value)}><option value="">Select a project</option>{projects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
         <p>Professional DMAIC templates — fill in the form, preview, then print or save as PDF.</p>
       </div>
 
@@ -533,7 +556,7 @@ export default function Templates() {
           </div>
           <div className="templates-grid no-print">
             {filtered.map(t => (
-              <button key={t.id} className="template-card" onClick={() => setSelected(t)}>
+              <button key={t.id} className="template-card" disabled={!activeProjectId} onClick={() => openTemplate(t)}>
                 <div className="template-icon">{t.icon}</div>
                 <div className="template-phase-badge" style={{ color: phaseColor[t.phase] }}>{t.phase}</div>
                 <h3>{t.name}</h3>

@@ -7,6 +7,8 @@
 .workspace-shell-bar button.primary { border-color: var(--accent); background: var(--accent); color: #fff; }
 .workspace-shell-back { margin-right: auto; }
 .workspace-shell-navigation,.workspace-shell-display { display: flex; gap: .35rem; }
+.workspace-shell-actions { display:flex; gap:.35rem; padding-left:.5rem; border-left:1px solid var(--border); }
+.workspace-shell-breadcrumb { min-width:0; max-width:22rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-muted); font-size:.72rem; }
 .workspace-mode-maximized { position: fixed; z-index: 80; inset: 60px 0 0; overflow: hidden; }
 .workspace-mode-maximized .workspace-shell-bar { padding-block: .35rem; }
 .workspace-mode-maximized .workspace-shell-content { height: calc(100vh - 104px); overflow: hidden; }
@@ -15,6 +17,9 @@
   .workspace-shell-bar { min-height: 42px; padding: .35rem .55rem; gap: .35rem; overflow-x: auto; }
   .workspace-shell-back { margin-right: 0; }
   .workspace-shell-navigation { margin-left: auto; }
+  .workspace-shell-breadcrumb { display:none; }
+  .workspace-shell-actions { padding-left:0; border-left:0; }
+  .workspace-shell-actions button span { display:none; }
   .workspace-shell-bar a span,.workspace-shell-display button span { display: none; }
   .workspace-shell-bar a,.workspace-shell-bar button { min-height: 29px; padding: .32rem .5rem; }
   .workspace-mode-maximized .workspace-shell-content { height: calc(100vh - 98px); }

@@ -2,10 +2,14 @@
 .templates-header { margin-bottom: 2rem; }
 .templates-header h1 { font-family: var(--font-display); font-size: 1.8rem; font-weight: 700; margin-bottom: 0.3rem; }
 .templates-header p { color: var(--text-secondary); font-size: 0.95rem; }
+.templates-project-select { display:block; width:min(320px,100%); margin-top:1rem; color:var(--text-muted); font-size:.7rem; font-weight:700; text-transform:uppercase; }
+.templates-project-select select { display:block; width:100%; margin-top:.4rem; }
 
 .templates-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; }
 .template-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.5rem; text-align: left; cursor: pointer; transition: all var(--transition); display: flex; flex-direction: column; gap: 0.4rem; }
 .template-card:hover { border-color: rgba(0,102,255,0.3); transform: translateY(-2px); box-shadow: var(--shadow); }
+.template-card:disabled { cursor:not-allowed; opacity:.6; transform:none; box-shadow:none; }
+.templates-not-found { max-width:640px; margin:5rem auto; padding:2rem; text-align:center; }
 .template-icon { font-size: 1.8rem; margin-bottom: 0.25rem; }
 .template-phase-badge { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
 .template-card h3 { font-family: var(--font-display); font-size: 1rem; font-weight: 600; color: var(--text-primary); }
@@ -44,6 +48,7 @@
 .doc-header { display: grid; grid-template-columns: 140px 1fr 140px; align-items: center; padding: 16px 24px; gap: 16px; }
 .doc-logo-block { display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .doc-logo-box { width: 60px; height: 42px; border: 2px dashed rgba(255,255,255,0.5); border-radius: 4px; display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.7); font-size: 9pt; letter-spacing: 0.05em; }
+.doc-logo-box img { max-width:100%; max-height:100%; object-fit:contain; }
 .doc-brand { color: rgba(255,255,255,0.95); font-size: 9pt; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
 .doc-header-center { text-align: center; }
 .doc-phase-label { color: rgba(255,255,255,0.75); font-size: 8pt; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 4px; }

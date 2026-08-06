@@ -1,0 +1,15 @@
+.expandable-editor-open { overflow:hidden; }
+.expandable-editor { position:fixed; z-index:140; inset:0; display:grid; place-items:center; padding:clamp(.75rem,3vw,2rem); }
+.expandable-editor-backdrop { position:absolute; inset:0; border:0; background:rgba(3,8,20,.76); backdrop-filter:blur(6px); }
+.expandable-editor-panel { position:relative; width:min(1080px,100%); height:min(760px,calc(100vh - 3rem)); display:grid; grid-template-rows:auto 1fr auto; overflow:hidden; border:1px solid var(--border); border-radius:var(--radius-lg); background:var(--surface); box-shadow:0 30px 90px rgba(0,0,0,.4); }
+.expandable-editor-panel header,.expandable-editor-panel footer { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1rem 1.25rem; border-bottom:1px solid var(--border); }
+.expandable-editor-panel footer { border-top:1px solid var(--border); border-bottom:0; color:var(--text-muted); font-size:.78rem; }
+.expandable-editor-panel header>div:last-child { display:flex; gap:.5rem; }
+.expandable-editor-panel header span { color:var(--accent); font-size:.68rem; font-weight:800; letter-spacing:.12em; }
+.expandable-editor-panel h2 { margin:.2rem 0 0; font-size:1.35rem; }
+.expandable-editor-panel>textarea { width:100%; min-height:0; padding:1.5rem; resize:none; border:0; border-radius:0; background:var(--bg-2); font-size:1rem; line-height:1.75; }
+.expandable-editor-rich { min-height:0; display:grid; grid-template-rows:auto 1fr; background:var(--bg-2); }
+.expandable-editor-toolbar { display:flex; gap:.35rem; padding:.65rem 1rem; border-bottom:1px solid var(--border); }
+.expandable-editor-toolbar button { padding:.4rem .65rem; border:1px solid var(--border); border-radius:7px; background:var(--surface); color:var(--text-primary); cursor:pointer; }
+.expandable-editor-rich [contenteditable] { min-height:0; overflow:auto; padding:1.5rem; outline:none; color:var(--text-primary); line-height:1.75; }
+@media(max-width:768px){.expandable-editor{padding:0}.expandable-editor-panel{height:100%;border-radius:0;border:0}.expandable-editor-panel header,.expandable-editor-panel footer{padding:.75rem}.expandable-editor-panel footer span{display:none}}

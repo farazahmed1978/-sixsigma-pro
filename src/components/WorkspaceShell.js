@@ -3,25 +3,13 @@ import { Link } from 'react-router-dom';
 import './WorkspaceShell.css';
 
 export default function WorkspaceShell({
-  children,
-  className = '',
-  mode = 'normal',
-  backTo = '/projects',
-  backLabel = 'Projects',
-  previousLabel = 'Previous',
-  nextLabel = 'Next',
-  previousDisabled = false,
-  nextDisabled = false,
-  onPrevious,
-  onNext,
-  onMinimize,
-  onMaximize,
-  onRestore,
+  children, className = '', mode = 'normal', backTo = '/projects', backLabel = 'Projects',
+  previousLabel = 'Previous', nextLabel = 'Next', previousDisabled = false, nextDisabled = false,
+  onPrevious, onNext, onMinimize, onMaximize, onRestore, breadcrumb, onSave, onExport,
+  onPrint, onHelp, saveLabel = 'Save', saving = false,
 }) {
   useEffect(() => {
-    const handleEscape = event => {
-      if (event.key === 'Escape' && mode !== 'normal') onRestore?.();
-    };
+    const handleEscape = event => { if (event.key === 'Escape' && mode !== 'normal') onRestore?.(); };
     document.addEventListener('keydown', handleEscape);
     document.body.classList.toggle('workspace-shell-locked', mode === 'maximized');
     return () => {
@@ -32,16 +20,23 @@ export default function WorkspaceShell({
 
   return <div className={`workspace-shell workspace-mode-${mode} ${className}`}>
     <div className="workspace-shell-bar" role="toolbar" aria-label="Workspace controls">
-      <Link to={backTo} className="workspace-shell-back">← <span>Back to {backLabel}</span></Link>
+      <Link to={backTo} className="workspace-shell-back">&larr; <span>Back to {backLabel}</span></Link>
+      {breadcrumb && <div className="workspace-shell-breadcrumb" aria-label="Breadcrumb">{breadcrumb}</div>}
       <div className="workspace-shell-navigation">
-        <button type="button" onClick={onPrevious} disabled={previousDisabled}>← {previousLabel}</button>
-        <button type="button" onClick={onNext} disabled={nextDisabled}>{nextLabel} →</button>
+        <button type="button" onClick={onPrevious} disabled={previousDisabled}>&larr; {previousLabel}</button>
+        <button type="button" onClick={onNext} disabled={nextDisabled}>{nextLabel} &rarr;</button>
       </div>
       <div className="workspace-shell-display">
-        {mode === 'normal' && <button type="button" onClick={onMinimize} title="Collapse workspace side panels">− <span>Minimize</span></button>}
-        {mode !== 'normal' && <button type="button" onClick={onRestore}>↙ <span>Restore</span></button>}
-        {mode !== 'maximized' && <button type="button" className="primary" onClick={onMaximize}>⛶ <span>Full Screen</span></button>}
+        {mode === 'normal' && <button type="button" onClick={onMinimize} title="Collapse workspace side panels">&minus; <span>Minimize</span></button>}
+        {mode !== 'normal' && <button type="button" onClick={onRestore}>&#8634; <span>Restore</span></button>}
+        {mode !== 'maximized' && <button type="button" className="primary" onClick={onMaximize}>&#10530; <span>Full Screen</span></button>}
       </div>
+      {(onSave || onExport || onPrint || onHelp) && <div className="workspace-shell-actions">
+        {onHelp && <button type="button" onClick={onHelp} title="Workspace help">? <span>Help</span></button>}
+        {onPrint && <button type="button" onClick={onPrint}>Print</button>}
+        {onExport && <button type="button" onClick={onExport}>Export PDF</button>}
+        {onSave && <button type="button" className="primary" onClick={onSave} disabled={saving}>{saving ? 'Saving...' : saveLabel}</button>}
+      </div>}
     </div>
     <div className="workspace-shell-content">{children}</div>
   </div>;

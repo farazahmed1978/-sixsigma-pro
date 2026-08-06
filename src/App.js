@@ -110,6 +110,7 @@ export default function App() {
                   <Route path="/hypothesis" element={<HypothesisTesting />} />
                   <Route path="/doe" element={<DOEPage />} />
                   <Route path="/templates" element={<Templates />} />
+                  <Route path="/projects/:projectId/documents/:templateId" element={<Templates />} />
                   <Route path="/report" element={<ReportBuilder />} />
                   <Route path="/projects" element={<ProjectsHome />} />
                   <Route path="/projects/:id" element={<ProjectDetail />} />
