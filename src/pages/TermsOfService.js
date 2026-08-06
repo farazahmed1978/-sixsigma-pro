@@ -12,12 +12,12 @@ export default function TermsOfService() {
 
       <section>
         <h2>1. Acceptance of Terms</h2>
-        <p>By accessing or using SixSigma Pro (the "Service"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree, do not use the Service.</p>
+        <p>By accessing or using Axentra (the "Service"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree, do not use the Service.</p>
       </section>
 
       <section>
         <h2>2. Description of Service</h2>
-        <p>SixSigma Pro provides a browser-based statistical analysis and project management platform for Lean Six Sigma and continuous improvement work.</p>
+        <p>Axentra provides a browser-based operational excellence platform for Lean Six Sigma, project management, analysis, documentation, and reporting.</p>
       </section>
 
       <section>
@@ -42,7 +42,7 @@ export default function TermsOfService() {
 
       <section>
         <h2>7. Intellectual Property</h2>
-        <p>The Service, including its software, design, and statistical methodologies as implemented, is owned by SixSigma Pro and protected by intellectual property laws. These Terms do not grant you any rights to our trademarks or branding.</p>
+        <p>The Service, including its software, design, and statistical methodologies as implemented, is owned by Axentra and protected by intellectual property laws. These Terms do not grant you any rights to our trademarks or branding.</p>
       </section>
 
       <section>
@@ -52,12 +52,12 @@ export default function TermsOfService() {
 
       <section>
         <h2>9. Limitation of Liability</h2>
-        <p>To the maximum extent permitted by law, SixSigma Pro shall not be liable for any indirect, incidental, special, consequential, or punitive damages arising from your use of the Service. Our total liability for any claim shall not exceed the amount you paid us in the twelve (12) months preceding the claim.</p>
+        <p>To the maximum extent permitted by law, Axentra shall not be liable for any indirect, incidental, special, consequential, or punitive damages arising from your use of the Service. Our total liability for any claim shall not exceed the amount you paid us in the twelve (12) months preceding the claim.</p>
       </section>
 
       <section>
         <h2>10. Indemnification</h2>
-        <p>You agree to indemnify and hold SixSigma Pro harmless from claims arising out of your misuse of the Service or violation of these Terms.</p>
+        <p>You agree to indemnify and hold Axentra harmless from claims arising out of your misuse of the Service or violation of these Terms.</p>
       </section>
 
       <section>

@@ -107,6 +107,7 @@ export default function App() {
                   <Route path="/worksheet" element={<Worksheet />} />
                   <Route path="/resources" element={<Resources />} />
                   <Route path="/resources/:resourceId" element={<ResourceStatus />} />
+                  <Route path="/ai-assistant" element={<ResourceStatus title="Axentra AI Assistant" future />} />
                   <Route path="/about" element={<About />} />
                   <Route path="/pricing" element={<Pricing />} />
                   <Route path="/privacy" element={<PrivacyPolicy />} />

@@ -3,13 +3,21 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
-    <meta name="theme-color" content="#0a2540" />
-    <meta name="description" content="SixSigma Pro — Professional Lean Six Sigma Analysis Platform. Control charts, capability analysis, hypothesis testing, DOE, and 50+ tools. $9.99/month." />
-    <meta name="keywords" content="lean six sigma, statistical analysis, control charts, capability analysis, hypothesis testing, DMAIC, quality tools" />
+    <meta name="theme-color" content="#081225" />
+    <script>
+      (function () {
+        var saved = localStorage.getItem('sp-theme');
+        var theme = saved || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+        document.documentElement.setAttribute('data-theme', theme);
+      }());
+    </script>
+    <meta name="description" content="Axentra is the integrated platform for Lean Six Sigma and project excellence—connecting projects, data, analyses, evidence, documents, and reports." />
+    <meta name="keywords" content="operational excellence, lean six sigma, project management, statistical analysis, DMAIC, project workspaces" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <title>SixSigma Pro | Professional Lean Six Sigma Platform</title>
+    <title>AXENTRA | Operational Excellence Platform</title>
+    <link rel="icon" href="%PUBLIC_URL%/favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />

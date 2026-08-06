@@ -1,275 +1,61 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
-import { useWorksheet } from '../context/WorksheetContext';
+import React,{useEffect,useRef,useState} from 'react';
+import {Link} from 'react-router-dom';
+import logoDark from '../assets/axentra-logo-dark.svg';
 import heroMain from '../hero-main.jpg';
-import featureEngineers from '../feature-engineers.jpg';
-import featureAnalyze from '../feature-analyze.jpg';
-import featureExcellence from '../feature-excellence.jpg';
-import logoMark from '../logo-mark.png';
+import qualityPhoto from '../feature-engineers.jpg';
+import operationsPhoto from '../feature-analyze.jpg';
+import leaderPhoto from '../feature-excellence.jpg';
 import './Dashboard.css';
 
-const TICKER_ITEMS = [
-  'Control Charts (I-MR / X-bar-R / CUSUM / EWMA)', 'Attribute Charts (p/np/c/u)', 'Capability Analysis',
-  'Gage R&R (MSA)', 'Descriptive Statistics', 'Histogram', 'Run Chart', 'Hypothesis Testing — 17 Tests',
-  'Pareto Analysis', 'Fishbone Diagrams', 'Multi-Vari Charts', 'Correlation Matrix',
-  'Regression & Multiple Regression', 'Logistic Regression', 'One / Two-Way & RM ANOVA',
-  'Effect Size Calculators', 'Design of Experiments', 'FMEA', 'Value Stream Mapping',
-  'Sigma Level & DPMO', 'Sample Size & Power Calculators', 'Document Library', 'Project Workbench',
+const pillars=[
+ ['◫','ONE PLATFORM','Everything connected. No more disconnected tools.'],['↗','END-TO-END EXECUTION','From project initiation to closure—seamless and structured.'],['◇','DATA TO DECISIONS','Powerful analysis and insights that matter.'],['✦','AI ASSISTANT','Ask. Discover. Decide. Your intelligent partner throughout the journey.'],['⌾','SECURE & PRIVATE','Privacy-minded architecture designed to keep you in control.'],['◎','ANYTIME, ANYWHERE','Browser-based. No installs. No IT roadblocks.']
+];
+const kpis=[['Active Projects',12],['Datasets',38],['Analyses',146],['On Track',84,'%']];
+const audiences=[
+ ['QUALITY ENGINEERS','Run validated analyses, manage evidence, and move from data to action.',qualityPhoto,'/worksheet'],
+ ['LEAN SIX SIGMA PROFESSIONALS','Execute DMAIC projects, connecting tools, documents, datasets, and reports.',operationsPhoto,'/documents/charter'],
+ ['PROJECT MANAGERS','Manage scope, risk, stakeholders, approvals, schedules, and closeout.',heroMain,'/projects'],
+ ['OPERATIONS LEADERS','See project health, open risks, decisions, actions, and business impact.',leaderPhoto,'/report']
+];
+const perspectives=[
+ ['QUALITY ENGINEER','“Instead of moving between spreadsheets, reports, and statistical tools, the work stays connected to the project.”'],
+ ['PROJECT MANAGER','“The document structure makes approvals, risks, actions, and status reporting easier to manage in one place.”'],
+ ['CONTINUOUS IMPROVEMENT LEADER','“The value is not one calculator. It is the connection between data, analysis, evidence, and execution.”']
 ];
 
-const FEATURES = [
-  {
-    image: featureEngineers,
-    headline: 'Designed for quality engineers, not statisticians.',
-    copy: 'Powerful tools. Practical insights. Built for real-world quality challenges.',
-    dmaic: [
-      { phase: 'Define', color: 'var(--yellow)', line: 'Align the objective.', examples: ['Project Charter', 'SIPOC', 'CTQ Tree'] },
-      { phase: 'Measure', color: 'var(--green)', line: 'Measure what matters.', examples: ['Control Chart', 'Capability Analysis', 'Gage R&R'] },
-    ],
-  },
-  {
-    image: featureAnalyze,
-    headline: 'Analyze with confidence. Improve with intelligence.',
-    copy: 'An AI-guided platform built for Lean Six Sigma professionals.',
-    dmaic: [
-      { phase: 'Analyze', color: 'var(--orange)', line: 'Transform data into insight.', examples: ['Hypothesis Testing', 'Regression', 'Pareto Chart'] },
-    ],
-  },
-  {
-    image: featureExcellence,
-    headline: 'Excellence, without the overhead.',
-    copy: 'From data to decisions — without unnecessary complexity.',
-    dmaic: [
-      { phase: 'Improve', color: 'var(--purple)', line: 'Design better processes.', examples: ['DOE', 'FMEA', 'Value Stream Map'] },
-      { phase: 'Control', color: 'var(--cyan)', line: 'Sustain the results.', examples: ['Control Chart', 'Meeting Minutes'] },
-    ],
-  },
-];
+function useReveal(){const ref=useRef(null);const[shown,setShown]=useState(false);useEffect(()=>{const node=ref.current;if(!node)return; if(window.matchMedia('(prefers-reduced-motion: reduce)').matches){setShown(true);return;}const observer=new IntersectionObserver(([entry])=>{if(entry.isIntersecting){setShown(true);observer.unobserve(node)}},{threshold:.12});observer.observe(node);return()=>observer.disconnect()},[]);return[ref,shown]}
+function Reveal({children,className=''}){const[ref,shown]=useReveal();return <div ref={ref} className={`ax-reveal ${shown?'is-visible':''} ${className}`}>{children}</div>}
+function Counter({value,suffix='',active=true}){const[current,setCurrent]=useState(0);useEffect(()=>{if(!active)return;if(window.matchMedia('(prefers-reduced-motion: reduce)').matches){setCurrent(value);return}let frame,start;const step=t=>{start??=t;const p=Math.min((t-start)/3000,1);setCurrent(Math.round(value*(1-Math.pow(1-p,3))));if(p<1)frame=requestAnimationFrame(step)};frame=requestAnimationFrame(step);return()=>cancelAnimationFrame(frame)},[value,active]);return <>{current}{suffix}</>}
 
-const PULL_QUOTES = [
-  'Templates and a project workbench mean the same report structure doesn\u2019t get rebuilt from scratch every time.',
-  'Running a real hypothesis test shouldn\u2019t require decoding a statistics textbook first.',
-  'One DMAIC report, synced automatically — instead of stitching four tools\u2019 screenshots together by hand.',
-];
+function ProductMockup(){const[ref,active]=useReveal();return <div ref={ref} className={`ax-product ${active?'is-live':''}`} aria-label="Illustrative Axentra portfolio dashboard preview"><div className="ax-product-bar"><span className="ax-dots"><i/><i/><i/></span><strong>Portfolio overview</strong><span>Illustrative data</span></div><div className="ax-kpis">{kpis.map(([label,value,suffix=''])=><div key={label}><span>{label}</span><strong><Counter value={value} suffix={suffix} active={active}/></strong></div>)}</div><div className="ax-product-grid"><section className="ax-portfolio"><header><strong>Project Portfolio</strong><span>View all</span></header>{[['Project Atlas','Measure','82%'],['Orion Launch','Planning','68%'],['Northstar Quality','Analyze','74%']].map(([name,phase,score],index)=><div className="ax-project-row" style={{'--row-delay':`${index*100}ms`}} key={name}><i/><span><b>{name}</b><small>{phase}</small><u style={{'--status-width':score}}/></span><em>{score}</em></div>)}</section><section className="ax-quality"><header><strong>Quality Performance</strong><span>+8.2%</span></header><svg viewBox="0 0 240 82" role="img" aria-label="Quality trend improving"><path className="ax-line-grid" d="M3 68H237M3 42H237M3 16H237"/><path className="ax-trend-line" pathLength="1" d="M4 66 C35 63 43 54 67 57 S106 35 132 41 S171 28 190 31 S218 12 236 16"/><circle className="ax-trend-dot" cx="236" cy="16" r="4"/></svg><small>Rolling 8-week quality index</small></section><section className="ax-dmaic"><header><strong>DMAIC Progress</strong><span>6 projects</span></header><div className="ax-dmaic-visual"><svg viewBox="0 0 44 44" aria-label="DMAIC completion 68 percent"><circle cx="22" cy="22" r="17"/><circle className="ax-ring-progress" pathLength="1" cx="22" cy="22" r="17"/><text x="22" y="24">68%</text></svg><div>{[88,72,54,36,20].map((width,index)=><i key={width} style={{'--bar-width':`${width}%`,'--bar-delay':`${index*90}ms`}}/>)}</div></div></section><section className="ax-insight"><span>✦ AI INSIGHTS · COMING SOON</span><strong>Two projects need sponsor attention.</strong><small>Quality trend improved 8% across the active portfolio.</small></section></div></div>}
 
-function prefersReducedMotion() {
-  return typeof window !== 'undefined' && window.matchMedia &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-}
+function GuidedScene({step}){const view=step<2?'overview':step<3?'project':step<4?'chart':step<5?'notification':step<8?'insight':step<9?'regression':'evidence';return <div className={`ax-guided-scene view-${view}`}>
+ {view==='project'&&<div className="ax-guide-panel"><span>NORTHSTAR QUALITY IMPROVEMENT</span><h3>Project Dashboard</h3><div className="ax-guide-metrics">{[['Project Health','At risk'],['Open Risks','3'],['Datasets','5'],['Documents','6 / 9'],['Recent Analyses','8'],['Timeline','72%']].map(([label,value])=><div key={label}><small>{label}</small><b>{value}</b></div>)}</div><div className="ax-guide-timeline"><i/><i/><i/><i/><span>Define</span><span>Measure</span><span>Analyze</span><span>Improve</span></div></div>}
+ {view==='chart'&&<div className="ax-guide-panel ax-guide-chart"><span>QUALITY PERFORMANCE · PRODUCTION DATA</span><h3>Defect rate investigation</h3><svg viewBox="0 0 520 220"><path className="ax-chart-grid" d="M35 185H500M35 130H500M35 75H500M35 20H500"/><path className="ax-inspect-line" pathLength="1" d="M40 164 C85 157 105 135 145 142 S205 95 250 112 S319 67 360 82 S430 34 490 48"/>{[[40,164],[145,142],[250,112],[360,82],[490,48]].map(([cx,cy],index)=><g key={cx}><circle cx={cx} cy={cy} r="6"/><text className={`tip tip-${index}`} x={cx-30} y={cy-16}>Defects {index+3}.{index}%</text></g>)}</svg><div><span>Cycle Time</span><span>Machine M2</span><span>Night Shift</span></div></div>}
+ {view==='notification'&&<><div className="ax-guide-panel ax-guide-chart"><span>QUALITY PERFORMANCE · PRODUCTION DATA</span><h3>Defect rate investigation</h3><svg viewBox="0 0 520 220"><path className="ax-chart-grid" d="M35 185H500M35 130H500M35 75H500M35 20H500"/><path className="ax-inspect-line" pathLength="1" d="M40 164 C85 157 105 135 145 142 S205 95 250 112 S319 67 360 82 S430 34 490 48"/></svg></div><button className="ax-ai-notification"><i>✦</i><span><b>AI Insight Available</b><small>Pattern detected in Production Data</small></span></button></>}
+ {view==='insight'&&<div className={`ax-guide-panel ax-guide-insight message-step-${step}`}><span>AXENTRA AI — PRODUCT PREVIEW</span><h3>Analysis insight</h3><div className="ax-ai-typed"><p>I detected an unusual defect pattern.</p><p>The strongest relationship appears between Cycle Time and Machine.</p><p>Night Shift also shows elevated variation.</p><p>I recommend Multiple Regression.</p></div><button>Run Analysis</button></div>}
+ {view==='regression'&&<div className="ax-guide-panel ax-guide-regression"><div><span>ACTIVE DATASET · PRODUCTION DATA</span><h3>Multiple Regression</h3><label>Response variable<b>Defect Rate</b></label><label>Predictor variables<b>Cycle Time · Machine · Shift</b></label><section><small>R²</small><strong>78.4%</strong><small>Adjusted R²</small><strong>75.9%</strong></section><button>Add to Project</button></div><svg viewBox="0 0 220 130"><path d="M15 115H210M15 12V115"/><path className="ax-guide-reg-line" pathLength="1" d="M24 105 201 25"/>{[[34,101],[55,83],[75,94],[96,68],[119,73],[142,49],[166,57],[188,30]].map(([cx,cy])=><circle key={cx} cx={cx} cy={cy} r="3.5"/>)}</svg></div>}
+ {view==='evidence'&&<div className="ax-guide-panel ax-guide-evidence"><span>EVIDENCE LIBRARY</span><h3>Analysis added to project</h3><div><i>✓</i><section><b>Multiple Regression — Defect Drivers</b><p>Production Data · Added just now</p><small>Regression · Northstar Quality Improvement</small></section><strong>Linked</strong></div><footer><span><small>ANALYSES</small><b>9 <em>+1</em></b></span><span><small>PROJECT TIMELINE</small><b>Analysis completed · Just now</b></span></footer></div>}
+ <div className={`ax-sim-cursor step-${step}`} aria-hidden="true"><i/></div></div>}
 
-function useReveal(threshold = 0.15) {
-  const ref = useRef(null);
-  const [inView, setInView] = useState(prefersReducedMotion());
-  useEffect(() => {
-    if (prefersReducedMotion() || !ref.current) { setInView(true); return; }
-    const el = ref.current;
-    const obs = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) { setInView(true); obs.unobserve(el); }
-    }, { threshold });
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [threshold]);
-  return [ref, inView];
-}
+function HeroProductDemo(){const host=useRef(null);const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;const mobile=window.matchMedia('(max-width: 600px)').matches;const skipped=sessionStorage.getItem('axentra-hero-demo-skipped')==='1';const[step,setStep]=useState(reduced||skipped?10:0);const[playing,setPlaying]=useState(!reduced&&!skipped);const[inView,setInView]=useState(true);useEffect(()=>{const node=host.current;if(!node)return;const observer=new IntersectionObserver(([entry])=>setInView(entry.isIntersecting),{threshold:.18});observer.observe(node);return()=>observer.disconnect()},[]);useEffect(()=>{const visibility=()=>{if(document.hidden)setPlaying(false)};document.addEventListener('visibilitychange',visibility);return()=>document.removeEventListener('visibilitychange',visibility)},[]);useEffect(()=>{if(!playing||!inView||step>=10)return;const timer=setTimeout(()=>setStep(current=>mobile?([0,2,5,8,10].find(value=>value>current)??10):current+1),mobile?1500:1750);return()=>clearTimeout(timer)},[playing,inView,step,mobile]);useEffect(()=>{if(step>=10)setPlaying(false)},[step]);const replay=()=>{setStep(0);setPlaying(true)};const togglePlayback=()=>step>=10?replay():setPlaying(value=>!value);const skip=()=>{sessionStorage.setItem('axentra-hero-demo-skipped','1');setStep(10);setPlaying(false)};return <div ref={host} className={`ax-hero-demo demo-step-${step} ${step>=10?'is-settled':'is-cinematic'}`}><ProductMockup/><GuidedScene step={step}/><div className="ax-demo-controls"><span>Guided product preview · {Math.min(step+1,10)}/10</span><button onClick={togglePlayback}>{playing?'Pause':'Play'}</button><button onClick={replay}>Replay</button><button onClick={skip}>Skip Demo</button></div></div>}
 
-function Hero() {
-  const [ref, inView] = useReveal(0.2);
-  return (
-    <section className="photo-hero" ref={ref}>
-      <div className="photo-hero-bg" style={{ backgroundImage: `url(${heroMain})` }} />
-      <div className="photo-hero-scrim" />
-      <div className="photo-hero-inner">
-        <div className={`slide-fade-text slide-fade-slow ${inView ? 'is-active' : ''}`}>
-          <div className="hero-logo-badge">
-            <img src={logoMark} alt="" className="hero-logo-mark" />
-            <span className="brand-wordmark brand-wordmark-light">SixSigma<b>Pro</b></span>
-          </div>
-          <h1>Streamline your Six Sigma journey.</h1>
-          <p>
-            50+ verified tools, project templates, and a workbench that keeps every finding
-            organized — built for the people running the project, not just reviewing it.
-          </p>
-        </div>
-        <div className="hero-ticker">
-          <div className="hero-ticker-eyebrow">50+ Verified Tools &amp; Tests</div>
-          <div className="hero-ticker-mask">
-            <div className="hero-ticker-track">
-              {[...TICKER_ITEMS, ...TICKER_ITEMS].map((item, i) => (
-                <span key={i} className="hero-ticker-pill">{item}</span>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
+function AIDemo(){const[ref,visible]=useReveal();const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;const[playing,setPlaying]=useState(!reduced);const[step,setStep]=useState(reduced?9:0);useEffect(()=>{if(!visible||!playing||reduced)return;const timer=setInterval(()=>setStep(current=>current>=8?9:current+1),900);return()=>clearInterval(timer)},[visible,playing,reduced]);useEffect(()=>{if(step>=9)setPlaying(false)},[step]);const replay=()=>{setStep(0);setPlaying(true)};const attention=['4 active projects','2 projects behind schedule','1 overdue change request','3 high-priority risks','5 actions due this week'];const agenda=['Review Project Atlas delay','Approve CR-17','Assign supplier-risk owner','Confirm pilot launch date'];return <div ref={ref} className={`ax-ai-demo ${visible?'is-running':''}`}><div className="ax-ai-controls"><span>AXENTRA AI — PREVIEW</span><div><button onClick={()=>setPlaying(value=>!value)} aria-label={playing?'Pause AI preview':'Play AI preview'}>{playing?'Pause':'Play'}</button><button onClick={replay}>Replay</button></div></div><div className="ax-prompt"><i>F</i><span><small>YOU</small><b className={step>0?'typed':''}>What needs my attention today?</b></span></div><div className="ax-response"><span>✦ PLANNED AI EXPERIENCE</span><ul className="ax-attention">{attention.map((item,index)=><li className={step>=index+2?'shown':''} key={item}>{item}</li>)}</ul><h4 className={step>=7?'shown':''}>TODAY’S AGENDA</h4><ul className="ax-agenda">{agenda.map((item,index)=><li className={step>=7+Math.min(index,2)?'shown':''} key={item}>{item}</li>)}</ul><div className={`ax-ai-actions ${step>=9?'shown':''}`}>{['Generate Executive Report','Draft Sponsor Email','Open Change Request','Build Action Plan'].map(action=><button key={action}>{action}</button>)}</div></div></div>}
 
-function FeatureBlock({ data }) {
-  const [ref, inView] = useReveal(0.25);
-  return (
-    <section className="feature-block" ref={ref}>
-      <div className="feature-block-bg" style={{ backgroundImage: `url(${data.image})` }} />
-      <div className="feature-block-scrim" />
-      <div className={`slide-fade-text slide-fade-slow feature-block-text ${inView ? 'is-active' : ''}`}>
-        <h2>{data.headline}</h2>
-        <p>{data.copy}</p>
-        <div className="dmaic-tags">
-          {data.dmaic.map((d, i) => (
-            <div key={d.phase} className="dmaic-tag" style={{ '--tag-color': d.color, transitionDelay: `${0.3 + i * 0.25}s` }}>
-              <div className="dmaic-tag-head">
-                <span className="dmaic-tag-dot" />
-                <span className="dmaic-tag-phase">{d.phase}</span>
-                <span className="dmaic-tag-line">{d.line}</span>
-              </div>
-              <div className="dmaic-tag-examples">
-                {d.examples.map((ex, j) => (
-                  <span key={ex} className="dmaic-example-chip" style={{ transitionDelay: `${0.6 + i * 0.25 + j * 0.15}s` }}>{ex}</span>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
+function Workflow(){const nodes=['Projects','Datasets','Statistical Analyses','Evidence Library','Lean Six Sigma & PMP Documents','Reports','AI Briefing'];return <Reveal className="ax-section"><div className="ax-heading"><span>CONNECTED BY DESIGN</span><h2>From project signal to executive decision.</h2><p>Every asset stays connected to its project, ready to be reused in documents, evidence, and reporting.</p></div><div className="ax-flow">{nodes.map((node,i)=><React.Fragment key={node}><div>{node}</div>{i<nodes.length-1&&<span>→</span>}</React.Fragment>)}</div><div className="ax-integrations"><span>PLANNED INTEGRATIONS</span>{['Excel','Outlook','Teams','Slack','SharePoint','DocuSign'].map(x=><i key={x}>{x}</i>)}</div></Reveal>}
 
-function Testimonials() {
-  const [ref, inView] = useReveal(0.06);
-  return (
-    <section ref={ref} className={`testimonials-section ${inView ? 'in-view' : ''}`}>
-      <div className="testimonials-eyebrow">Why Teams Choose Us!</div>
-      <div className="testimonials-grid">
-        {PULL_QUOTES.map((q, i) => (
-          <div key={i} className="pull-quote-card"><p>&ldquo;{q}&rdquo;</p></div>
-        ))}
-      </div>
-    </section>
-  );
-}
+function Audience(){return <section className="ax-audience-photo" style={{'--section-photo':`url(${operationsPhoto})`}}><Reveal className="ax-audience-inner"><div className="ax-heading ax-heading-light"><span>BUILT FOR THE PEOPLE WHO DRIVE CHANGE</span><h2>Different disciplines. One shared source of truth.</h2><p>Axentra gives every role a focused way into the same connected project system.</p></div><div className="ax-audience-grid">{audiences.map(([title,copy,image,path],index)=><Link className={`ax-audience-card ${index%2?'from-right':'from-left'}`} style={{'--card-photo':`url(${image})`,'--delay':`${index*90}ms`}} to={path} key={title}><div><span>0{index+1}</span><h3>{title}</h3><p>{copy}</p><b>Explore workspace →</b></div></Link>)}</div></Reveal></section>}
 
-// Gaussian bell curve: dot climbs the left slope to the apex, then
-// pulses continuously once there. Only starts once the chart itself
-// (not just the section) is well into view.
-function GaussianChart({ active }) {
-  const width = 600, height = 260, padding = 40;
-  const baseline = 215, peakY = 50, mu = width / 2, sigmaPx = 62;
-  const amplitude = baseline - peakY;
-  const N = 60;
-  const pts = [];
-  for (let i = 0; i <= N; i++) {
-    const x = padding + (i / N) * (width - padding * 2);
-    const y = baseline - amplitude * Math.exp(-((x - mu) ** 2) / (2 * sigmaPx ** 2));
-    pts.push([x, y]);
-  }
-  const fullPath = pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
-  const ascendingPts = pts.filter(([x]) => x <= mu);
-  const climbPath = ascendingPts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+function Reviews(){return <section className="ax-reviews-photo" style={{'--section-photo':`url(${heroMain})`}}><Reveal className="ax-reviews-inner"><div className="ax-heading ax-heading-light"><span>ILLUSTRATIVE USER PERSPECTIVES</span><h2>Built for real project work.</h2></div><div className="ax-review-grid">{perspectives.map(([role,quote],index)=><article style={{'--delay':`${index*110}ms`}} key={role}><i>“</i><p>{quote}</p><span>{role}</span><small>Sample perspective—not a verified customer review</small></article>)}</div></Reveal></section>}
 
-  const sigmaLabels = [-3, -2, -1, 0, 1, 2, 3].map(k => ({
-    k, x: mu + k * sigmaPx, label: k === 0 ? '\u03bc' : `${k > 0 ? '+' : ''}${k}\u03c3`,
-  }));
-
-  return (
-    <div className="sigma-reveal">
-      <div className="sigma-reveal-logo">
-        <img src={logoMark} alt="" className="sigma-logo-mark" />
-        <span className="brand-wordmark">SixSigma<b>Pro</b></span>
-      </div>
-      <svg viewBox={`0 0 ${width} ${height}`} className="sigma-reveal-svg" role="img" aria-label="Gaussian distribution curve with sigma markings">
-        <defs>
-          <linearGradient id="sigmaLineGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="var(--accent)" />
-            <stop offset="100%" stopColor="var(--accent-light)" />
-          </linearGradient>
-        </defs>
-        <line x1={padding} y1={baseline} x2={width - padding} y2={baseline} className="sigma-center-line" />
-
-        {active && sigmaLabels.map((s, i) => (
-          <g key={s.k} className="sigma-pop" style={{ animationDelay: `${4.8 + i * 0.22}s` }}>
-            <line x1={s.x} y1={baseline} x2={s.x} y2={baseline + 8} className="sigma-tick" />
-            <text x={s.x} y={baseline + 22} className="sigma-band-label" textAnchor="middle">{s.label}</text>
-          </g>
-        ))}
-
-        <path d={fullPath} className="sigma-reveal-line-glow" style={active ? { animationPlayState: 'running' } : {}} />
-        <path d={fullPath} className="sigma-reveal-line" style={active ? { animationPlayState: 'running' } : {}} />
-
-        {active && (
-          <>
-            <circle r="6" className="sigma-chase-dot">
-              <animateMotion dur="3.6s" begin="0.1s" fill="freeze" path={climbPath} />
-            </circle>
-            <g className="sigma-apex-pulse" style={{ transform: `translate(${mu}px, ${peakY}px)`, animationDelay: '3.7s' }}>
-              <circle r="10" className="sigma-apex-ring" />
-            </g>
-          </>
-        )}
-      </svg>
-    </div>
-  );
-}
-
-function ClosingChapter() {
-  const [ref, inView] = useReveal(0.06);
-  const [chartRef, chartActive] = useReveal(0.6);
-  return (
-    <section ref={ref} className={`closing-chapter ${inView ? 'in-view' : ''}`}>
-      <div className="closing-chapter-inner">
-        <div className="closing-chapter-text">
-          <h2>The same rigor. A fraction of the cost.</h2>
-          <p>
-            SixSigma Pro runs entirely in your browser — no installs, no IT approval, no
-            per-seat license.
-          </p>
-          <div className="closing-value-list">
-            <div><strong>100% Private</strong><span>Every calculation runs locally. Data never leaves your machine.</span></div>
-            <div><strong>No Installation</strong><span>Works on any device with a browser. No IT ticket required.</span></div>
-            <div><strong>90%+ Less</strong><span>Than legacy Six Sigma software — starting at $9.99/month.</span></div>
-          </div>
-          <p className="closing-footnote">Based on Minitab's published list price of $154+/month.</p>
-          <div className="closing-chapter-actions">
-            <Link to="/pricing" className="btn-primary">Start Free Trial</Link>
-            <Link to="/worksheet" className="btn-secondary">Load Your Data</Link>
-          </div>
-        </div>
-        <div className="sigma-reveal-wrap" ref={chartRef}>
-          <GaussianChart active={chartActive} />
-        </div>
-      </div>
-    </section>
-  );
-}
-
-export default function Dashboard() {
-  const { hasData, fileName, rowCount, columns } = useWorksheet();
-  return (
-    <div data-theme="light" className="dashboard-light-scope">
-      <Hero />
-
-      <div className="sticky-ws-banner">
-        {hasData ? (
-          <div className="dash-ws-banner">
-            <span className="dash-ws-icon">📊</span>
-            <div>
-              <strong>{fileName}</strong> is loaded — <span>{rowCount} rows, {columns.length} columns</span>
-            </div>
-            <Link to="/worksheet" className="btn-ghost">View &amp; Edit →</Link>
-          </div>
-        ) : (
-          <div className="dash-ws-banner dash-ws-empty">
-            <span className="dash-ws-icon">💡</span>
-            <div><strong>Start by loading your data</strong> — enter it once in the Worksheet and every tool uses it automatically.</div>
-            <Link to="/worksheet" className="btn-primary" style={{ fontSize: '0.85rem', padding: '0.45rem 1rem' }}>Open Worksheet</Link>
-          </div>
-        )}
-      </div>
-
-      {FEATURES.map((f, i) => <FeatureBlock key={i} data={f} />)}
-
-      <Testimonials />
-      <ClosingChapter />
-    </div>
-  );
-}
+export default function Dashboard(){return <div className="ax-home">
+ <section className="ax-hero" style={{'--hero-photo':`url(${heroMain})`}}><div className="ax-orb ax-orb-one"/><div className="ax-orb ax-orb-two"/><div className="ax-hero-copy"><img src={logoDark} alt="AXENTRA"/><span className="ax-kicker">EVOLVE. INNOVATE. ELEVATE.</span><h1>Move every project<br/>forward with clarity.</h1><h2>New tools. Smarter insights. Stronger results.</h2><p>The integrated platform for Lean Six Sigma and project excellence—built to help teams evolve, innovate, and carry their business forward.</p><div className="ax-actions"><Link className="btn-primary" to="/pricing">Start Free Trial <span>→</span></Link><Link className="btn-secondary" to="/projects">Explore Platform</Link></div></div><div className="ax-hero-product"><HeroProductDemo/></div></section>
+ <Reveal className="ax-pillars">{pillars.map(([icon,title,copy])=><article key={title}><i>{icon}</i><div><h3>{title}</h3><p>{copy}</p></div></article>)}</Reveal>
+ <Audience/>
+ <Workflow/>
+ <section className="ax-ai" style={{'--section-photo':`url(${leaderPhoto})`}}><Reveal className="ax-ai-inner"><div><span className="ax-future">PLANNED AI EXPERIENCE</span><h2>Your portfolio, ready to brief you.</h2><p>Future Axentra AI will help teams review project signals, surface inconsistencies, and prepare action-focused briefings. This guided preview represents product direction—not a live AI feature.</p><Link to="/ai-assistant">Preview the AI roadmap →</Link></div><AIDemo/></Reveal></section>
+ <Reviews/>
+ <Reveal className="ax-consolidate"><div><span>ONE CONNECTED PLATFORM</span><h2>Replace disconnected work without replacing rigor.</h2><p>Bring statistical tools, spreadsheets, Word documents, project trackers, email approvals, and presentation reporting into a coherent execution system.</p></div><Link className="btn-primary" to="/pricing">Explore Pricing</Link></Reveal>
+ <section className="ax-final"><Reveal><img src={logoDark} alt="AXENTRA"/><h2>Give every improvement project a clear way forward.</h2><p>New tools. Smarter insights. Stronger results.</p><div><Link className="btn-primary" to="/pricing">Start Free Trial</Link><Link className="btn-secondary" to="/projects">Explore Platform</Link></div></Reveal></section>
+ <footer className="ax-footer"><img src={logoDark} alt="AXENTRA"/><p>EVOLVE. INNOVATE. ELEVATE.</p><nav><Link to="/privacy">Privacy</Link><Link to="/terms">Terms</Link><Link to="/about">About</Link></nav></footer>
+ </div>}

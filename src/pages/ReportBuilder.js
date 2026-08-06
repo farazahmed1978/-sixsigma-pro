@@ -97,7 +97,7 @@ export default function ReportBuilder() {
           <div className="print-header">
             <div className="print-logo-block">
               <div className="print-logo-placeholder">LOGO</div>
-              <div className="print-brand">SixSigmaPro</div>
+              <div className="print-brand">AXENTRA</div>
             </div>
             <div className="print-header-center">
               <div className="print-doc-type">Analysis Report</div>
@@ -166,7 +166,7 @@ export default function ReportBuilder() {
           ))}
 
           <div className="print-footer">
-            <span>SixSigmaPro — Generated Report</span>
+            <span>AXENTRA — Generated Report</span>
             <span>{new Date().toLocaleString()}</span>
           </div>
         </div>
