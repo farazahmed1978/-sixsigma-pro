@@ -25,6 +25,7 @@ import ReportBuilder from './pages/ReportBuilder';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import ResourceStatus from './pages/ResourceStatus';
+import Onboarding from './pages/Onboarding';
 
 // Tool wrapper
 import ToolPage from './pages/ToolPage';
@@ -110,6 +111,7 @@ export default function App() {
                   <Route path="/ai-assistant" element={<ResourceStatus title="Axentra AI Assistant" future />} />
                   <Route path="/about" element={<About />} />
                   <Route path="/pricing" element={<Pricing />} />
+                  <Route path="/start" element={<Onboarding />} />
                   <Route path="/privacy" element={<PrivacyPolicy />} />
                   <Route path="/terms" element={<TermsOfService />} />
                   <Route path="/hypothesis" element={<HypothesisTesting />} />

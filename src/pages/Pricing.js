@@ -47,7 +47,7 @@ export default function Pricing() {
           full DMAIC toolkit with hypothesis testing, DOE, templates, and more.
         </p>
         <div className="pricing-hero-cta">
-          <Link to="/worksheet" className="btn-primary" style={{ fontSize: '1rem', padding: '0.8rem 2rem' }}>
+          <Link to="/start" className="btn-primary" style={{ fontSize: '1rem', padding: '0.8rem 2rem' }}>
             Start 14-Day Free Trial
           </Link>
           <Link to="/" className="btn-secondary" style={{ fontSize: '1rem', padding: '0.8rem 2rem' }}>
@@ -128,7 +128,7 @@ export default function Pricing() {
               ))}
             </ul>
 
-            <Link to="/worksheet" className="btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '0.9rem', fontSize: '1rem' }}>
+            <Link to="/start" className="btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '0.9rem', fontSize: '1rem' }}>
               Start Free 14-Day Trial
             </Link>
             <p className="pricing-card-note">No credit card required</p>
@@ -188,7 +188,7 @@ export default function Pricing() {
       <section className="pricing-final-cta">
         <h2>Ready to upgrade your quality toolkit?</h2>
         <p>Connect project execution, operational excellence, data, documents, and reporting in Axentra.</p>
-        <Link to="/worksheet" className="btn-primary" style={{ fontSize: '1rem', padding: '0.85rem 2.5rem' }}>
+        <Link to="/start" className="btn-primary" style={{ fontSize: '1rem', padding: '0.85rem 2.5rem' }}>
           Start Your Free Trial Today
         </Link>
         <p style={{ marginTop: '1rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
