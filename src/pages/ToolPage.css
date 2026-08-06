@@ -21,6 +21,11 @@
 .tool-header-meta span:last-child { font-size: 0.83rem; color: var(--text-secondary); }
 
 .tool-header-actions { display: flex; align-items: center; gap: 0.5rem; }
+.tool-data-context { display: flex; flex-direction: column; min-width: 170px; padding: .48rem .7rem; border: 1px solid var(--border); border-radius: 9px; background: var(--bg-2); transition: all var(--transition); }
+.tool-data-context:hover { border-color: var(--accent); background: var(--accent-dim); }
+.tool-data-context span { color: var(--green); font-size: .52rem; font-weight: 700; letter-spacing: .08em; }
+.tool-data-context strong { max-width: 210px; overflow: hidden; color: var(--text-primary); font-size: .72rem; text-overflow: ellipsis; white-space: nowrap; }
+.tool-data-context small { color: var(--text-muted); font-size: .58rem; }
 
 .info-panel {
   margin: 1rem 2rem; padding: 1.25rem;
@@ -52,4 +57,6 @@
 @media (max-width: 768px) {
   .tool-header { padding: 1rem; }
   .info-panel { margin: 0.75rem 1rem; }
+  .tool-header-actions { width: 100%; flex-wrap: wrap; }
+  .tool-data-context { flex: 1; }
 }

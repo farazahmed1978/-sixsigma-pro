@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { BOOK_EXCERPTS } from '../utils/bookExcerpts';
+import { useAnalysis } from '../context/AnalysisContext';
 import './ToolPage.css';
 
 const toolMeta = {
@@ -196,6 +197,7 @@ const toolMeta = {
 
 export default function ToolPage({ tool, children }) {
   const [showInfo, setShowInfo] = useState(false);
+  const analysis = useAnalysis();
   const meta = toolMeta[tool] || {};
   const bookExcerpt = BOOK_EXCERPTS[tool];
 
@@ -231,6 +233,7 @@ export default function ToolPage({ tool, children }) {
           </div>
         </div>
         <div className="tool-header-actions">
+          {analysis.datasetId && <Link to="/worksheet" className="tool-data-context" title="Open connected worksheet"><span>CONNECTED DATA</span><strong>{analysis.datasetName}</strong><small>{analysis.project?.name || 'Unassigned project'} · {analysis.rowCount} rows</small></Link>}
           <button
             className={`btn ${showInfo ? 'btn-primary' : 'btn-ghost'}`}
             onClick={() => setShowInfo(!showInfo)}

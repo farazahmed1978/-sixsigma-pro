@@ -4,6 +4,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { WorksheetProvider } from './context/WorksheetContext';
 import { ReportProvider } from './context/ReportContext';
 import { ProjectsProvider } from './context/ProjectsContext';
+import { AnalysisProvider } from './context/AnalysisContext';
 import Layout from './components/Layout';
 
 
@@ -95,9 +96,10 @@ export default function App() {
       <WorksheetProvider>
         <ReportProvider>
           <ProjectsProvider>
-            <Router>
-              <Layout>
-                <Routes>
+            <AnalysisProvider>
+              <Router>
+                <Layout>
+                  <Routes>
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/worksheet" element={<Worksheet />} />
                   <Route path="/resources" element={<Resources />} />
@@ -115,9 +117,10 @@ export default function App() {
                   {Object.keys(toolMeta).map(id => (
                     <Route key={id} path={`/tool/${id}`} element={<ToolRoute toolId={id} />} />
                   ))}
-                </Routes>
-              </Layout>
-            </Router>
+                  </Routes>
+                </Layout>
+              </Router>
+            </AnalysisProvider>
           </ProjectsProvider>
         </ReportProvider>
       </WorksheetProvider>

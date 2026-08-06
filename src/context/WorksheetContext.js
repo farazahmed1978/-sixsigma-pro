@@ -21,6 +21,9 @@ function normalizeDataset(dataset) {
     id: dataset.id || makeId(),
     projectId: dataset.projectId || '',
     name: dataset.name || 'Worksheet',
+    description: dataset.description || '',
+    source: dataset.source || 'worksheet',
+    analysisIds: Array.isArray(dataset.analysisIds) ? dataset.analysisIds : [],
     columns,
     createdAt: dataset.createdAt || now(),
     updatedAt: dataset.updatedAt || now(),
@@ -65,15 +68,15 @@ export function WorksheetProvider({ children }) {
     }));
   }, [activeDatasetId]);
 
-  const createDataset = useCallback(({ name = 'New Worksheet', projectId = '', columns: initialColumns = [] } = {}) => {
-    const dataset = normalizeDataset({ id: makeId(), name, projectId, columns: initialColumns, history: [historyItem('Dataset created')] });
+  const createDataset = useCallback(({ name = 'New Worksheet', description = '', projectId = '', columns: initialColumns = [] } = {}) => {
+    const dataset = normalizeDataset({ id: makeId(), name, description, projectId, columns: initialColumns, history: [historyItem('Dataset created')] });
     setDatasets(previous => [...previous, dataset]);
     setActiveDatasetId(dataset.id);
     return dataset.id;
   }, []);
 
   const loadData = useCallback((parsedColumns, name, options = {}) => {
-    const dataset = normalizeDataset({ id: makeId(), name: name || 'Worksheet', projectId: options.projectId || '', columns: parsedColumns, history: [historyItem('Data imported')] });
+    const dataset = normalizeDataset({ id: makeId(), name: name || 'Worksheet', description: options.description || '', projectId: options.projectId || '', source: options.source || 'import', columns: parsedColumns, history: [historyItem('Data imported')] });
     setDatasets(previous => [...previous, dataset]);
     setActiveDatasetId(dataset.id);
     return dataset.id;
@@ -97,6 +100,7 @@ export function WorksheetProvider({ children }) {
   const startBlankSheet = useCallback((numCols = 5, numRows = 15, options = {}) => createDataset({ name: options.name || 'New Worksheet', projectId: options.projectId || '', columns: Array.from({ length: numCols }, (_, index) => ({ name: `Column${index + 1}`, data: new Array(numRows).fill(''), type: 'auto' })) }), [createDataset]);
 
   const renameDataset = useCallback((id, name) => setDatasets(previous => previous.map(dataset => dataset.id === id ? { ...dataset, name: name.trim() || dataset.name, updatedAt: now(), history: [historyItem('Dataset renamed'), ...dataset.history].slice(0, 50) } : dataset)), []);
+  const updateDatasetMetadata = useCallback((id, updates) => setDatasets(previous => previous.map(dataset => dataset.id === id ? { ...dataset, ...updates, id: dataset.id, columns: dataset.columns, updatedAt: now(), history: [historyItem('Dataset details updated'), ...dataset.history].slice(0, 50) } : dataset)), []);
   const duplicateDataset = useCallback(id => {
     const source = datasets.find(dataset => dataset.id === id); if (!source) return null;
     const copy = normalizeDataset({ ...source, id: makeId(), name: `${source.name} Copy`, columns: source.columns.map(column => ({ ...column, data: [...column.data] })), createdAt: now(), updatedAt: now(), history: [historyItem('Dataset duplicated')] });
@@ -119,7 +123,7 @@ export function WorksheetProvider({ children }) {
   return <WorksheetContext.Provider value={{
     columns, fileName, rowCount, hasData: columns.length > 0, datasets, activeDataset, activeDatasetId,
     loadData, clearData, addColumn, updateCell, renameColumn, deleteColumn, addBlankColumn, addBlankRow, deleteRow, startBlankSheet,
-    createDataset, switchDataset: setActiveDatasetId, renameDataset, duplicateDataset, deleteDataset, assignDatasetProject, changeColumnType, sortColumn,
+    createDataset, switchDataset: setActiveDatasetId, renameDataset, updateDatasetMetadata, duplicateDataset, deleteDataset, assignDatasetProject, changeColumnType, sortColumn,
     getNumericColumns, getCategoricalColumns, getColumnData, getRawColumnData,
   }}>{children}</WorksheetContext.Provider>;
 }

@@ -1,4 +1,18 @@
 .worksheet-page { min-height: calc(100vh - 60px); background: var(--bg); }
+body.worksheet-maximized { overflow: hidden; }
+.worksheet-page.maximized { position: fixed; z-index: 80; inset: 60px 0 0; overflow: hidden; background: var(--bg); }
+.worksheet-page.maximized .ws-executive { display: grid; grid-template-columns: auto minmax(340px,520px) 1fr; align-items: end; gap: .75rem 1.25rem; padding: .65rem 1rem; }
+.worksheet-page.maximized .ws-title > span,.worksheet-page.maximized .ws-title > p { display: none; }
+.worksheet-page.maximized .ws-title h1 { margin: 0; font-size: 1.25rem; }
+.worksheet-page.maximized .ws-selectors,.worksheet-page.maximized .ws-metrics,.worksheet-page.maximized .ws-header-actions { margin: 0; }
+.worksheet-page.maximized .ws-metrics { display: flex; justify-content: flex-end; }
+.worksheet-page.maximized .ws-metrics > div { min-width: 72px; padding: .45rem .55rem; }
+.worksheet-page.maximized .ws-header-actions { grid-column: 1/-1; }
+.worksheet-page.maximized .ws-hub { display: block; min-height: 0; height: calc(100vh - 194px); }
+.worksheet-page.maximized .ws-explorer,.worksheet-page.maximized .ws-analysis { display: none; }
+.worksheet-page.maximized .ws-center { height: 100%; padding: .5rem; }
+.worksheet-page.maximized .ws-tabs { margin-bottom: .4rem; }
+.worksheet-page.maximized .ws-table-wrapper { max-height: calc(100vh - 245px); height: calc(100vh - 245px); }
 .ws-executive { padding: 1.2rem clamp(1.25rem,2.5vw,2.5rem) 1rem; background: var(--surface); border-bottom: 1px solid var(--border); }
 .ws-title > span,.ws-analysis > span,.ws-upload-card > span,.ws-modal-card header span { color: var(--accent-light); font-size: .62rem; font-weight: 700; letter-spacing: .1em; }
 .ws-title h1 { margin: .15rem 0; font-size: clamp(1.7rem,2.5vw,2.25rem); letter-spacing: -.04em; }
@@ -40,6 +54,9 @@
 .ws-dataset-actions button { padding: .3rem .45rem; border: 0; border-radius: 6px; background: var(--bg-2); color: var(--text-secondary); font: inherit; font-size: .62rem; cursor: pointer; }
 .ws-dataset-actions button:hover { color: var(--text-primary); }
 .ws-dataset-actions button.danger:hover { color: var(--red); }
+.ws-dataset-meta { margin-top: .75rem; padding: .65rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-2); }
+.ws-dataset-meta p { color: var(--text-secondary); font-size: .63rem; line-height: 1.45; margin-bottom: .45rem; }
+.ws-dataset-meta span { display: block; color: var(--text-muted); font-size: .55rem; }
 .ws-center { min-width: 0; padding: 1rem; }
 .ws-tabs { display: flex; gap: .2rem; margin-bottom: .75rem; overflow-x: auto; border-bottom: 1px solid var(--border); }
 .ws-tabs button { padding: .55rem .75rem; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--text-muted); font: inherit; font-size: .7rem; font-weight: 600; white-space: nowrap; cursor: pointer; }
@@ -87,6 +104,8 @@
 .ws-outlier-count { display: block; margin-top: .8rem; font-size: 1.8rem; }.ws-view-card > p,.ws-view-card > small { color: var(--text-muted); font-size: .66rem; }
 .ws-history > div { display: flex; gap: .65rem; padding: .55rem 0; border-bottom: 1px solid var(--border); }.ws-history i { width: 8px; height: 8px; margin-top: .35rem; border-radius: 50%; background: var(--accent); }.ws-history span { display: flex; flex-direction: column; font-size: .7rem; }.ws-history small { color: var(--text-muted); }
 .ws-modal { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: 1rem; }.ws-modal-backdrop { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: rgba(2,7,18,.8); backdrop-filter: blur(6px); }.ws-modal-card { position: relative; z-index: 1; width: min(650px,94vw); padding: 1.25rem; background: var(--surface); border: 1px solid var(--border); border-radius: 15px; box-shadow: var(--shadow); }.ws-modal-card header { display: flex; justify-content: space-between; margin-bottom: .8rem; }.ws-modal-card header h2 { font-size: 1.15rem; }.ws-modal-card header button { border: 0; background: transparent; color: var(--text-secondary); font-size: 1.3rem; cursor: pointer; }.ws-modal-card > p { color: var(--text-secondary); font-size: .75rem; margin-bottom: .6rem; }.ws-modal-card textarea { margin-bottom: .65rem; font-family: var(--font-mono); font-size: .75rem; }.ws-modal-card > input { margin-bottom: .65rem; }
+.ws-modal-card > label { margin-bottom: .7rem; color: var(--text-secondary); font-size: .66rem; }.ws-modal-card > label input,.ws-modal-card > label textarea { margin-top: .3rem; }
 @media (max-width:1200px) { .ws-hub,.ws-hub.explorer-closed { grid-template-columns: 190px minmax(480px,1fr); }.ws-analysis { position: static; grid-column: 1/-1; min-height: 0; border: 1px solid var(--border); display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }.ws-analysis > span { grid-column: 1/-1; } }
 @media (max-width:850px) { .ws-metrics { grid-template-columns: repeat(3,1fr); }.ws-hub,.ws-hub.explorer-closed { display: block; }.ws-explorer { position: relative; top: 0; min-height: 0; border-right: 0; border-bottom: 1px solid var(--border); }.ws-explorer nav { flex-direction: row; overflow-x: auto; }.ws-explorer nav button { min-width: 170px; }.ws-collapse { display: none; }.ws-analysis { display: block; margin: 0 1rem 1rem; }.ws-summary-list { display: grid; grid-template-columns: 1fr 1fr; gap: 0 .75rem; }.ws-table-wrapper { max-height: 65vh; }.ws-selectors { grid-template-columns: 1fr 1fr; } }
 @media (max-width:600px) { .ws-executive { padding: 1rem; }.ws-selectors,.ws-metrics { grid-template-columns: 1fr 1fr; }.ws-header-actions { justify-content: flex-start; }.ws-upload-card > div:nth-of-type(2) { flex-direction: column; }.ws-upload-card > div:nth-of-type(2) button { justify-content: center; }.ws-center { padding: .75rem; }.ws-profile-stats { grid-template-columns: 1fr 1fr; }.ws-analysis { margin: 0 .75rem .75rem; }.ws-modal-card { padding: 1rem; } }
+@media (max-width:850px) { .worksheet-page.maximized { inset: 56px 0 0; }.worksheet-page.maximized .ws-executive { display: block; padding: .55rem .75rem; }.worksheet-page.maximized .ws-title { display: none; }.worksheet-page.maximized .ws-selectors { display: grid; }.worksheet-page.maximized .ws-metrics { display: none; }.worksheet-page.maximized .ws-header-actions { margin-top: .45rem; }.worksheet-page.maximized .ws-hub { height: calc(100vh - 194px); }.worksheet-page.maximized .ws-center { padding: .35rem; }.worksheet-page.maximized .ws-table-wrapper { height: calc(100vh - 235px); max-height: calc(100vh - 235px); } }
