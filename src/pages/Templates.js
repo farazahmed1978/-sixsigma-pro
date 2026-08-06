@@ -6,6 +6,9 @@ import logoMark from '../logo-mark.png';
 import { DEFINE_TEMPLATES } from '../config/defineTemplates';
 import { MEASURE_TEMPLATES } from '../config/measureTemplates';
 import { CONTROL_TEMPLATES } from '../config/controlTemplates';
+import { ANALYZE_TEMPLATES } from '../config/analyzeTemplates';
+import { IMPROVE_TEMPLATES } from '../config/improveTemplates';
+import { PMP_TEMPLATES } from '../config/pmpTemplates';
 import './Templates.css';
 
 const LEGACY_TEMPLATES = [
@@ -268,7 +271,7 @@ const LEGACY_TEMPLATES = [
   },
 ];
 
-export const TEMPLATES = [...DEFINE_TEMPLATES, ...MEASURE_TEMPLATES, ...CONTROL_TEMPLATES, ...LEGACY_TEMPLATES.filter(template => !['Define','Measure','Control'].includes(template.phase))];
+export const TEMPLATES = [...DEFINE_TEMPLATES, ...MEASURE_TEMPLATES, ...ANALYZE_TEMPLATES, ...IMPROVE_TEMPLATES, ...CONTROL_TEMPLATES, ...PMP_TEMPLATES, ...LEGACY_TEMPLATES.filter(template => !['Define','Measure','Analyze','Improve','Control'].includes(template.phase))];
 
 const phaseColor = {
   Define: '#1a56a0', Measure: '#00875a', Analyze: '#c05500',
@@ -527,9 +530,16 @@ export default function Templates() {
   const { projects, getProject, updateProject } = useProjects();
   const [selected, setSelected] = useState(null);
   const [filter, setFilter] = useState('All');
+  const [search, setSearch] = useState('');
+  const [lifecycleFilter, setLifecycleFilter] = useState('All');
+  const [typeFilter, setTypeFilter] = useState('All');
   const [activeProjectId, setActiveProjectId] = useState(() => projectId || projects[0]?.id || '');
   const phases = ['All', 'Define', 'Measure', 'Analyze', 'Improve', 'Control'];
-  const filtered = TEMPLATES.filter(t => filter === 'All' || t.phase === filter);
+  const activeProject = projects.find(project => project.id === activeProjectId);
+  const documentTypes = ['All', ...new Set(TEMPLATES.map(template => template.documentType || 'Workspace'))];
+  const lifecycles = ['All', ...new Set(TEMPLATES.map(template => template.pmpLifecycle).filter(Boolean))];
+  const filtered = TEMPLATES.filter(template => (filter === 'All' || template.phase === filter) && (lifecycleFilter === 'All' || template.pmpLifecycle === lifecycleFilter) && (typeFilter === 'All' || (template.documentType || 'Workspace') === typeFilter) && `${template.name} ${template.desc}`.toLowerCase().includes(search.toLowerCase()));
+  const workspaceStatus = template => { const record = template.id === 'charter' ? activeProject?.charter : activeProject?.documents?.[`document-${template.id}`]; if (!record) return 'Not Started'; return record.status === 'complete' ? 'Available' : 'In Progress'; };
 
   if (templateId && !projectId) {
     const template = TEMPLATES.find(item => item.id === templateId);
@@ -555,11 +565,12 @@ export default function Templates() {
       <div className="templates-header no-print">
         <h1>Document Library</h1>
         <label className="templates-project-select">Active project<select value={activeProjectId} onChange={event => setActiveProjectId(event.target.value)}><option value="">Select a project</option>{projects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
-        <p>Professional DMAIC templates — fill in the form, preview, then print or save as PDF.</p>
+        <p>Search project-connected Lean Six Sigma and Project Management workspaces.</p>
       </div>
 
       {!selected ? (
         <>
+          <div className="library-controls no-print"><label>Search documents<input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search by document name" /></label><label>PMP lifecycle<select value={lifecycleFilter} onChange={event => setLifecycleFilter(event.target.value)}>{lifecycles.map(value => <option key={value}>{value}</option>)}</select></label><label>Document type<select value={typeFilter} onChange={event => setTypeFilter(event.target.value)}>{documentTypes.map(value => <option key={value}>{value}</option>)}</select></label></div>
           <div className="tab-bar no-print" style={{ marginBottom: '1.5rem' }}>
             {phases.map(p => (
               <button key={p} className={`tab-btn ${filter === p ? 'active' : ''}`} onClick={() => setFilter(p)}>{p}</button>
@@ -572,6 +583,7 @@ export default function Templates() {
                 <div className="template-phase-badge" style={{ color: phaseColor[t.phase] }}>{t.phase}</div>
                 <h3>{t.name}</h3>
                 <p>{t.desc}</p>
+                <span className={`library-status status-${workspaceStatus(t).toLowerCase().replace(' ','-')}`}>{workspaceStatus(t)}</span>
                 <div className="template-open-btn">Open Template →</div>
               </button>
             ))}

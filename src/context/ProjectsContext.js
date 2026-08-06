@@ -16,7 +16,7 @@ function loadProjects() {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     // Guard against older/malformed records missing a phase key.
-    return parsed.map(p => ({ ...p, phases: { ...emptyPhases(), ...p.phases }, documents: p.documents || {}, evidenceLibrary: Array.isArray(p.evidenceLibrary) ? p.evidenceLibrary : [] }));
+    return parsed.map(p => ({ status: 'Active', currentPhase: 'Define', targetDate: '', ...p, phases: { ...emptyPhases(), ...p.phases }, documents: p.documents || {}, evidenceLibrary: Array.isArray(p.evidenceLibrary) ? p.evidenceLibrary : [], team: Array.isArray(p.team) ? p.team : [], timeline: Array.isArray(p.timeline) ? p.timeline : [] }));
   } catch {
     return [];
   }
@@ -45,6 +45,11 @@ export function ProjectsProvider({ children }) {
       phases: emptyPhases(),
       documents: {},
       evidenceLibrary: [],
+      status: 'Active',
+      currentPhase: 'Define',
+      targetDate: '',
+      team: [],
+      timeline: [],
     };
     setProjects(prev => [...prev, project]);
     return id;

@@ -97,7 +97,7 @@ export default function DocumentWorkspace({ template, project, updateProject }) 
   const persist = useCallback(next => { const saved={...next,updatedAt:new Date().toISOString()}; updateProject(project.id,{documents:{...documentsRef.current,[saved.id]:saved}}); },[project.id,updateProject]);
   useEffect(() => { setSaveState('saving'); const timer=window.setTimeout(() => {persist(record);setSaveState('saved');},700); return()=>window.clearTimeout(timer); },[persist,record]);
 
-  const updateValue=(id,value)=>setRecord(previous=>({...previous,values:{...previous.values,[id]:value}}));
+  const updateValue=(id,value)=>setRecord(previous=>{const values={...previous.values,[id]:value};const calculated=template.calculate?.(values);return{...previous,values:calculated?{...values,...calculated}:values};});
   const sectionComplete=section=>section.fields.filter(field=>field.required!==false).every(field=>Array.isArray(record.values[field.id]) ? record.values[field.id].length>0 : Boolean(textValue(record.values[field.id])));
   const saveNow=()=>{persist(record);setSaveState('saved');setNotice('Document saved');};
   const print=()=>window.print();

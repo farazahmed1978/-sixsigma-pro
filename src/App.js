@@ -23,7 +23,7 @@ import Templates from './pages/Templates';
 import ReportBuilder from './pages/ReportBuilder';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
-import ComingSoon from './pages/ComingSoon';
+import ResourceStatus from './pages/ResourceStatus';
 
 // Tool wrapper
 import ToolPage from './pages/ToolPage';
@@ -104,6 +104,7 @@ export default function App() {
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/worksheet" element={<Worksheet />} />
                   <Route path="/resources" element={<Resources />} />
+                  <Route path="/resources/:resourceId" element={<ResourceStatus />} />
                   <Route path="/about" element={<About />} />
                   <Route path="/pricing" element={<Pricing />} />
                   <Route path="/privacy" element={<PrivacyPolicy />} />
@@ -113,7 +114,6 @@ export default function App() {
                   <Route path="/templates" element={<Templates />} />
                   <Route path="/documents/:templateId" element={<Templates />} />
                   <Route path="/projects/:projectId/documents/:templateId" element={<Templates />} />
-                  <Route path="/project-management/:stage/:documentId" element={<ComingSoon />} />
                   <Route path="/report" element={<ReportBuilder />} />
                   <Route path="/projects" element={<ProjectsHome />} />
                   <Route path="/projects/:id" element={<ProjectDetail />} />

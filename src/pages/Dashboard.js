@@ -14,7 +14,7 @@ const TICKER_ITEMS = [
   'Pareto Analysis', 'Fishbone Diagrams', 'Multi-Vari Charts', 'Correlation Matrix',
   'Regression & Multiple Regression', 'Logistic Regression', 'One / Two-Way & RM ANOVA',
   'Effect Size Calculators', 'Design of Experiments', 'FMEA', 'Value Stream Mapping',
-  'Sigma Level & DPMO', 'Sample Size & Power Calculators', 'Project Templates', 'Project Workbench',
+  'Sigma Level & DPMO', 'Sample Size & Power Calculators', 'Document Library', 'Project Workbench',
 ];
 
 const FEATURES = [
