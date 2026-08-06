@@ -5,6 +5,7 @@ import { WorksheetProvider } from './context/WorksheetContext';
 import { ReportProvider } from './context/ReportContext';
 import { ProjectsProvider } from './context/ProjectsContext';
 import { AnalysisProvider } from './context/AnalysisContext';
+import { IntelligenceProvider } from './context/IntelligenceContext';
 import Layout from './components/Layout';
 
 
@@ -98,6 +99,7 @@ export default function App() {
         <ReportProvider>
           <ProjectsProvider>
             <AnalysisProvider>
+              <IntelligenceProvider>
               <Router>
                 <Layout>
                   <Routes>
@@ -124,6 +126,7 @@ export default function App() {
                   </Routes>
                 </Layout>
               </Router>
+              </IntelligenceProvider>
             </AnalysisProvider>
           </ProjectsProvider>
         </ReportProvider>

@@ -27,6 +27,7 @@ function normalizeDataset(dataset) {
     columns,
     createdAt: dataset.createdAt || now(),
     updatedAt: dataset.updatedAt || now(),
+    archivedAt: dataset.archivedAt || '',
     history: Array.isArray(dataset.history) ? dataset.history.slice(0, 50) : [],
   };
 }
@@ -107,6 +108,7 @@ export function WorksheetProvider({ children }) {
     setDatasets(previous => [...previous, copy]); setActiveDatasetId(copy.id); return copy.id;
   }, [datasets]);
   const deleteDataset = useCallback(id => { setDatasets(previous => previous.filter(dataset => dataset.id !== id)); setActiveDatasetId(current => current === id ? '' : current); }, []);
+  const archiveDataset = useCallback(id => setDatasets(previous => previous.map(dataset => dataset.id === id ? { ...dataset, archivedAt: dataset.archivedAt ? '' : now(), updatedAt: now(), history: [historyItem(dataset.archivedAt ? 'Dataset restored' : 'Dataset archived'), ...dataset.history].slice(0, 50) } : dataset)), []);
   const assignDatasetProject = useCallback((id, projectId) => setDatasets(previous => previous.map(dataset => dataset.id === id ? { ...dataset, projectId, updatedAt: now(), history: [historyItem('Project assignment changed'), ...dataset.history].slice(0, 50) } : dataset)), []);
   const changeColumnType = useCallback((colIndex, type) => updateActive(dataset => ({ ...dataset, columns: dataset.columns.map((column, index) => index === colIndex ? { ...column, type } : column) }), `Column type changed to ${type}`), [updateActive]);
   const sortColumn = useCallback((colIndex, direction) => updateActive(dataset => {
@@ -123,7 +125,7 @@ export function WorksheetProvider({ children }) {
   return <WorksheetContext.Provider value={{
     columns, fileName, rowCount, hasData: columns.length > 0, datasets, activeDataset, activeDatasetId,
     loadData, clearData, addColumn, updateCell, renameColumn, deleteColumn, addBlankColumn, addBlankRow, deleteRow, startBlankSheet,
-    createDataset, switchDataset: setActiveDatasetId, renameDataset, updateDatasetMetadata, duplicateDataset, deleteDataset, assignDatasetProject, changeColumnType, sortColumn,
+    createDataset, switchDataset: setActiveDatasetId, renameDataset, updateDatasetMetadata, duplicateDataset, archiveDataset, deleteDataset, assignDatasetProject, changeColumnType, sortColumn,
     getNumericColumns, getCategoricalColumns, getColumnData, getRawColumnData,
   }}>{children}</WorksheetContext.Provider>;
 }
