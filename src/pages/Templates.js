@@ -5,6 +5,7 @@ import DocumentWorkspace from '../components/DocumentWorkspace';
 import logoMark from '../logo-mark.png';
 import { DEFINE_TEMPLATES } from '../config/defineTemplates';
 import { MEASURE_TEMPLATES } from '../config/measureTemplates';
+import { CONTROL_TEMPLATES } from '../config/controlTemplates';
 import './Templates.css';
 
 const LEGACY_TEMPLATES = [
@@ -267,7 +268,7 @@ const LEGACY_TEMPLATES = [
   },
 ];
 
-export const TEMPLATES = [...DEFINE_TEMPLATES, ...MEASURE_TEMPLATES, ...LEGACY_TEMPLATES.filter(template => !['Define','Measure'].includes(template.phase))];
+export const TEMPLATES = [...DEFINE_TEMPLATES, ...MEASURE_TEMPLATES, ...CONTROL_TEMPLATES, ...LEGACY_TEMPLATES.filter(template => !['Define','Measure','Control'].includes(template.phase))];
 
 const phaseColor = {
   Define: '#1a56a0', Measure: '#00875a', Analyze: '#c05500',

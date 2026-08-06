@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 
 const ProjectsContext = createContext();
 const STORAGE_KEY = 'sixsigmapro_projects';
+export const EVIDENCE_SCHEMA_VERSION = 1;
 
 export const PHASES = ['Define', 'Measure', 'Analyze', 'Improve', 'Control'];
 
@@ -15,7 +16,7 @@ function loadProjects() {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     // Guard against older/malformed records missing a phase key.
-    return parsed.map(p => ({ ...p, phases: { ...emptyPhases(), ...p.phases } }));
+    return parsed.map(p => ({ ...p, phases: { ...emptyPhases(), ...p.phases }, documents: p.documents || {}, evidenceLibrary: Array.isArray(p.evidenceLibrary) ? p.evidenceLibrary : [] }));
   } catch {
     return [];
   }
@@ -42,6 +43,8 @@ export function ProjectsProvider({ children }) {
       champion: data.champion || '',
       createdAt: new Date().toISOString(),
       phases: emptyPhases(),
+      documents: {},
+      evidenceLibrary: [],
     };
     setProjects(prev => [...prev, project]);
     return id;
@@ -90,6 +93,15 @@ export function ProjectsProvider({ children }) {
 
   const getProject = useCallback((id) => projects.find(p => p.id === id), [projects]);
 
+  const addEvidence = useCallback((projectId, evidence) => {
+    const id = evidence.id || `evidence-${Date.now()}`;
+    setProjects(prev => prev.map(project => project.id === projectId ? { ...project, evidenceLibrary: [...(project.evidenceLibrary || []), { schemaVersion: EVIDENCE_SCHEMA_VERSION, id, projectId, assetType: 'analysis', title: 'Untitled Evidence', sourceType: '', sourceId: '', datasetIds: [], analysisIds: [], reportIds: [], documentIds: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), ...evidence }] } : project));
+    return id;
+  }, []);
+
+  const updateEvidence = useCallback((projectId, evidenceId, updates) => setProjects(prev => prev.map(project => project.id === projectId ? { ...project, evidenceLibrary: (project.evidenceLibrary || []).map(item => item.id === evidenceId ? { ...item, ...updates, updatedAt: new Date().toISOString() } : item) } : project)), []);
+  const removeEvidence = useCallback((projectId, evidenceId) => setProjects(prev => prev.map(project => project.id === projectId ? { ...project, evidenceLibrary: (project.evidenceLibrary || []).filter(item => item.id !== evidenceId) } : project)), []);
+
   return (
     <ProjectsContext.Provider value={{
       projects,
@@ -100,6 +112,9 @@ export function ProjectsProvider({ children }) {
       removeItemFromProject,
       updatePhaseNotes,
       getProject,
+      addEvidence,
+      updateEvidence,
+      removeEvidence,
     }}>
       {children}
     </ProjectsContext.Provider>
