@@ -4,6 +4,7 @@ const ReportContext = createContext();
 const STORAGE_KEY = 'sixsigmapro_report_items';
 const MAX_IMAGE_WIDTH = 1000;   // px — chart snapshots are captured at scale:2, far larger than needed for storage
 const IMAGE_QUALITY = 0.72;     // JPEG quality — typically cuts base64 size 70-90% vs the original PNG
+const PHASE_ORDER = ['Define','Measure','Analyze','Improve','Control'];
 
 function loadItems() {
   try {
@@ -82,7 +83,12 @@ export function ReportProvider({ children }) {
   const addReportItem = useCallback(async (item) => {
     const id = `${item.toolId}-${Date.now()}`;
     const compressedImage = await compressImage(item.chartImage);
-    setItems(prev => [...prev, { id, includeRawData: false, ...item, chartImage: compressedImage }]);
+    setItems(prev => {
+      const next={ id, includeRawData: false, assetType:item.documentId?'document':item.assetType||'analysis', ...item, chartImage: compressedImage };
+      const withoutDuplicate=item.documentId?prev.filter(existing=>existing.documentId!==item.documentId):prev;
+      const updated=[...withoutDuplicate,next];
+      return updated.sort((a,b)=>{const left=PHASE_ORDER.indexOf(a.phase),right=PHASE_ORDER.indexOf(b.phase);return(left<0?99:left)-(right<0?99:right)});
+    });
     return id;
   }, []);
 

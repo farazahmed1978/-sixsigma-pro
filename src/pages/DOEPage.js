@@ -1,4 +1,7 @@
 import React, { useState } from 'react';
+import {Link} from 'react-router-dom';
+import {useWorksheet} from '../context/WorksheetContext';
+import {useAnalysis} from '../context/AnalysisContext';
 import { BOOK_EXCERPTS } from '../utils/bookExcerpts';
 import { doeFullFactorialAnalysis } from '../utils/statTests';
 import './DOEPage.css';
@@ -45,6 +48,8 @@ function generateFractional(factors) {
 const EMPTY_FACTOR = { name: '', low: '', high: '' };
 
 export default function DOEPage() {
+  const {activeDataset}=useWorksheet();
+  const analysisContext=useAnalysis();
   const [factors, setFactors] = useState([
     { name: 'Temperature', low: '150', high: '200' },
     { name: 'Pressure', low: '10', high: '20' },
@@ -112,6 +117,7 @@ export default function DOEPage() {
     if (k < 2) return 0;
     return (design === 'full' ? Math.pow(2, k) : Math.pow(2, k - 1)) * replicates;
   })();
+  const handoff=destination=>{sessionStorage.setItem('axentra_analysis_handoff',JSON.stringify({schemaVersion:1,sourceTool:'doe',destination,projectId:analysisContext?.projectId||activeDataset?.projectId||'',datasetId:activeDataset?.id||'',datasetName:activeDataset?.name||'',factorColumns:matrix?.factors?.map(f=>f.name)||factors.map(f=>f.name).filter(Boolean),responseColumn:response,createdAt:new Date().toISOString()}));};
 
   return (
     <div className="doe-page">
@@ -312,6 +318,7 @@ export default function DOEPage() {
                   </table>
                 </div>
               )}
+              {(matrix.fullAnalysis||matrix.effects)&&<div className="card doe-next-analysis" style={{marginTop:'1.25rem'}}><div><strong>Continue downstream analysis</strong><p>Carry the active project, dataset, factor metadata, and response context into a supported analysis workspace.</p></div><div><Link className="btn-secondary" to="/hypothesis" onClick={()=>handoff('anova')}>Open ANOVA / Hypothesis Testing</Link><Link className="btn-primary" to="/regression" onClick={()=>handoff('regression')}>Open Regression</Link></div></div>}
             </>
           )}
         </div>

@@ -1,176 +1,28 @@
-import React, { useState } from 'react';
-import { useReport } from '../context/ReportContext';
-import '../pages/Templates.css'; // reuse existing print-doc / print-section styling
+import React,{useMemo,useState} from 'react';
+import jsPDF from 'jspdf';
+import {useReport} from '../context/ReportContext';
+import {useProjects} from '../context/ProjectsContext';
+import {NAVIGATION} from '../config/navigation';
+import '../pages/Templates.css';
 
-export default function ReportBuilder() {
-  const { items, removeReportItem, toggleIncludeRawData, reorderItems, clearReport, storageWarning, dismissStorageWarning } = useReport();
-  const [reportTitle, setReportTitle] = useState('Project Analysis Report');
-  const [preparedBy, setPreparedBy] = useState('');
+const PHASES=['Define','Measure','Analyze','Improve','Control'];
+const lean=NAVIGATION.find(group=>group.section==='Lean Six Sigma')?.groups||[];
+const documentPhase=new Map(lean.flatMap(group=>(group.subgroups?.find(sub=>sub.label==='Documents')?.items||[]).map(item=>[item.id.replace(/^doc-/,''),group.name])));
+const analysisPhase={hypothesis:'Analyze',anova:'Analyze',regression:'Analyze',correlation:'Analyze',pareto:'Analyze',scatter:'Analyze',boxplot:'Analyze',doe:'Improve',fmea:'Analyze',capability:'Measure','control-chart':'Control','attribute-chart':'Control','run-chart':'Control',msa:'Measure',histogram:'Measure',descriptive:'Measure'};
+const phaseFor=item=>PHASES.includes(item.phase)?item.phase:documentPhase.get(item.documentSnapshot?.templateId)||analysisPhase[item.toolId]||(item.documentId?'Define':'Analyze');
+const sourceId=item=>item.documentId||item.analysisId||item.id;
 
-  const moveItem = (index, direction) => {
-    const target = index + direction;
-    if (target < 0 || target >= items.length) return;
-    reorderItems(index, target);
-  };
-
-  const handlePrint = () => window.print();
-
-  if (items.length === 0) {
-    return (
-      <div style={{ padding: '2rem', maxWidth: 700, margin: '0 auto', textAlign: 'center' }}>
-        {storageWarning && (
-          <div className="alert alert-danger no-print" style={{ textAlign: 'left', marginBottom: '1.25rem' }}>
-            ⚠️ {storageWarning}
-            <button className="btn-secondary" style={{ marginLeft: '0.75rem', fontSize: '0.78rem', padding: '0.2rem 0.5rem' }} onClick={dismissStorageWarning}>Dismiss</button>
-          </div>
-        )}
-        <h2 style={{ marginBottom: '0.5rem' }}>Report Builder</h2>
-        <p style={{ color: 'var(--text-secondary)' }}>
-          No results added yet. Run a tool (e.g. Control Chart, Capability Analysis) and click <strong>"Add to Report"</strong> to start building a combined document here.
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="templates-page">
-      {/* ── Editing view (hidden on print) ── */}
-      <div className="no-print">
-        {storageWarning && (
-          <div className="alert alert-danger" style={{ marginBottom: '1.25rem' }}>
-            ⚠️ {storageWarning}
-            <button className="btn-secondary" style={{ marginLeft: '0.75rem', fontSize: '0.78rem', padding: '0.2rem 0.5rem' }} onClick={dismissStorageWarning}>Dismiss</button>
-          </div>
-        )}
-        <div className="templates-header">
-          <h1>Report Builder</h1>
-          <p>Review, reorder, and choose what to include, then print or save as PDF.</p>
-        </div>
-
-        <div className="card" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
-          <div className="form-grid">
-            <div className="form-group">
-              <label>Report Title</label>
-              <input type="text" value={reportTitle} onChange={e => setReportTitle(e.target.value)} />
-            </div>
-            <div className="form-group">
-              <label>Prepared By</label>
-              <input type="text" value={preparedBy} onChange={e => setPreparedBy(e.target.value)} placeholder="Name" />
-            </div>
-          </div>
-        </div>
-
-        {items.map((item, i) => (
-          <div key={item.id} className="card" style={{ padding: '1.25rem', marginBottom: '1rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
-              <div>
-                <h3 style={{ fontSize: '1rem', marginBottom: '0.25rem' }}>{item.title}</h3>
-                <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', maxWidth: 560 }}>{item.interpretation}</p>
-              </div>
-              <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
-                <button className="btn-secondary" style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem' }} onClick={() => moveItem(i, -1)} disabled={i === 0}>↑</button>
-                <button className="btn-secondary" style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem' }} onClick={() => moveItem(i, 1)} disabled={i === items.length - 1}>↓</button>
-                <button className="btn-secondary" style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem' }} onClick={() => removeReportItem(item.id)}>🗑️ Remove</button>
-              </div>
-            </div>
-
-            {item.chartImage && (
-              <img src={item.chartImage} alt={item.title} style={{ maxWidth: '100%', marginTop: '0.75rem', borderRadius: 8, border: '1px solid var(--border)' }} />
-            )}
-
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.75rem', fontSize: '0.85rem' }}>
-              <input type="checkbox" checked={item.includeRawData} onChange={() => toggleIncludeRawData(item.id)} />
-              Include raw data table in report
-            </label>
-          </div>
-        ))}
-
-        <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
-          <button className="btn-primary" onClick={handlePrint}>🖨️ Print / Save as PDF</button>
-          <button className="btn-secondary" onClick={clearReport}>Clear All</button>
-        </div>
-      </div>
-
-      {/* ── Print document (hidden on screen, shown on print) ── */}
-      <div className="print-target">
-        <div className="print-doc print-only">
-          <div className="print-header">
-            <div className="print-logo-block">
-              <div className="print-logo-placeholder">LOGO</div>
-              <div className="print-brand">AXENTRA</div>
-            </div>
-            <div className="print-header-center">
-              <div className="print-doc-type">Analysis Report</div>
-              <div className="print-doc-title">{reportTitle}</div>
-            </div>
-            <div className="print-header-meta">
-              <div><span>Prepared By:</span> {preparedBy || '—'}</div>
-              <div><span>Date:</span> {new Date().toLocaleDateString()}</div>
-            </div>
-          </div>
-
-          {items.map((item, i) => (
-            <div key={item.id} className="print-section">
-              <div className="print-section-title" style={{ background: '#1a3a6b' }}>
-                {i + 1}. {item.title}
-              </div>
-
-              {item.chartImage && (
-                <div style={{ padding: '12px 20px' }}>
-                  <img src={item.chartImage} alt={item.title} style={{ maxWidth: '100%' }} />
-                </div>
-              )}
-
-              <div className="print-fields-grid cols-1">
-                <div className="print-field">
-                  <div className="print-field-label">Interpretation</div>
-                  <div className="print-field-value multiline">{item.interpretation}</div>
-                </div>
-              </div>
-
-              {item.statsSummary && (
-                <div className="print-fields-grid cols-3">
-                  {Object.entries(item.statsSummary).map(([k, v]) => (
-                    <div key={k} className="print-field">
-                      <div className="print-field-label">{k}</div>
-                      <div className="print-field-value">{v}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {item.includeRawData && item.rawData && (
-                <div style={{ padding: '12px 20px' }}>
-                  <div className="print-field-label" style={{ marginBottom: 6 }}>Raw Data</div>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9pt' }}>
-                    <thead>
-                      <tr>
-                        {Object.keys(item.rawData[0] || {}).map(k => (
-                          <th key={k} style={{ textAlign: 'left', borderBottom: '1px solid #d0d8e8', padding: '4px 8px' }}>{k}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {item.rawData.map((row, ri) => (
-                        <tr key={ri}>
-                          {Object.values(row).map((v, vi) => (
-                            <td key={vi} style={{ padding: '4px 8px', borderBottom: '1px solid #edf0f7' }}>{typeof v === 'number' ? v.toFixed(4) : v}</td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          ))}
-
-          <div className="print-footer">
-            <span>AXENTRA — Generated Report</span>
-            <span>{new Date().toLocaleString()}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+export default function ReportBuilder(){
+ const{items,removeReportItem,toggleIncludeRawData,reorderItems,clearReport,storageWarning,dismissStorageWarning}=useReport();
+ const{projects}=useProjects();
+ const[reportTitle,setReportTitle]=useState('DMAIC Project Report');
+ const[preparedBy,setPreparedBy]=useState('');
+ const project=projects.find(entry=>entry.id===items.find(item=>item.projectId)?.projectId);
+ const binder=project?.binderConfig||{order:[],hiddenIds:[]};
+ const visibleItems=useMemo(()=>items.filter(item=>!binder.hiddenIds.includes(sourceId(item))).map(item=>({...item,phase:phaseFor(item)})).sort((a,b)=>{const phaseDelta=PHASES.indexOf(a.phase)-PHASES.indexOf(b.phase);if(phaseDelta)return phaseDelta;const ai=binder.order.indexOf(sourceId(a)),bi=binder.order.indexOf(sourceId(b));return ai>=0||bi>=0?(ai<0?9999:ai)-(bi<0?9999:bi):items.indexOf(a)-items.indexOf(b)}),[items,binder.hiddenIds,binder.order]);
+ const move=(item,direction)=>{const index=items.findIndex(entry=>entry.id===item.id),target=index+direction;if(index>=0&&target>=0&&target<items.length)reorderItems(index,target)};
+ const print=()=>window.print();
+ const savePdf=()=>{const pdf=new jsPDF({unit:'mm',format:'a4'}),margin=16,width=178;let y=18,page=1;const pageBreak=needed=>{if(y+needed>280){pdf.setFontSize(8);pdf.setTextColor(100);pdf.text(`AXENTRA · ${project?.name||reportTitle} · Page ${page}`,margin,292);pdf.addPage();page+=1;y=18}};const text=(value,size=10,bold=false,color=[32,43,61])=>{pdf.setFont('helvetica',bold?'bold':'normal');pdf.setFontSize(size);pdf.setTextColor(...color);const lines=pdf.splitTextToSize(String(value||'Not yet established'),width);pageBreak(lines.length*size*.4+3);pdf.text(lines,margin,y);y+=lines.length*size*.4+3};pdf.setFillColor(20,50,88);pdf.rect(0,0,210,42,'F');pdf.setTextColor(255);pdf.setFontSize(10);pdf.setFont('helvetica','bold');pdf.text('AXENTRA',margin,14);pdf.setFontSize(20);pdf.text(reportTitle,margin,26);pdf.setFontSize(9);pdf.setFont('helvetica','normal');pdf.text(`${project?.name||'Project'} · Prepared by ${preparedBy||'Not specified'} · ${new Date().toLocaleDateString()}`,margin,35);y=52;text('PROJECT SUMMARY',11,true,[20,50,88]);text(project?.goal||'Project summary not yet established.',10);[['Status',project?.status],['DMAIC phase',project?.currentPhase],['Owner',project?.owner],['Sponsor',project?.champion],['Target date',project?.targetDate]].forEach(([label,value])=>text(`${label}: ${value||'Not yet established'}`,9));PHASES.forEach(phase=>{const phaseItems=visibleItems.filter(item=>item.phase===phase);if(!phaseItems.length)return;pageBreak(18);y+=4;text(phase.toUpperCase(),16,true,[20,50,88]);phaseItems.forEach((item,index)=>{pageBreak(24);text(`${index+1}. ${item.title}`,12,true);if(item.interpretation)text(item.interpretation,9);Object.entries(item.statsSummary||{}).forEach(([key,value])=>text(`${key}: ${value}`,9,true,[66,82,105]));if(item.chartImage){try{pageBreak(75);pdf.addImage(item.chartImage,'JPEG',margin,y,width,Math.min(70,width*.55));y+=74}catch{}}const values=item.documentSnapshot?.values||{};Object.entries(values).filter(([,value])=>typeof value==='string'&&value.trim()).slice(0,8).forEach(([key,value])=>{text(key.replace(/([a-z])([A-Z])/g,'$1 $2').replace(/^./,letter=>letter.toUpperCase()),9,true,[66,82,105]);text(value.replace(/<[^>]*>/g,' '),9)});});});pageBreak(24);y+=5;text('PROJECT CLOSURE',14,true,[20,50,88]);text(project?.closureSummary||'Closure information has not yet been established.',9);pdf.setFontSize(8);pdf.setTextColor(100);pdf.text(`AXENTRA · ${project?.name||reportTitle} · Page ${page}`,margin,292);pdf.save(`${(project?.name||reportTitle).replace(/[^a-z0-9]+/gi,'-').toLowerCase()}-dmaic-report.pdf`)};
+ if(!items.length)return <div style={{padding:'2rem',maxWidth:700,margin:'0 auto',textAlign:'center'}}><h2>Report Builder</h2><p style={{color:'var(--text-secondary)'}}>No project assets added yet. Add a document workspace or completed analysis to build a connected DMAIC report here.</p></div>;
+ return <div className="templates-page"><div className="no-print">{storageWarning&&<div className="alert alert-danger">{storageWarning}<button className="btn-secondary" onClick={dismissStorageWarning}>Dismiss</button></div>}<div className="templates-header"><h1>Report Builder</h1><p>Review the project in DMAIC sequence, then print or generate a local PDF.</p></div><div className="card" style={{padding:'1.5rem',marginBottom:'1.5rem'}}><div className="form-grid"><div className="form-group"><label>Report Title</label><input value={reportTitle} onChange={event=>setReportTitle(event.target.value)}/></div><div className="form-group"><label>Prepared By</label><input value={preparedBy} onChange={event=>setPreparedBy(event.target.value)} placeholder="Name"/></div></div></div>{PHASES.map(phase=>{const phaseItems=visibleItems.filter(item=>item.phase===phase);return phaseItems.length?<section key={phase} style={{marginBottom:'1.5rem'}}><h2 style={{color:'var(--accent-light)',borderBottom:'1px solid var(--border)',paddingBottom:'.6rem'}}>{phase.toUpperCase()}</h2>{phaseItems.map(item=><article key={item.id} className="card" style={{padding:'1.25rem',marginBottom:'1rem'}}><div style={{display:'flex',justifyContent:'space-between',gap:'1rem'}}><div><span style={{fontSize:'.7rem',fontWeight:800,letterSpacing:'.1em'}}>{item.assetType||'PROJECT ASSET'}</span><h3>{item.title}</h3><p style={{color:'var(--text-secondary)'}}>{item.interpretation}</p></div><div style={{display:'flex',gap:'.4rem'}}><button className="btn-secondary" onClick={()=>move(item,-1)}>↑</button><button className="btn-secondary" onClick={()=>move(item,1)}>↓</button><button className="btn-secondary" onClick={()=>removeReportItem(item.id)}>Remove</button></div></div>{item.chartImage&&<img src={item.chartImage} alt={item.title} style={{maxWidth:'100%',borderRadius:8}}/>}<label style={{display:'flex',gap:'.5rem',marginTop:'.75rem'}}><input type="checkbox" checked={item.includeRawData} onChange={()=>toggleIncludeRawData(item.id)}/>Include raw data table</label></article>)}</section>:null})}<div style={{display:'flex',gap:'.75rem',flexWrap:'wrap'}}><button className="btn-primary" onClick={print}>Print</button><button className="btn-primary" onClick={savePdf}>Save PDF</button><button className="btn-secondary" disabled title="Configure an Outlook or mail provider to enable secure sending.">Email / Send · Not configured</button><button className="btn-secondary" onClick={clearReport}>Clear All</button></div></div><div className="print-target"><article className="print-doc print-only"><header className="print-header"><div className="print-logo-block"><div className="print-brand">AXENTRA</div></div><div className="print-header-center"><div className="print-doc-type">DMAIC Project Report</div><div className="print-doc-title">{reportTitle}</div></div><div className="print-header-meta"><div>{project?.name||'Project'}</div><div>Prepared by {preparedBy||'—'}</div><div>{new Date().toLocaleDateString()}</div></div></header><section className="print-section"><div className="print-section-title">PROJECT</div><div className="print-fields-grid cols-1"><div className="print-field"><div className="print-field-label">Project summary</div><div className="print-field-value multiline">{project?.goal||'Not yet established'}</div></div></div></section>{PHASES.map(phase=>{const phaseItems=visibleItems.filter(item=>item.phase===phase);return phaseItems.length?<section className="print-section" key={phase}><div className="print-section-title">{phase.toUpperCase()}</div>{phaseItems.map((item,index)=><div className="print-fields-grid cols-1" key={item.id} style={{breakInside:'avoid'}}><div className="print-field"><div className="print-field-label">{index+1}. {item.title}</div><div className="print-field-value multiline">{item.interpretation||'Structured project document'}</div></div>{item.chartImage&&<img src={item.chartImage} alt="" style={{maxWidth:'100%'}}/>}</div>)}</section>:null})}<section className="print-section"><div className="print-section-title">PROJECT CLOSURE</div><div className="print-fields-grid cols-1"><div className="print-field"><div className="print-field-value multiline">{project?.closureSummary||'Not yet established'}</div></div></div></section></article></div></div>;
 }

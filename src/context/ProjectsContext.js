@@ -16,7 +16,7 @@ function loadProjects() {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     // Guard against older/malformed records missing a phase key.
-    return parsed.map(p => ({ status: 'Active', currentPhase: 'Define', targetDate: '', ...p, phases: { ...emptyPhases(), ...p.phases }, documents: p.documents || {}, evidenceLibrary: Array.isArray(p.evidenceLibrary) ? p.evidenceLibrary : [], activityLog: Array.isArray(p.activityLog) ? p.activityLog : [], team: Array.isArray(p.team) ? p.team : [], timeline: Array.isArray(p.timeline) ? p.timeline : [] }));
+    return parsed.map(p => ({ status: 'Active', currentPhase: 'Define', targetDate: '', ...p, phases: { ...emptyPhases(), ...p.phases }, documents: p.documents || {}, evidenceLibrary: Array.isArray(p.evidenceLibrary) ? p.evidenceLibrary : [], artifacts: Array.isArray(p.artifacts) ? p.artifacts : [], binderConfig: { order: [], hiddenIds: [], links: {}, ...(p.binderConfig || {}) }, sharedFields: p.sharedFields || {}, activityLog: Array.isArray(p.activityLog) ? p.activityLog : [], team: Array.isArray(p.team) ? p.team : [], timeline: Array.isArray(p.timeline) ? p.timeline : [] }));
   } catch {
     return [];
   }
@@ -45,6 +45,9 @@ export function ProjectsProvider({ children }) {
       phases: emptyPhases(),
       documents: {},
       evidenceLibrary: [],
+      artifacts: [],
+      binderConfig: { order: [], hiddenIds: [], links: {} },
+      sharedFields: {},
       status: 'Active',
       currentPhase: 'Define',
       targetDate: '',
@@ -108,6 +111,13 @@ export function ProjectsProvider({ children }) {
   const updateEvidence = useCallback((projectId, evidenceId, updates) => setProjects(prev => prev.map(project => project.id === projectId ? { ...project, evidenceLibrary: (project.evidenceLibrary || []).map(item => item.id === evidenceId ? { ...item, ...updates, updatedAt: new Date().toISOString() } : item) } : project)), []);
   const removeEvidence = useCallback((projectId, evidenceId) => setProjects(prev => prev.map(project => project.id === projectId ? { ...project, evidenceLibrary: (project.evidenceLibrary || []).filter(item => item.id !== evidenceId) } : project)), []);
   const recordActivity = useCallback((projectId, activity) => setProjects(prev => prev.map(project => project.id === projectId ? { ...project, activityLog: [{ id: activity.id || `activity-${Date.now()}-${Math.random().toString(36).slice(2,5)}`, at: activity.at || new Date().toISOString(), ...activity }, ...(project.activityLog || [])].slice(0, 100) } : project)), []);
+  const addArtifact = useCallback((projectId, artifact) => {
+    const id = artifact.id || `artifact-${Date.now()}`;
+    setProjects(prev => prev.map(project => project.id === projectId ? { ...project, artifacts: [...(project.artifacts || []), { id, projectId, schemaVersion: 1, title: 'Untitled Artifact', type: 'artifact', phase: project.currentPhase || 'Define', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), linkedDocumentIds: [], linkedAnalysisIds: [], linkedReportIds: [], ...artifact }] } : project));
+    return id;
+  }, []);
+  const updateArtifact = useCallback((projectId, artifactId, updates) => setProjects(prev => prev.map(project => project.id === projectId ? { ...project, artifacts: (project.artifacts || []).map(item => item.id === artifactId ? { ...item, ...updates, updatedAt: new Date().toISOString() } : item) } : project)), []);
+  const removeArtifact = useCallback((projectId, artifactId) => setProjects(prev => prev.map(project => project.id === projectId ? { ...project, artifacts: (project.artifacts || []).filter(item => item.id !== artifactId) } : project)), []);
 
   return (
     <ProjectsContext.Provider value={{
@@ -123,6 +133,9 @@ export function ProjectsProvider({ children }) {
       updateEvidence,
       removeEvidence,
       recordActivity,
+      addArtifact,
+      updateArtifact,
+      removeArtifact,
     }}>
       {children}
     </ProjectsContext.Provider>
