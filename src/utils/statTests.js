@@ -652,7 +652,12 @@ export function logisticRegression(X, y, predictorNames, maxIter = 50, tol = 1e-
   let beta = new Array(k + 1).fill(0);
 
   for (let iter = 0; iter < maxIter; iter++) {
-    const eta = Xd.map(row => row.reduce((s, v, i) => s + v * beta[i], 0));
+    const eta = [];
+    for (const row of Xd) {
+      let linearPredictor = 0;
+      for (let coefficientIndex = 0; coefficientIndex < row.length; coefficientIndex++) linearPredictor += row[coefficientIndex] * beta[coefficientIndex];
+      eta.push(linearPredictor);
+    }
     const p = eta.map(sigmoid);
     const W = p.map(pi => pi * (1 - pi));
     const Xt = transpose(Xd);

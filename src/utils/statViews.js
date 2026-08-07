@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Line, ComposedChart } from 'recharts';
+import { Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Line, ComposedChart } from 'recharts';
 import { invNorm } from './statMath';
 
 const mean = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
@@ -71,7 +71,7 @@ export function GroupBoxPlot({ groups, labels, title = 'Box Plot by Group' }) {
   const range = globalMax - globalMin || 1;
   const H = 240, padTop = 20, padBottom = 30, plotH = H - padTop - padBottom;
   const yPos = (v) => padTop + plotH - ((v - globalMin) / range) * plotH;
-  const boxW = 60, gap = 100 / groups.length;
+  const boxW = 60;
 
   return (
     <div>

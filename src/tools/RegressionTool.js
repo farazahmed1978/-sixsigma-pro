@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { useWorksheet } from '../context/WorksheetContext';
-import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, Line, ResponsiveContainer, ComposedChart } from 'recharts';
+import { Scatter, XAxis, YAxis, CartesianGrid, Tooltip, Line, ResponsiveContainer, ComposedChart } from 'recharts';
 import html2canvas from 'html2canvas';
 import { useReport } from '../context/ReportContext';
 import { interpretRegression } from '../utils/interpretations';

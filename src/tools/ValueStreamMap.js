@@ -23,7 +23,6 @@ export default function ValueStreamMap() {
 
   const totalLeadTime = steps.reduce((s, st) => s + st.cycleTime + st.waitTime, 0);
   const totalVATime = steps.reduce((s, st) => s + st.vaTime, 0);
-  const totalCycleTime = steps.reduce((s, st) => s + st.cycleTime, 0);
   const efficiency = totalLeadTime > 0 ? ((totalVATime / totalLeadTime) * 100) : 0;
   const totalInventory = steps.reduce((s, st) => s + st.inventory, 0);
 

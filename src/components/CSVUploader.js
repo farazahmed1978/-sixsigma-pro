@@ -42,9 +42,6 @@ export default function CSVUploader({ onData, requiredColumns, sampleData, title
 
   const loadSample = useCallback(() => {
     if (!sampleData) return;
-    const csv = Papa.unparse(sampleData);
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const file = new File([blob], 'sample_data.csv');
     setFileName('sample_data.csv (demo)');
     setError('');
     onData(sampleData, Object.keys(sampleData[0]));

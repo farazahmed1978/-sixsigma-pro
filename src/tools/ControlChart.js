@@ -287,12 +287,12 @@ export default function ControlChart() {
     } catch (e) {
       setXbarRError(e.message);
     }
-  }, [data, valueCol, subgroupCol]);
+  }, [data, valueCol, subgroupCol, getColumnData, hasData]);
 
-  const getRawValues = () => {
+  const getRawValues = useCallback(() => {
     if (hasData) return getColumnData(valueCol).map(Number);
     return (data || []).map(r => +r[valueCol]).filter(v => !isNaN(v));
-  };
+  }, [data, getColumnData, hasData, valueCol]);
 
   const analyzeCusum = useCallback(() => {
     if (!valueCol) return;
@@ -307,7 +307,7 @@ export default function ControlChart() {
     } catch (e) {
       setCusumEwmaError(e.message);
     }
-  }, [valueCol, targetVal, sigmaVal, cusumK, cusumH, data, hasData]);
+  }, [valueCol, targetVal, sigmaVal, cusumK, cusumH, getRawValues]);
 
   const analyzeEwma = useCallback(() => {
     if (!valueCol) return;
@@ -324,7 +324,7 @@ export default function ControlChart() {
     } catch (e) {
       setCusumEwmaError(e.message);
     }
-  }, [valueCol, targetVal, sigmaVal, ewmaLambda, ewmaL, data, hasData]);
+  }, [valueCol, targetVal, sigmaVal, ewmaLambda, ewmaL, getRawValues]);
 
   const violationCount = chartType === 'imr'
     ? (chartData ? chartData.filter(d => d.outOfControl).length : 0)

@@ -68,7 +68,7 @@ const CHART_META = {
 };
 
 export default function AttributeChart() {
-  const { columns, getColumnData, getNumericColumns, hasData } = useWorksheet();
+  const { getColumnData, getNumericColumns, hasData } = useWorksheet();
   const { addReportItem } = useReport();
   const chartWrapperRef = useRef(null);
 
@@ -112,7 +112,7 @@ export default function AttributeChart() {
     } catch (e) {
       setError(e.message);
     }
-  }, [chartType, countCol, sampleCol, constantN, hasData]);
+  }, [chartType, countCol, sampleCol, constantN, hasData, getColumnData]);
 
   const violationCount = result ? result.points.filter(p => p.outOfControl).length : 0;
 
