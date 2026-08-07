@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {syncService} from '../services/syncService';
 import { Link } from 'react-router-dom';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -96,8 +97,8 @@ export default function DocumentWorkspace({ template, project, updateProject }) 
   const scores = useMemo(() => documentScores(template,record.values),[template,record.values]);
 
   useEffect(() => { const key=`${project.id}:${template.id}`; if(hydratedKey.current!==key){setRecord(createDocument(template,project.id,project.documents?.[documentIdFor(template.id)]));setActiveIndex(0);hydratedKey.current=key;} },[project,template]);
-  const persist = useCallback(next => { const saved={...next,updatedAt:new Date().toISOString()}; const activity={id:`activity-${Date.now()}`,action:`Updated ${template.name}`,assetType:'document',assetId:saved.id,at:saved.updatedAt}; updateProject(project.id,{documents:{...documentsRef.current,[saved.id]:saved},activityLog:[activity,...activityRef.current.filter(item=>!(item.assetType==='document'&&item.assetId===saved.id))].slice(0,100)}); },[project.id,template.name,updateProject]);
-  useEffect(() => { setSaveState('saving'); const timer=window.setTimeout(() => {persist(record);setSaveState('saved');},700); return()=>window.clearTimeout(timer); },[persist,record]);
+  const persist = useCallback(next => { const saved={...next,updatedAt:new Date().toISOString()};syncService.bufferDraft(saved.id,saved,saved.updatedAt); const activity={id:`activity-${Date.now()}`,action:`Updated ${template.name}`,assetType:'document',assetId:saved.id,at:saved.updatedAt}; updateProject(project.id,{documents:{...documentsRef.current,[saved.id]:saved},activityLog:[activity,...activityRef.current.filter(item=>!(item.assetType==='document'&&item.assetId===saved.id))].slice(0,100)});if(navigator.onLine)syncService.clearDraft(saved.id); },[project.id,template.name,updateProject]);
+  useEffect(() => { setSaveState(navigator.onLine?'saving':'offline'); const timer=window.setTimeout(() => {persist(record);setSaveState(navigator.onLine?'saved':'offline');},700); return()=>window.clearTimeout(timer); },[persist,record]);
 
   const updateValue=(id,value)=>setRecord(previous=>{const values={...previous.values,[id]:value};const calculated=template.calculate?.(values);return{...previous,values:calculated?{...values,...calculated}:values};});
   const sectionComplete=section=>section.fields.filter(field=>field.required!==false).every(field=>Array.isArray(record.values[field.id]) ? record.values[field.id].length>0 : Boolean(textValue(record.values[field.id])));

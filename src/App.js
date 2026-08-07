@@ -7,6 +7,9 @@ import { ProjectsProvider } from './context/ProjectsContext';
 import { AnalysisProvider } from './context/AnalysisContext';
 import { IntelligenceProvider } from './context/IntelligenceContext';
 import Layout from './components/Layout';
+import {AuthProvider} from './context/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
+import SupabaseSetupGate from './components/SupabaseSetupGate';
 
 
 // Pages
@@ -26,6 +29,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import ResourceStatus from './pages/ResourceStatus';
 import Onboarding from './pages/Onboarding';
+import AuthAction from './pages/AuthAction';
 
 // Tool wrapper
 import ToolPage from './pages/ToolPage';
@@ -96,6 +100,7 @@ function ToolRoute({ toolId }) {
 export default function App() {
   return (
     <ThemeProvider>
+      <AuthProvider>
       <WorksheetProvider>
         <ReportProvider>
           <ProjectsProvider>
@@ -105,26 +110,30 @@ export default function App() {
                 <Layout>
                   <Routes>
                   <Route path="/" element={<Dashboard />} />
-                  <Route path="/worksheet" element={<Worksheet />} />
+                  <Route path="/worksheet" element={<ProtectedRoute><Worksheet /></ProtectedRoute>} />
                   <Route path="/resources" element={<Resources />} />
                   <Route path="/resources/:resourceId" element={<ResourceStatus />} />
                   <Route path="/ai-assistant" element={<ResourceStatus title="Axentra AI Assistant" future />} />
                   <Route path="/about" element={<About />} />
                   <Route path="/pricing" element={<Pricing />} />
-                  <Route path="/start" element={<Onboarding />} />
+                  <Route path="/start" element={<SupabaseSetupGate><Onboarding /></SupabaseSetupGate>} />
+                  <Route path="/signup" element={<SupabaseSetupGate><Onboarding /></SupabaseSetupGate>} />
+                  <Route path="/signin" element={<SupabaseSetupGate><AuthAction /></SupabaseSetupGate>} />
+                  <Route path="/forgot-password" element={<SupabaseSetupGate><AuthAction /></SupabaseSetupGate>} />
+                  <Route path="/reset-password" element={<SupabaseSetupGate><AuthAction /></SupabaseSetupGate>} />
                   <Route path="/privacy" element={<PrivacyPolicy />} />
                   <Route path="/terms" element={<TermsOfService />} />
-                  <Route path="/hypothesis" element={<HypothesisTesting />} />
-                  <Route path="/doe" element={<DOEPage />} />
-                  <Route path="/templates" element={<Templates />} />
-                  <Route path="/documents/:templateId" element={<Templates />} />
-                  <Route path="/projects/:projectId/documents/:templateId" element={<Templates />} />
-                  <Route path="/report" element={<ReportBuilder />} />
-                  <Route path="/projects" element={<ProjectsHome />} />
-                  <Route path="/projects/:id" element={<ProjectDetail />} />
-                  <Route path="/projects/:id/charter" element={<ProjectCharter />} />
+                  <Route path="/hypothesis" element={<ProtectedRoute><HypothesisTesting /></ProtectedRoute>} />
+                  <Route path="/doe" element={<ProtectedRoute><DOEPage /></ProtectedRoute>} />
+                  <Route path="/templates" element={<ProtectedRoute><Templates /></ProtectedRoute>} />
+                  <Route path="/documents/:templateId" element={<ProtectedRoute><Templates /></ProtectedRoute>} />
+                  <Route path="/projects/:projectId/documents/:templateId" element={<ProtectedRoute><Templates /></ProtectedRoute>} />
+                  <Route path="/report" element={<ProtectedRoute><ReportBuilder /></ProtectedRoute>} />
+                  <Route path="/projects" element={<ProtectedRoute><ProjectsHome /></ProtectedRoute>} />
+                  <Route path="/projects/:id" element={<ProtectedRoute><ProjectDetail /></ProtectedRoute>} />
+                  <Route path="/projects/:id/charter" element={<ProtectedRoute><ProjectCharter /></ProtectedRoute>} />
                   {Object.keys(toolMeta).map(id => (
-                    <Route key={id} path={`/tool/${id}`} element={<ToolRoute toolId={id} />} />
+                    <Route key={id} path={`/tool/${id}`} element={<ProtectedRoute><ToolRoute toolId={id} /></ProtectedRoute>} />
                   ))}
                   </Routes>
                 </Layout>
@@ -134,6 +143,7 @@ export default function App() {
           </ProjectsProvider>
         </ReportProvider>
       </WorksheetProvider>
+      </AuthProvider>
     </ThemeProvider>
   );
 }
