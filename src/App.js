@@ -10,6 +10,7 @@ import Layout from './components/Layout';
 import {AuthProvider} from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import SupabaseSetupGate from './components/SupabaseSetupGate';
+import GlobalErrorBoundary from './components/GlobalErrorBoundary';
 
 
 // Pages
@@ -101,6 +102,7 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
+      <GlobalErrorBoundary>
       <WorksheetProvider>
         <ReportProvider>
           <ProjectsProvider>
@@ -143,6 +145,7 @@ export default function App() {
           </ProjectsProvider>
         </ReportProvider>
       </WorksheetProvider>
+      </GlobalErrorBoundary>
       </AuthProvider>
     </ThemeProvider>
   );

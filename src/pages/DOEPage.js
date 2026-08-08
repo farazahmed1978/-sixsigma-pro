@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {Link} from 'react-router-dom';
 import {useWorksheet} from '../context/WorksheetContext';
 import {useAnalysis} from '../context/AnalysisContext';
+import {createAnalysisHandoff} from '../services/analysisHandoff';
 import { BOOK_EXCERPTS } from '../utils/bookExcerpts';
 import { doeFullFactorialAnalysis } from '../utils/statTests';
 import './DOEPage.css';
@@ -117,7 +118,7 @@ export default function DOEPage() {
     if (k < 2) return 0;
     return (design === 'full' ? Math.pow(2, k) : Math.pow(2, k - 1)) * replicates;
   })();
-  const handoff=destination=>{sessionStorage.setItem('axentra_analysis_handoff',JSON.stringify({schemaVersion:1,sourceTool:'doe',destination,projectId:analysisContext?.projectId||activeDataset?.projectId||'',datasetId:activeDataset?.id||'',datasetName:activeDataset?.name||'',factorColumns:matrix?.factors?.map(f=>f.name)||factors.map(f=>f.name).filter(Boolean),responseColumn:response,createdAt:new Date().toISOString()}));};
+  const handoff=destination=>createAnalysisHandoff({sourceTool:'doe',destination,projectId:analysisContext?.projectId||activeDataset?.projectId||'',datasetId:activeDataset?.id||'',datasetVersion:activeDataset?.version||1,datasetName:activeDataset?.name||'',selectedColumns:[...(matrix?.factors?.map(f=>f.name)||factors.map(f=>f.name).filter(Boolean)),response],factors:matrix?.factors?.map(f=>f.name)||factors.map(f=>f.name).filter(Boolean),response,metadata:{design,replicates}});
 
   return (
     <div className="doe-page">

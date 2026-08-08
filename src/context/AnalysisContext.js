@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useWorksheet } from './WorksheetContext';
 import { useProjects } from './ProjectsContext';
+import {useAuth} from './AuthContext';
 
 const AnalysisContext = createContext();
 export const ANALYSIS_CONTEXT_SCHEMA_VERSION = 1;
@@ -19,6 +20,7 @@ function detectedType(column) {
 export function AnalysisProvider({ children }) {
   const { activeDataset, datasets, columns, rowCount } = useWorksheet();
   const { projects, recordActivity } = useProjects();
+  const {user,profile}=useAuth();
   const [selectedDatasetIds, setSelectedDatasetIds] = useState([]);
   const [analysisResults, setAnalysisResults] = useState(loadAnalyses);
   const project = projects.find(item => item.id === activeDataset?.projectId) || null;
@@ -26,11 +28,11 @@ export function AnalysisProvider({ children }) {
   useEffect(() => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(analysisResults)); } catch (error) { console.warn('Analyses could not be saved:', error); } }, [analysisResults]);
 
   const registerAnalysisResult = useCallback(result => {
-    const record = { schemaVersion: ANALYSIS_CONTEXT_SCHEMA_VERSION, id: result.id || `analysis-${Date.now()}`, projectId: result.projectId || activeDataset?.projectId || '', datasetIds: result.datasetIds || (activeDataset ? [activeDataset.id] : []), linkedReportIds: [], linkedDocumentIds: [], createdAt: result.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString(), ...result };
+    const record = { schemaVersion: ANALYSIS_CONTEXT_SCHEMA_VERSION, id: result.id || `analysis-${Date.now()}`, projectId: result.projectId || activeDataset?.projectId || '',organizationId:result.organizationId||project?.organizationId||profile?.default_organization_id||'',createdBy:result.createdBy||user?.id||'', datasetIds: result.datasetIds || (activeDataset ? [activeDataset.id] : []),datasetVersion:result.datasetVersion||activeDataset?.version||1,toolType:result.toolType||result.toolId||'analysis',phase:result.phase||'Analyze',methodology:result.methodology||'lean-six-sigma',inputConfiguration:result.inputConfiguration||{},result:result.result||result.statsSummary||{},interpretation:result.interpretation||'',evidenceIds:result.evidenceIds||[],linkedReportIds: [], linkedDocumentIds: [],status:result.status||'complete', createdAt: result.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString(), ...result };
     setAnalysisResults(previous => [record, ...previous]);
     if (record.projectId) recordActivity?.(record.projectId, { action: `Ran ${record.title || record.name || 'analysis'}`, assetType: 'analysis', assetId: record.id });
     return record.id;
-  }, [activeDataset, recordActivity]);
+  }, [activeDataset, profile, project, recordActivity, user]);
   const duplicateAnalysis = useCallback(id => { const source=analysisResults.find(item=>item.id===id); if(!source)return null; const copy={...source,id:`analysis-${Date.now()}`,title:`${source.title||source.name||'Analysis'} Copy`,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()}; setAnalysisResults(previous=>[copy,...previous]); return copy.id; },[analysisResults]);
   const deleteAnalysis = useCallback(id => setAnalysisResults(previous=>previous.filter(item=>item.id!==id)),[]);
   const updateAnalysis = useCallback((id,updates) => setAnalysisResults(previous=>previous.map(item=>item.id===id?{...item,...updates,updatedAt:new Date().toISOString()}:item)),[]);

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import {useAuth} from './AuthContext';
 
 const ReportContext = createContext();
 const STORAGE_KEY = 'sixsigmapro_report_items';
@@ -72,6 +73,7 @@ function saveWithFallback(items, setWarning) {
 }
 
 export function ReportProvider({ children }) {
+  const {user,profile}=useAuth();
   // [{ id, title, toolId, timestamp, statsSummary, interpretation, chartImage, includeRawData, rawData }]
   const [items, setItems] = useState(loadItems);
   const [storageWarning, setStorageWarning] = useState(null);
@@ -84,13 +86,13 @@ export function ReportProvider({ children }) {
     const id = `${item.toolId}-${Date.now()}`;
     const compressedImage = await compressImage(item.chartImage);
     setItems(prev => {
-      const next={ id, includeRawData: false, assetType:item.documentId?'document':item.assetType||'analysis', ...item, chartImage: compressedImage };
+      const next={ id, includeRawData: false,organizationId:item.organizationId||profile?.default_organization_id||'',createdBy:item.createdBy||user?.id||'',status:item.status||'active',methodology:item.methodology||'lean-six-sigma',createdAt:item.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString(), assetType:item.documentId?'document':item.assetType||'analysis', ...item, chartImage: compressedImage };
       const withoutDuplicate=item.documentId?prev.filter(existing=>existing.documentId!==item.documentId):prev;
       const updated=[...withoutDuplicate,next];
       return updated.sort((a,b)=>{const left=PHASE_ORDER.indexOf(a.phase),right=PHASE_ORDER.indexOf(b.phase);return(left<0?99:left)-(right<0?99:right)});
     });
     return id;
-  }, []);
+  }, [profile,user]);
 
   const removeReportItem = useCallback((id) => {
     setItems(prev => prev.filter(i => i.id !== id));

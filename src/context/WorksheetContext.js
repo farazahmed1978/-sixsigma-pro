@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
+import {useAuth} from './AuthContext';
 
 const WorksheetContext = createContext();
 const STORAGE_KEY = 'sixsigmapro_datasets_v1';
@@ -20,9 +21,16 @@ function normalizeDataset(dataset) {
     schemaVersion: SCHEMA_VERSION,
     id: dataset.id || makeId(),
     projectId: dataset.projectId || '',
+    organizationId: dataset.organizationId || '',
+    createdBy: dataset.createdBy || '',
     name: dataset.name || 'Worksheet',
     description: dataset.description || '',
     source: dataset.source || 'worksheet',
+    sourceNote: dataset.sourceNote || '',
+    status: dataset.status || (dataset.archivedAt ? 'archived' : 'active'),
+    version: Number(dataset.version) || 1,
+    rowCount: rowCountFor(columns),
+    columnCount: columns.length,
     analysisIds: Array.isArray(dataset.analysisIds) ? dataset.analysisIds : [],
     columns,
     createdAt: dataset.createdAt || now(),
@@ -42,6 +50,7 @@ function loadRegistry() {
 }
 
 export function WorksheetProvider({ children }) {
+  const {user,profile}=useAuth();
   const [datasets, setDatasets] = useState(loadRegistry);
   const [activeDatasetId, setActiveDatasetId] = useState(() => localStorage.getItem(ACTIVE_KEY) || '');
 
@@ -65,23 +74,23 @@ export function WorksheetProvider({ children }) {
     setDatasets(previous => previous.map(dataset => {
       if (dataset.id !== activeDatasetId) return dataset;
       const updated = updater(dataset);
-      return { ...updated, schemaVersion: SCHEMA_VERSION, updatedAt: now(), history: action ? [historyItem(action), ...(updated.history || dataset.history || [])].slice(0, 50) : updated.history || dataset.history || [] };
+      return { ...updated, schemaVersion: SCHEMA_VERSION, version:(dataset.version||1)+1, rowCount:rowCountFor(updated.columns||[]), columnCount:(updated.columns||[]).length, updatedAt: now(), history: action ? [historyItem(action), ...(updated.history || dataset.history || [])].slice(0, 50) : updated.history || dataset.history || [] };
     }));
   }, [activeDatasetId]);
 
   const createDataset = useCallback(({ name = 'New Worksheet', description = '', projectId = '', columns: initialColumns = [] } = {}) => {
-    const dataset = normalizeDataset({ id: makeId(), name, description, projectId, columns: initialColumns, history: [historyItem('Dataset created')] });
+    const dataset = normalizeDataset({ id: makeId(), name, description, projectId, organizationId:profile?.default_organization_id||'',createdBy:user?.id||'', columns: initialColumns, history: [historyItem('Dataset created')] });
     setDatasets(previous => [...previous, dataset]);
     setActiveDatasetId(dataset.id);
     return dataset.id;
-  }, []);
+  }, [profile,user]);
 
   const loadData = useCallback((parsedColumns, name, options = {}) => {
-    const dataset = normalizeDataset({ id: makeId(), name: name || 'Worksheet', description: options.description || '', projectId: options.projectId || '', source: options.source || 'import', columns: parsedColumns, history: [historyItem('Data imported')] });
+    const dataset = normalizeDataset({ id: makeId(), name: name || 'Worksheet', description: options.description || '', projectId: options.projectId || '', organizationId:options.organizationId||profile?.default_organization_id||'',createdBy:user?.id||'', source: options.source || 'import',sourceNote:options.sourceNote||'', columns: parsedColumns, history: [historyItem('Data imported')] });
     setDatasets(previous => [...previous, dataset]);
     setActiveDatasetId(dataset.id);
     return dataset.id;
-  }, []);
+  }, [profile,user]);
 
   const clearData = useCallback(() => updateActive(dataset => ({ ...dataset, columns: [] }), 'Dataset cleared'), [updateActive]);
   const addColumn = useCallback((name, data) => updateActive(dataset => {
@@ -108,7 +117,7 @@ export function WorksheetProvider({ children }) {
     setDatasets(previous => [...previous, copy]); setActiveDatasetId(copy.id); return copy.id;
   }, [datasets]);
   const deleteDataset = useCallback(id => { setDatasets(previous => previous.filter(dataset => dataset.id !== id)); setActiveDatasetId(current => current === id ? '' : current); }, []);
-  const archiveDataset = useCallback(id => setDatasets(previous => previous.map(dataset => dataset.id === id ? { ...dataset, archivedAt: dataset.archivedAt ? '' : now(), updatedAt: now(), history: [historyItem(dataset.archivedAt ? 'Dataset restored' : 'Dataset archived'), ...dataset.history].slice(0, 50) } : dataset)), []);
+  const archiveDataset = useCallback(id => setDatasets(previous => previous.map(dataset => dataset.id === id ? { ...dataset, archivedAt: dataset.archivedAt ? '' : now(),status:dataset.archivedAt?'active':'archived', updatedAt: now(), history: [historyItem(dataset.archivedAt ? 'Dataset restored' : 'Dataset archived'), ...dataset.history].slice(0, 50) } : dataset)), []);
   const assignDatasetProject = useCallback((id, projectId) => setDatasets(previous => previous.map(dataset => dataset.id === id ? { ...dataset, projectId, updatedAt: now(), history: [historyItem('Project assignment changed'), ...dataset.history].slice(0, 50) } : dataset)), []);
   const changeColumnType = useCallback((colIndex, type) => updateActive(dataset => ({ ...dataset, columns: dataset.columns.map((column, index) => index === colIndex ? { ...column, type } : column) }), `Column type changed to ${type}`), [updateActive]);
   const sortColumn = useCallback((colIndex, direction) => updateActive(dataset => {

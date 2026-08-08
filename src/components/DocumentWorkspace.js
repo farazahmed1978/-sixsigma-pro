@@ -13,7 +13,7 @@ import { createDocument, documentIdFor, documentScores, textValue } from '../uti
 import './DocumentWorkspace.css';
 
 const rowId = prefix => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-const sharedFieldKey=id=>({sponsor:'sponsor',projectSponsor:'sponsor',owner:'owner',projectOwner:'owner',startDate:'startDate',targetDate:'targetDate',endDate:'targetDate',businessCase:'businessCaseSummary',businessCaseSummary:'businessCaseSummary',financialImpact:'financialImpact',stakeholders:'stakeholders'}[id]||null);
+const sharedFieldKey=id=>({projectName:'projectName',sponsor:'sponsor',projectSponsor:'sponsor',owner:'owner',projectOwner:'owner',projectManager:'owner',processOwner:'processOwner',startDate:'startDate',targetDate:'targetDate',endDate:'targetDate',status:'status',budget:'budget',businessCase:'businessCaseSummary',businessCaseSummary:'businessCaseSummary',goal:'goalSummary',goalStatement:'goalSummary',scope:'scopeSummary',scopeSummary:'scopeSummary',financialImpact:'financialImpact',stakeholders:'stakeholders'}[id]||null);
 
 function MultilineField({ field, value, onChange }) {
   const [expanded, setExpanded] = useState(false);

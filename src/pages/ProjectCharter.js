@@ -87,9 +87,10 @@ export default function ProjectCharter() {
   const hydrated = useRef(id);
 
   useEffect(() => { if (hydrated.current !== id) { setCharter({ ...EMPTY, ...(project?.charter || {}) }); hydrated.current = id; } }, [id, project]);
+  useEffect(()=>{if(!project)return;const shared=project.sharedFields||{};setCharter(current=>{const next={...current,targetDate:current.targetDate||shared.targetDate||'',businessCase:current.businessCase||shared.businessCaseSummary||'',goalStatement:current.goalStatement||shared.goalSummary||'',scopeIn:current.scopeIn||shared.scopeSummary||''};return next.targetDate===current.targetDate&&next.businessCase===current.businessCase&&next.goalStatement===current.goalStatement&&next.scopeIn===current.scopeIn?current:next})},[project]);
   useEffect(() => { if (!exists) return undefined; setSaveState('saving'); const timer = window.setTimeout(() => { updateProject(id, { charter: { ...charter, updatedAt: new Date().toISOString() } }); setSaveState('saved'); }, 700); return () => window.clearTimeout(timer); }, [charter, exists, id, updateProject]);
 
-  const update = (field, value) => setCharter(current => ({ ...current, [field]: value }));
+  const update = (field, value) => {const sharedKey={targetDate:'targetDate',businessCase:'businessCaseSummary',goalStatement:'goalSummary',scopeIn:'scopeSummary'}[field];if(sharedKey)updateProject(id,{sharedFields:{...(project.sharedFields||{}),[sharedKey]:value},...(field==='targetDate'?{targetDate:value}:{})});setCharter(current => ({ ...current, [field]: value }));};
   const complete = field => Array.isArray(charter[field]) ? charter[field].some(row => Object.entries(row).some(([key, value]) => key !== 'id' && plain(value))) : Boolean(plain(charter[field]));
   const completedSections = SECTIONS.filter(section => section.fields.every(complete)).length;
   const completion = Math.round((SECTIONS.reduce((sum, section) => sum + section.fields.filter(complete).length, 0) / SECTIONS.reduce((sum, section) => sum + section.fields.length, 0)) * 100);

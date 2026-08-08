@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import {useAuth} from './AuthContext';
 
 const ProjectsContext = createContext();
 const STORAGE_KEY = 'sixsigmapro_projects';
@@ -16,13 +17,14 @@ function loadProjects() {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     // Guard against older/malformed records missing a phase key.
-    return parsed.map(p => ({ status: 'Active', currentPhase: 'Define', targetDate: '', ...p, phases: { ...emptyPhases(), ...p.phases }, documents: p.documents || {}, evidenceLibrary: Array.isArray(p.evidenceLibrary) ? p.evidenceLibrary : [], artifacts: Array.isArray(p.artifacts) ? p.artifacts : [], binderConfig: { order: [], hiddenIds: [], links: {}, ...(p.binderConfig || {}) }, sharedFields: p.sharedFields || {}, activityLog: Array.isArray(p.activityLog) ? p.activityLog : [], team: Array.isArray(p.team) ? p.team : [], timeline: Array.isArray(p.timeline) ? p.timeline : [] }));
+    return parsed.map(p => ({ status: 'Active', currentPhase: 'Define', targetDate: '',methodology:'hybrid', ...p, phases: { ...emptyPhases(), ...p.phases }, documents: p.documents || {}, evidenceLibrary: Array.isArray(p.evidenceLibrary) ? p.evidenceLibrary : [], artifacts: Array.isArray(p.artifacts) ? p.artifacts : [], binderConfig: { order: [], hiddenIds: [], links: {}, ...(p.binderConfig || {}) }, sharedFields: {projectName:p.name||'',sponsor:p.champion||'',owner:p.owner||'',targetDate:p.targetDate||'',status:p.status||'Active',...(p.sharedFields||{})}, activityLog: Array.isArray(p.activityLog) ? p.activityLog : [], team: Array.isArray(p.team) ? p.team : [], timeline: Array.isArray(p.timeline) ? p.timeline : [],tasks:Array.isArray(p.tasks)?p.tasks:[],risks:Array.isArray(p.risks)?p.risks:[],issues:Array.isArray(p.issues)?p.issues:[],decisions:Array.isArray(p.decisions)?p.decisions:[],approvals:Array.isArray(p.approvals)?p.approvals:[] }));
   } catch {
     return [];
   }
 }
 
 export function ProjectsProvider({ children }) {
+  const {user,profile}=useAuth();
   const [projects, setProjects] = useState(loadProjects);
 
   useEffect(() => {
@@ -42,25 +44,33 @@ export function ProjectsProvider({ children }) {
       owner: data.owner || '',
       champion: data.champion || '',
       createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),organizationId:profile?.default_organization_id||'',createdBy:user?.id||'',methodology:data.methodology||'hybrid',
       phases: emptyPhases(),
       documents: {},
       evidenceLibrary: [],
       artifacts: [],
       binderConfig: { order: [], hiddenIds: [], links: {} },
-      sharedFields: {},
+      sharedFields: {projectName:(data.name||'').trim()||'Untitled Project',sponsor:data.champion||'',owner:data.owner||'',processOwner:data.processOwner||'',startDate:data.startDate||'',targetDate:data.targetDate||'',status:'Active',budget:data.budget||'',businessCaseSummary:data.businessCaseSummary||'',goalSummary:data.goal||'',scopeSummary:data.scopeSummary||''},
       status: 'Active',
       currentPhase: 'Define',
       targetDate: '',
       team: [],
       timeline: [],
+      tasks:[],risks:[],issues:[],decisions:[],approvals:[],
       activityLog: [{ id: `activity-${Date.now()}`, action: 'Project created', assetType: 'project', at: new Date().toISOString() }],
     };
     setProjects(prev => [...prev, project]);
     return id;
-  }, []);
+  }, [profile,user]);
 
   const updateProject = useCallback((id, updates) => {
-    setProjects(prev => prev.map(p => (p.id === id ? { ...p, ...updates } : p)));
+    setProjects(prev => prev.map(p => {
+      if (p.id !== id) return p;
+      const shared = { ...(p.sharedFields || {}) };
+      const mappings = { name:'projectName', champion:'sponsor', owner:'owner', processOwner:'processOwner', startDate:'startDate', targetDate:'targetDate', status:'status', budget:'budget', goal:'goalSummary', scopeSummary:'scopeSummary', businessCaseSummary:'businessCaseSummary' };
+      Object.entries(mappings).forEach(([source,target]) => { if (Object.prototype.hasOwnProperty.call(updates,source)) shared[target]=updates[source]; });
+      return { ...p, ...updates, sharedFields:{...shared,...(updates.sharedFields||{})}, updatedAt:new Date().toISOString() };
+    }));
   }, []);
 
   const deleteProject = useCallback((id) => {
@@ -104,18 +114,18 @@ export function ProjectsProvider({ children }) {
 
   const addEvidence = useCallback((projectId, evidence) => {
     const id = evidence.id || `evidence-${Date.now()}`;
-    setProjects(prev => prev.map(project => project.id === projectId ? { ...project, evidenceLibrary: [...(project.evidenceLibrary || []), { schemaVersion: EVIDENCE_SCHEMA_VERSION, id, projectId, assetType: 'analysis', title: 'Untitled Evidence', sourceType: '', sourceId: '', datasetIds: [], analysisIds: [], reportIds: [], documentIds: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), ...evidence }] } : project));
+    setProjects(prev => prev.map(project => project.id === projectId ? { ...project, evidenceLibrary: [...(project.evidenceLibrary || []), { schemaVersion: EVIDENCE_SCHEMA_VERSION, id, projectId,organizationId:project.organizationId||profile?.default_organization_id||'',createdBy:user?.id||'',status:'active',methodology:project.methodology||'hybrid',phase:evidence.phase||project.currentPhase||'Analyze', assetType: 'analysis', title: 'Untitled Evidence', sourceType: '', sourceId: '', datasetIds: [], analysisIds: [], reportIds: [], documentIds: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), ...evidence }] } : project));
     return id;
-  }, []);
+  }, [profile,user]);
 
   const updateEvidence = useCallback((projectId, evidenceId, updates) => setProjects(prev => prev.map(project => project.id === projectId ? { ...project, evidenceLibrary: (project.evidenceLibrary || []).map(item => item.id === evidenceId ? { ...item, ...updates, updatedAt: new Date().toISOString() } : item) } : project)), []);
   const removeEvidence = useCallback((projectId, evidenceId) => setProjects(prev => prev.map(project => project.id === projectId ? { ...project, evidenceLibrary: (project.evidenceLibrary || []).filter(item => item.id !== evidenceId) } : project)), []);
   const recordActivity = useCallback((projectId, activity) => setProjects(prev => prev.map(project => project.id === projectId ? { ...project, activityLog: [{ id: activity.id || `activity-${Date.now()}-${Math.random().toString(36).slice(2,5)}`, at: activity.at || new Date().toISOString(), ...activity }, ...(project.activityLog || [])].slice(0, 100) } : project)), []);
   const addArtifact = useCallback((projectId, artifact) => {
     const id = artifact.id || `artifact-${Date.now()}`;
-    setProjects(prev => prev.map(project => project.id === projectId ? { ...project, artifacts: [...(project.artifacts || []), { id, projectId, schemaVersion: 1, title: 'Untitled Artifact', type: 'artifact', phase: project.currentPhase || 'Define', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), linkedDocumentIds: [], linkedAnalysisIds: [], linkedReportIds: [], ...artifact }] } : project));
+    setProjects(prev => prev.map(project => project.id === projectId ? { ...project, artifacts: [...(project.artifacts || []), { id, projectId,organizationId:project.organizationId||profile?.default_organization_id||'',createdBy:user?.id||'', schemaVersion: 1, title: 'Untitled Artifact', type: 'artifact',status:'active',methodology:project.methodology||'hybrid', phase: project.currentPhase || 'Define', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), linkedDocumentIds: [], linkedAnalysisIds: [], linkedReportIds: [], ...artifact }] } : project));
     return id;
-  }, []);
+  }, [profile,user]);
   const updateArtifact = useCallback((projectId, artifactId, updates) => setProjects(prev => prev.map(project => project.id === projectId ? { ...project, artifacts: (project.artifacts || []).map(item => item.id === artifactId ? { ...item, ...updates, updatedAt: new Date().toISOString() } : item) } : project)), []);
   const removeArtifact = useCallback((projectId, artifactId) => setProjects(prev => prev.map(project => project.id === projectId ? { ...project, artifacts: (project.artifacts || []).filter(item => item.id !== artifactId) } : project)), []);
 
