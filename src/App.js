@@ -8,9 +8,11 @@ import { AnalysisProvider } from './context/AnalysisContext';
 import { IntelligenceProvider } from './context/IntelligenceContext';
 import Layout from './components/Layout';
 import {AuthProvider} from './context/AuthContext';
+import {EntitlementProvider} from './context/EntitlementContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import SupabaseSetupGate from './components/SupabaseSetupGate';
 import GlobalErrorBoundary from './components/GlobalErrorBoundary';
+import SuiteGate from './components/SuiteGate';
 
 
 // Pages
@@ -31,6 +33,7 @@ import TermsOfService from './pages/TermsOfService';
 import ResourceStatus from './pages/ResourceStatus';
 import Onboarding from './pages/Onboarding';
 import AuthAction from './pages/AuthAction';
+import Suites,{SuiteRoute} from './pages/Suites';
 
 // Tool wrapper
 import ToolPage from './pages/ToolPage';
@@ -102,6 +105,7 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
+      <EntitlementProvider>
       <GlobalErrorBoundary>
       <WorksheetProvider>
         <ReportProvider>
@@ -112,12 +116,14 @@ export default function App() {
                 <Layout>
                   <Routes>
                   <Route path="/" element={<Dashboard />} />
-                  <Route path="/worksheet" element={<ProtectedRoute><Worksheet /></ProtectedRoute>} />
+                  <Route path="/worksheet" element={<ProtectedRoute><SuiteGate suiteIds="operational-excellence"><Worksheet /></SuiteGate></ProtectedRoute>} />
                   <Route path="/resources" element={<Resources />} />
                   <Route path="/resources/:resourceId" element={<ResourceStatus />} />
-                  <Route path="/ai-assistant" element={<ResourceStatus title="Axentra AI Assistant" future />} />
+                  <Route path="/ai-assistant" element={<ResourceStatus title="Aureqin AI Assistant" future />} />
                   <Route path="/about" element={<About />} />
                   <Route path="/pricing" element={<Pricing />} />
+                  <Route path="/suites" element={<Suites />} />
+                  <Route path="/suites/:suiteId" element={<SuiteRoute />} />
                   <Route path="/start" element={<SupabaseSetupGate><Onboarding /></SupabaseSetupGate>} />
                   <Route path="/signup" element={<SupabaseSetupGate><Onboarding /></SupabaseSetupGate>} />
                   <Route path="/signin" element={<SupabaseSetupGate><AuthAction /></SupabaseSetupGate>} />
@@ -125,8 +131,8 @@ export default function App() {
                   <Route path="/reset-password" element={<SupabaseSetupGate><AuthAction /></SupabaseSetupGate>} />
                   <Route path="/privacy" element={<PrivacyPolicy />} />
                   <Route path="/terms" element={<TermsOfService />} />
-                  <Route path="/hypothesis" element={<ProtectedRoute><HypothesisTesting /></ProtectedRoute>} />
-                  <Route path="/doe" element={<ProtectedRoute><DOEPage /></ProtectedRoute>} />
+                  <Route path="/hypothesis" element={<ProtectedRoute><SuiteGate suiteIds="operational-excellence"><HypothesisTesting /></SuiteGate></ProtectedRoute>} />
+                  <Route path="/doe" element={<ProtectedRoute><SuiteGate suiteIds="operational-excellence"><DOEPage /></SuiteGate></ProtectedRoute>} />
                   <Route path="/templates" element={<ProtectedRoute><Templates /></ProtectedRoute>} />
                   <Route path="/documents/:templateId" element={<ProtectedRoute><Templates /></ProtectedRoute>} />
                   <Route path="/projects/:projectId/documents/:templateId" element={<ProtectedRoute><Templates /></ProtectedRoute>} />
@@ -135,7 +141,7 @@ export default function App() {
                   <Route path="/projects/:id" element={<ProtectedRoute><ProjectDetail /></ProtectedRoute>} />
                   <Route path="/projects/:id/charter" element={<ProtectedRoute><ProjectCharter /></ProtectedRoute>} />
                   {Object.keys(toolMeta).map(id => (
-                    <Route key={id} path={`/tool/${id}`} element={<ProtectedRoute><ToolRoute toolId={id} /></ProtectedRoute>} />
+                    <Route key={id} path={`/tool/${id}`} element={<ProtectedRoute><SuiteGate suiteIds="operational-excellence"><ToolRoute toolId={id} /></SuiteGate></ProtectedRoute>} />
                   ))}
                   </Routes>
                 </Layout>
@@ -146,6 +152,7 @@ export default function App() {
         </ReportProvider>
       </WorksheetProvider>
       </GlobalErrorBoundary>
+      </EntitlementProvider>
       </AuthProvider>
     </ThemeProvider>
   );

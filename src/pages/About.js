@@ -41,12 +41,12 @@ const phaseColor = {
 
 const FAQS = [
   {
-    q: 'Do I need a background in statistics to use Axentra?',
-    a: 'No. Axentra supports quality professionals, engineers, operations leaders, project teams, and students with guided workflows and plain-language explanations. You remain in control while the platform simplifies technical complexity.'
+    q: 'Do I need a background in statistics to use Aureqin?',
+    a: 'No. Aureqin supports quality professionals, engineers, operations leaders, project teams, and students with guided workflows and plain-language explanations. You remain in control while the platform simplifies technical complexity.'
   },
   {
-    q: 'What makes Axentra different from standalone statistical software?',
-    a: 'Standalone tools focus on isolated analyses. Axentra connects operational excellence and project execution: projects, datasets, analyses, evidence, interactive documents, and reports remain part of one workspace. Future intelligence features are designed to build on that connected foundation.'
+    q: 'What makes Aureqin different from standalone statistical software?',
+    a: 'Standalone tools focus on isolated analyses. Aureqin connects operational excellence and project execution: projects, datasets, analyses, evidence, interactive documents, and reports remain part of one workspace. Future intelligence features are designed to build on that connected foundation.'
   },
   {
     q: 'Are the statistical calculations accurate?',
@@ -63,7 +63,7 @@ const FAQS = [
   
   {
     q: 'Can I manage multiple Six Sigma projects?',
-    a: 'Yes. Axentra is built as a complete project workspace. Organize multiple initiatives, store datasets, generate reports, maintain project history, and keep analyses and documentation connected.'
+    a: 'Yes. Aureqin is built as a complete project workspace. Organize multiple initiatives, store datasets, generate reports, maintain project history, and keep analyses and documentation connected.'
   },
   {
     q: 'Can I collaborate with my team?',
@@ -74,8 +74,8 @@ const FAQS = [
     a: 'Protecting customer data is a priority. Projects are stored securely, and access is restricted to authorized users. We continuously follow industry best practices to safeguard your information.'
   },
   {
-    q: 'Is Axentra suitable for regulated industries?',
-    a: 'Axentra supports standard improvement methods used across regulated environments. Organizations operating under FDA, ISO, GMP, or similar requirements should validate software use according to their own quality and compliance procedures.'
+    q: 'Is Aureqin suitable for regulated industries?',
+    a: 'Aureqin supports standard improvement methods used across regulated environments. Organizations operating under FDA, ISO, GMP, or similar requirements should validate software use according to their own quality and compliance procedures.'
   },
   {
     q: 'Can I export my work?',
@@ -83,11 +83,11 @@ const FAQS = [
   },
   {
     q: 'Will more statistical tools be added?',
-    a: 'Absolutely. Axentra is under continuous development. New workspaces, statistical methods, visualizations, and project management capabilities are shaped by customer feedback and industry practice.'
+    a: 'Absolutely. Aureqin is under continuous development. New workspaces, statistical methods, visualizations, and project management capabilities are shaped by customer feedback and industry practice.'
   },
   {
-    q: 'Is Axentra suitable for students?',
-    a: "Yes. Whether you're learning Lean Six Sigma, project management, completing coursework, or working on your first improvement project, Axentra provides structured workflows for professional-quality work."
+    q: 'Is Aureqin suitable for students?',
+    a: "Yes. Whether you're learning Lean Six Sigma, project management, completing coursework, or working on your first improvement project, Aureqin provides structured workflows for professional-quality work."
   },
   {
     q: 'Is there a free trial?',
@@ -98,11 +98,11 @@ const FAQS = [
     a: "Yes. You can cancel your subscription at any time. Your plan will remain active until the end of your current billing period, and you won't be charged again unless you renew."
   },
   {
-    q: 'Who is Axentra built for?',
+    q: 'Who is Aureqin built for?',
     a: 'Six Sigma Green Belts, Black Belts, and Master Black Belts; Quality Engineers and Quality Managers; Manufacturing and Operations Leaders; Process Improvement and Continuous Improvement Teams; Supply Chain and Logistics Professionals; Healthcare Improvement Teams; Students and Certification Candidates; and organizations implementing Lean, Six Sigma, or Operational Excellence programs.'
   },
   {
-    q: 'How does Axentra simplify the tool stack?',
+    q: 'How does Aureqin simplify the tool stack?',
     a: 'Our mission is to make professional-grade continuous improvement tools accessible to everyone. By delivering a cloud-based platform with integrated AI, project management, and validated statistical analysis, we eliminate the high licensing costs and complex deployments associated with traditional enterprise software — without compromising analytical rigor.'
   },
 ];
@@ -112,7 +112,7 @@ export default function About() {
     <div className="about-page">
       <section className="about-hero">
         <div className="about-hero-badge">Built for Quality Professionals</div>
-        <h1>About Axentra</h1>
+        <h1>About Aureqin</h1>
         <p>
           A browser-based statistical analysis platform for Lean Six Sigma practitioners,
           quality engineers, and continuous improvement teams — no software license or
@@ -123,7 +123,7 @@ export default function About() {
       <section className="about-card mission-card about-mission-full">
         <h2>Our Mission</h2>
         <p>
-          At Axentra, our mission is to advance operational excellence through an
+          At Aureqin, our mission is to advance operational excellence through an
           integrated platform that unifies statistical analysis, AI-assisted guidance, project
           execution, and documentation. Rather than treating analytics as isolated tasks, we
           connect every phase of the DMAIC methodology into a single, structured workflow that
@@ -135,7 +135,7 @@ export default function About() {
 
       <section className="about-tools-section">
         <h2>Included Tools</h2>
-        <p>Axentra connects statistical tools with Lean Six Sigma, project management, datasets, evidence, documents, and reporting.</p>
+        <p>Aureqin connects statistical tools with Lean Six Sigma, project management, datasets, evidence, documents, and reporting.</p>
         <div className="about-tools-grid">
           {tools.map(tool => (
             <Link key={tool.path} to={tool.path} className="about-tool-chip">
@@ -167,7 +167,7 @@ export default function About() {
       <section className="about-disclaimer">
         <h2>Disclaimer</h2>
         <p>
-          Axentra is provided as-is for professional and educational use. All statistical
+          Aureqin is provided as-is for professional and educational use. All statistical
           calculations follow standard Six Sigma formulas and are independently verified. Users
           are responsible for validating results before making critical business decisions. This
           tool is not a substitute for certified statistical software in regulated industries —

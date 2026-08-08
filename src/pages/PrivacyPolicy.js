@@ -12,7 +12,7 @@ export default function PrivacyPolicy() {
 
       <section>
         <h2>1. Introduction</h2>
-        <p>Axentra ("we," "us," or "our") respects your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our website and platform (the "Service").</p>
+        <p>Aureqin ("we," "us," or "our") respects your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our website and platform (the "Service").</p>
       </section>
 
       <section>

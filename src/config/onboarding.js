@@ -1,7 +1,3 @@
-export const ONBOARDING_CONFIG={
- trial:{label:'14-day trial',days:14,creditCardRequired:false,status:'configurable'},
- plans:[
-  {id:'standard',name:'Axentra Standard',priceMonthly:9.99,status:'Available for selection',features:['Connected project workspaces','Data Worksheet and analyses','Evidence Library and reports','Lean Six Sigma and PMP documents']},
-  {id:'ai',name:'Axentra AI',priceMonthly:null,status:'Planned — pricing not finalized',features:['Everything in Standard','Future portfolio briefing','Future document and analysis assistance','Future action recommendations']}
- ]
-};
+import{COMMERCIAL_CATALOG}from'./commercial';
+const founding=COMMERCIAL_CATALOG.plans[0],price=COMMERCIAL_CATALOG.prices[0];
+export const ONBOARDING_CONFIG={trial:{label:`${founding.trialDays}-day trial`,days:founding.trialDays,creditCardRequired:false,status:'configurable'},plans:[{id:'founding-operational-excellence',catalogPlanId:founding.id,suiteId:'operational-excellence',name:'Operational Excellence Suite',priceMonthly:price.unitAmount/100,status:'Founding one-suite selection',features:['DMAIC project workspaces','Data Worksheet and statistical analyses','Evidence Library and reports','Lean Six Sigma and quality documents']},{id:'founding-project-management',catalogPlanId:founding.id,suiteId:'project-management',name:'Project Management Suite',priceMonthly:price.unitAmount/100,status:'Founding one-suite selection',features:['Project lifecycle workspaces','Planning and execution documents','Risks, actions, decisions, and approvals','Connected project reporting']}]};

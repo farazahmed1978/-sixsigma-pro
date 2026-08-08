@@ -1,0 +1,9 @@
+import React,{createContext,useCallback,useContext,useEffect,useMemo,useState}from'react';
+import{useAuth}from'./AuthContext';
+import{supabase}from'../lib/supabase';
+import{SUITES,SUITE_STATES}from'../config/suites';
+const EntitlementContext=createContext(null);
+const localDefaults=SUITES.filter(suite=>suite.status===SUITE_STATES.ACTIVE).map(suite=>({suiteId:suite.id,status:SUITE_STATES.ACTIVE,source:'development-default'}));
+export function EntitlementProvider({children}){const{user,profile}=useAuth();const[entitlements,setEntitlements]=useState(localDefaults);const[loading,setLoading]=useState(false);const[managed,setManaged]=useState(false);const refresh=useCallback(async()=>{if(!supabase||!user||!profile?.default_organization_id){setManaged(false);setEntitlements(localDefaults);return}setLoading(true);const{data,error}=await supabase.from('suite_entitlements').select('suite_id,status,starts_at,ends_at,source').eq('organization_id',profile.default_organization_id);if(error){setManaged(false);setEntitlements(localDefaults)}else{setManaged(true);setEntitlements((data||[]).map(item=>({suiteId:item.suite_id,status:item.status,startsAt:item.starts_at,endsAt:item.ends_at,source:item.source})))}setLoading(false)},[profile,user]);useEffect(()=>{refresh()},[refresh]);const statusFor=useCallback(id=>entitlements.find(item=>item.suiteId===id)?.status||(managed?SUITE_STATES.LOCKED:SUITES.find(item=>item.id===id)?.status)||SUITE_STATES.LOCKED,[entitlements,managed]);const canAccess=useCallback(id=>[SUITE_STATES.ACTIVE,SUITE_STATES.TRIAL].includes(statusFor(id)),[statusFor]);const value=useMemo(()=>({entitlements,loading,managed,refresh,statusFor,canAccess}),[canAccess,entitlements,loading,managed,refresh,statusFor]);return <EntitlementContext.Provider value={value}>{children}</EntitlementContext.Provider>}
+export const useEntitlements=()=>useContext(EntitlementContext);
+

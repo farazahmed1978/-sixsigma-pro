@@ -20,8 +20,8 @@ const testimonials = [
 ];
 
 const faqs = [
-  { q: 'Can I try it before subscribing?', a: 'Yes — the 14-day free trial gives you full access to every tool with no credit card required. Cancel anytime.' },
-  { q: 'Do I need to install anything?', a: 'No. Axentra runs entirely in your browser. No downloads, no IT approval, no installation.' },
+  { q: 'Can I try it before subscribing?', a: 'Yes. The 14-day free trial provides access to your selected professional suite with no credit card required.' },
+  { q: 'Do I need to install anything?', a: 'No. Aureqin runs entirely in your browser. No downloads, no IT approval, no installation.' },
   { q: 'Is my data safe?', a: 'All analysis happens locally in your browser. Your data never leaves your computer or gets sent to any server.' },
   { q: 'Can I export my results?', a: 'Yes. Every analysis can be exported as PDF. Templates export as PDF or Word (.docx).' },
   { q: 'What if I need to cancel?', a: 'Cancel anytime from your account settings. No questions asked, no hidden fees.' },
@@ -87,8 +87,8 @@ export default function Pricing() {
       {/* Pricing card */}
       <section className="pricing-card-section">
         <div className="pricing-section-header">
-          <h2>Simple, transparent pricing</h2>
-          <p>One plan. Every feature. No hidden costs.</p>
+          <h2>Founding one-suite pricing</h2>
+          <p>Select one active professional suite. Products, plans, prices, and entitlements remain separate as Aureqin grows.</p>
         </div>
 
         <div className="billing-toggle">
@@ -102,7 +102,7 @@ export default function Pricing() {
         <div className="pricing-card-wrapper">
           <div className="pricing-card-main">
             <div className="pricing-card-header">
-              <div className="pricing-plan-name">AXENTRA</div>
+              <div className="pricing-plan-name">AUREQIN · ONE PROFESSIONAL SUITE</div>
               <div className="pricing-amount">
                 <span className="price-currency">$</span>
                 <span className="price-num">{annual ? annualPrice : monthlyPrice}</span>
@@ -113,7 +113,8 @@ export default function Pricing() {
 
             <ul className="pricing-features-list">
               {[
-                'Full access to all 40+ analysis tools',
+                'One selected active Aureqin suite',
+                'Operational Excellence includes all 40+ analysis tools',
                 'Central data worksheet',
                 '20+ hypothesis tests (continuous, discrete, nonparametric)',
                 'Design of Experiments (DOE)',
@@ -121,7 +122,7 @@ export default function Pricing() {
                 'Export & print any analysis',
                 'Light/dark mode',
                 'Resources, guides & interpretation help',
-                'Future tools included at no extra cost',
+                'Future tools within the licensed suite',
                 'Cancel anytime',
               ].map(f => (
                 <li key={f}><span className="check">✓</span>{f}</li>
@@ -137,7 +138,7 @@ export default function Pricing() {
               <div className="vs-label">vs. Minitab</div>
               <div className="vs-compare">
                 <div className="vs-them"><span>Minitab</span><strong>$154+/mo</strong></div>
-                <div className="vs-us"><span>AXENTRA</span><strong>${monthlyPrice}/mo</strong></div>
+                <div className="vs-us"><span>AUREQIN</span><strong>${monthlyPrice}/mo</strong></div>
               </div>
             </div>
           </div>
@@ -187,7 +188,7 @@ export default function Pricing() {
       {/* Final CTA */}
       <section className="pricing-final-cta">
         <h2>Ready to upgrade your quality toolkit?</h2>
-        <p>Connect project execution, operational excellence, data, documents, and reporting in Axentra.</p>
+        <p>Connect project execution, operational excellence, data, documents, and reporting in Aureqin.</p>
         <Link to="/start" className="btn-primary" style={{ fontSize: '1rem', padding: '0.85rem 2.5rem' }}>
           Start Your Free Trial Today
         </Link>

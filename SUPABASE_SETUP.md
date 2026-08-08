@@ -1,6 +1,6 @@
-# Configure Supabase for Axentra
+# Configure Supabase for Aureqin
 
-Axentra uses Supabase Auth and Postgres. Until the two public environment variables are configured, account routes display a setup screen instead of attempting authentication.
+Aureqin uses Supabase Auth and Postgres. Until the two public environment variables are configured, account routes display a setup screen instead of attempting authentication.
 
 ## 1. Create a Supabase project
 
@@ -35,7 +35,13 @@ REACT_APP_SUPABASE_ANON_KEY=your-public-anon-key
 
 ## 4. Apply the database migration
 
-Open **SQL Editor** in Supabase, paste the contents of `supabase/migrations/202608060001_axentra_foundation.sql`, and run it once. This creates profiles, personal organizations, project tables, triggers, indexes, and RLS policies.
+Open **SQL Editor** in Supabase and apply these migrations in order:
+
+1. `supabase/migrations/202608070001_project_architecture_hardening.sql`
+2. `supabase/migrations/202608070002_aureqin_suite_entitlements.sql`
+3. `supabase/migrations/202608070003_user_workspace_provisioning.sql`
+
+The first migration establishes the hardened project schema and row-level security. The second adds Aureqin's suite catalog, subscriptions, entitlements, and AI usage metering foundation. The third provisions default organizations for new and existing authenticated users so ownership-safe project import can succeed. Run each migration once.
 
 ## 5. Configure Auth URLs
 
