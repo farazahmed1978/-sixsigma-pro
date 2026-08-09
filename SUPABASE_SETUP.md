@@ -40,8 +40,9 @@ Open **SQL Editor** in Supabase and apply these migrations in order:
 1. `supabase/migrations/202608070001_project_architecture_hardening.sql`
 2. `supabase/migrations/202608070002_aureqin_suite_entitlements.sql`
 3. `supabase/migrations/202608070003_user_workspace_provisioning.sql`
+4. `supabase/migrations/202608080001_billing_subscription_foundation.sql`
 
-The first migration establishes the hardened project schema and row-level security. The second adds Aureqin's suite catalog, subscriptions, entitlements, and AI usage metering foundation. The third provisions default organizations for new and existing authenticated users so ownership-safe project import can succeed. Run each migration once.
+The first migration establishes the hardened project schema and row-level security. The second adds Aureqin's suite catalog, subscriptions, entitlements, and AI usage metering foundation. The third provisions default organizations for new and existing authenticated users so ownership-safe project import can succeed. The fourth adds Stripe reconciliation, subscription items, suite trials, entitlement history, billing events, and configurable usage allowances. Run each migration once.
 
 ## 5. Configure Auth URLs
 

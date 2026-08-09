@@ -9,10 +9,12 @@ import { IntelligenceProvider } from './context/IntelligenceContext';
 import Layout from './components/Layout';
 import {AuthProvider} from './context/AuthContext';
 import {EntitlementProvider} from './context/EntitlementContext';
+import {BillingProvider} from './context/BillingContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import SupabaseSetupGate from './components/SupabaseSetupGate';
 import GlobalErrorBoundary from './components/GlobalErrorBoundary';
 import SuiteGate from './components/SuiteGate';
+import DocumentSuiteGate from './components/DocumentSuiteGate';
 
 
 // Pages
@@ -34,6 +36,7 @@ import ResourceStatus from './pages/ResourceStatus';
 import Onboarding from './pages/Onboarding';
 import AuthAction from './pages/AuthAction';
 import Suites,{SuiteRoute} from './pages/Suites';
+import Billing from './pages/Billing';
 
 // Tool wrapper
 import ToolPage from './pages/ToolPage';
@@ -106,6 +109,7 @@ export default function App() {
     <ThemeProvider>
       <AuthProvider>
       <EntitlementProvider>
+      <BillingProvider>
       <GlobalErrorBoundary>
       <WorksheetProvider>
         <ReportProvider>
@@ -124,6 +128,7 @@ export default function App() {
                   <Route path="/pricing" element={<Pricing />} />
                   <Route path="/suites" element={<Suites />} />
                   <Route path="/suites/:suiteId" element={<SuiteRoute />} />
+                  <Route path="/account/billing" element={<ProtectedRoute><Billing /></ProtectedRoute>} />
                   <Route path="/start" element={<SupabaseSetupGate><Onboarding /></SupabaseSetupGate>} />
                   <Route path="/signup" element={<SupabaseSetupGate><Onboarding /></SupabaseSetupGate>} />
                   <Route path="/signin" element={<SupabaseSetupGate><AuthAction /></SupabaseSetupGate>} />
@@ -134,12 +139,12 @@ export default function App() {
                   <Route path="/hypothesis" element={<ProtectedRoute><SuiteGate suiteIds="operational-excellence"><HypothesisTesting /></SuiteGate></ProtectedRoute>} />
                   <Route path="/doe" element={<ProtectedRoute><SuiteGate suiteIds="operational-excellence"><DOEPage /></SuiteGate></ProtectedRoute>} />
                   <Route path="/templates" element={<ProtectedRoute><Templates /></ProtectedRoute>} />
-                  <Route path="/documents/:templateId" element={<ProtectedRoute><Templates /></ProtectedRoute>} />
-                  <Route path="/projects/:projectId/documents/:templateId" element={<ProtectedRoute><Templates /></ProtectedRoute>} />
+                  <Route path="/documents/:templateId" element={<ProtectedRoute><DocumentSuiteGate><Templates /></DocumentSuiteGate></ProtectedRoute>} />
+                  <Route path="/projects/:projectId/documents/:templateId" element={<ProtectedRoute><DocumentSuiteGate><Templates /></DocumentSuiteGate></ProtectedRoute>} />
                   <Route path="/report" element={<ProtectedRoute><ReportBuilder /></ProtectedRoute>} />
                   <Route path="/projects" element={<ProtectedRoute><ProjectsHome /></ProtectedRoute>} />
                   <Route path="/projects/:id" element={<ProtectedRoute><ProjectDetail /></ProtectedRoute>} />
-                  <Route path="/projects/:id/charter" element={<ProtectedRoute><ProjectCharter /></ProtectedRoute>} />
+                  <Route path="/projects/:id/charter" element={<ProtectedRoute><SuiteGate suiteIds={['operational-excellence','project-management']}><ProjectCharter /></SuiteGate></ProtectedRoute>} />
                   {Object.keys(toolMeta).map(id => (
                     <Route key={id} path={`/tool/${id}`} element={<ProtectedRoute><SuiteGate suiteIds="operational-excellence"><ToolRoute toolId={id} /></SuiteGate></ProtectedRoute>} />
                   ))}
@@ -152,6 +157,7 @@ export default function App() {
         </ReportProvider>
       </WorksheetProvider>
       </GlobalErrorBoundary>
+      </BillingProvider>
       </EntitlementProvider>
       </AuthProvider>
     </ThemeProvider>
