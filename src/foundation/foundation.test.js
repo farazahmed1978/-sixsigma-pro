@@ -65,9 +65,9 @@ describe('statistical validation harness', () => {
     expect(calculator).not.toHaveBeenCalled();
   });
 
-  test('catalog wires five representative families but reports them honestly', () => {
+  test('catalog wires five representative families and discounts incomplete output coverage', () => {
     expect(STATISTICAL_VALIDATION_CATALOG).toHaveLength(5);
-    STATISTICAL_VALIDATION_CATALOG.forEach(manifest => expect(validateMethod(manifest, manifest.runner).status).toBe(VALIDATION_STATUS.UNVALIDATED));
+    STATISTICAL_VALIDATION_CATALOG.forEach(manifest => expect(validateMethod(manifest, manifest.runner).status).toBe(VALIDATION_STATUS.PARTIALLY_VALIDATED));
   });
 });
 

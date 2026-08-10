@@ -10,6 +10,7 @@ import Layout from './components/Layout';
 import {AuthProvider} from './context/AuthContext';
 import {EntitlementProvider} from './context/EntitlementContext';
 import {BillingProvider} from './context/BillingContext';
+import {InteractionProvider} from './context/InteractionContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import SupabaseSetupGate from './components/SupabaseSetupGate';
 import GlobalErrorBoundary from './components/GlobalErrorBoundary';
@@ -107,6 +108,7 @@ function ToolRoute({ toolId }) {
 export default function App() {
   return (
     <ThemeProvider>
+      <InteractionProvider>
       <AuthProvider>
       <EntitlementProvider>
       <BillingProvider>
@@ -160,6 +162,7 @@ export default function App() {
       </BillingProvider>
       </EntitlementProvider>
       </AuthProvider>
+      </InteractionProvider>
     </ThemeProvider>
   );
 }

@@ -54,5 +54,9 @@ export function validationStatus(cases = [], results = []) {
 
 export function validateMethod(manifest, calculator) {
   const results = (manifest.cases || []).map(item => runValidationCase(item, calculator));
-  return { methodId: manifest.methodId, manifestVersion: manifest.manifestVersion || VALIDATION_MANIFEST_VERSION, status: validationStatus(manifest.cases, results), results };
+  let status = validationStatus(manifest.cases, results);
+  const covered = new Set((manifest.cases || []).flatMap(item => Object.keys(item.expected?.outputs || {})));
+  const missingRequiredOutputs = (manifest.requiredOutputs || []).filter(path => !covered.has(path));
+  if (status === VALIDATION_STATUS.VALIDATED && missingRequiredOutputs.length) status = VALIDATION_STATUS.PARTIALLY_VALIDATED;
+  return { methodId: manifest.methodId, manifestVersion: manifest.manifestVersion || VALIDATION_MANIFEST_VERSION, status, results, coveredOutputs: [...covered], missingRequiredOutputs };
 }

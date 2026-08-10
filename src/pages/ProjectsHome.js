@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useProjects, PHASES } from '../context/ProjectsContext';
+import { useInteractions } from '../context/InteractionContext';
 import './ProjectWorkspace.css';
 
 function projectProgress(project) {
@@ -16,6 +17,7 @@ function currentPhase(project) {
 
 export default function ProjectsHome() {
   const { projects, createProject, deleteProject } = useProjects();
+  const {confirm,toast}=useInteractions();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: '', goal: '', owner: '', champion: '' });
 
@@ -101,9 +103,9 @@ export default function ProjectsHome() {
                   <button
                     className="pw-delete-btn"
                     title="Delete project"
-                    onClick={() => {
-                      if (window.confirm(`Delete "${project.name}"? This won't delete the underlying report items.`)) {
-                        deleteProject(project.id);
+                    onClick={async () => {
+                      if (await confirm({title:'Delete project?',message:`“${project.name}” will be permanently removed. Existing report items are retained. This cannot be undone.`,confirmLabel:'Delete Project',destructive:true})) {
+                        deleteProject(project.id);toast('Project deleted.');
                       }
                     }}
                   >

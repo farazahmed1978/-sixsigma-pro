@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 import {useAuth} from './AuthContext';
+import { calculatedColumn, createLineage, joinDatasets, pivot, recodeColumn, sortedRowIndices, stackColumns, transformColumn, typedColumn, unpivot } from '../utils/dataWorkspace';
 
 const WorksheetContext = createContext();
 const STORAGE_KEY = 'sixsigmapro_datasets_v1';
@@ -13,10 +14,11 @@ const rowCountFor = columns => Math.max(0, ...columns.map(column => column.data?
 const historyItem = action => ({ id: `history-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`, action, at: now() });
 
 function normalizeDataset(dataset) {
-  const columns = Array.isArray(dataset.columns) ? dataset.columns.map((column, index) => ({
+  const columns = Array.isArray(dataset.columns) ? dataset.columns.map((column, index) => typedColumn({
     name: column.name || `Column${index + 1}`,
     data: Array.isArray(column.data) ? column.data : [],
     type: column.type || 'auto',
+    derivation: column.derivation || null,
   })) : [];
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -39,6 +41,7 @@ function normalizeDataset(dataset) {
     updatedAt: dataset.updatedAt || now(),
     archivedAt: dataset.archivedAt || '',
     history: Array.isArray(dataset.history) ? dataset.history.slice(0, 50) : [],
+    lineage: Array.isArray(dataset.lineage) ? dataset.lineage : [],
   };
 }
 
@@ -55,11 +58,13 @@ export function WorksheetProvider({ children }) {
   const {user,profile}=useAuth();
   const [datasets, setDatasets] = useState(loadRegistry);
   const [activeDatasetId, setActiveDatasetId] = useState(() => localStorage.getItem(ACTIVE_KEY) || '');
+  const [viewSort, setViewSort] = useState([]);
 
   const activeDataset = useMemo(() => datasets.find(dataset => dataset.id === activeDatasetId) || null, [datasets, activeDatasetId]);
-  const columns = activeDataset?.columns || [];
+  const columns = useMemo(() => activeDataset?.columns || [], [activeDataset]);
   const fileName = activeDataset?.name || '';
   const rowCount = rowCountFor(columns);
+  const viewRowIndices = useMemo(() => sortedRowIndices(columns, viewSort), [columns, viewSort]);
 
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(datasets)); } catch (error) { console.warn('Datasets could not be saved:', error); }
@@ -86,6 +91,14 @@ export function WorksheetProvider({ children }) {
     setActiveDatasetId(dataset.id);
     return dataset.id;
   }, [profile,user]);
+
+  const createDerivedDataset = useCallback(({ name, derivedColumns, operation, parameters = {}, sourceDatasetIds = [] }) => {
+    if (!activeDataset) throw new Error('Select a source dataset first.');
+    const id = makeId(), versionId = makeVersionId();
+    const lineage = createLineage({ sourceDataset: activeDataset, resultDatasetId: id, resultVersionId: versionId, operation, parameters, sourceDatasetIds });
+    const dataset = normalizeDataset({ id, versionId, name: name || `${activeDataset.name} — ${operation}`, description: `Derived from ${activeDataset.name}`, projectId: activeDataset.projectId, organizationId: activeDataset.organizationId, createdBy: user?.id || activeDataset.createdBy, source: 'derived', columns: derivedColumns, lineage: [...(activeDataset.lineage || []), lineage], history: [historyItem(`Derived dataset created: ${operation}`)] });
+    setDatasets(previous => [...previous, dataset]); setActiveDatasetId(id); return id;
+  }, [activeDataset, user]);
 
   const loadData = useCallback((parsedColumns, name, options = {}) => {
     const dataset = normalizeDataset({ id: makeId(), name: name || 'Worksheet', description: options.description || '', projectId: options.projectId || '', organizationId:options.organizationId||profile?.default_organization_id||'',createdBy:user?.id||'', source: options.source || 'import',sourceNote:options.sourceNote||'', columns: parsedColumns, history: [historyItem('Data imported')] });
@@ -115,18 +128,23 @@ export function WorksheetProvider({ children }) {
   const updateDatasetMetadata = useCallback((id, updates) => setDatasets(previous => previous.map(dataset => dataset.id === id ? { ...dataset, ...updates, id: dataset.id, columns: dataset.columns, updatedAt: now(), history: [historyItem('Dataset details updated'), ...dataset.history].slice(0, 50) } : dataset)), []);
   const duplicateDataset = useCallback(id => {
     const source = datasets.find(dataset => dataset.id === id); if (!source) return null;
-    const copy = normalizeDataset({ ...source, id: makeId(), name: `${source.name} Copy`, columns: source.columns.map(column => ({ ...column, data: [...column.data] })), createdAt: now(), updatedAt: now(), history: [historyItem('Dataset duplicated')] });
+    const copy = normalizeDataset({ ...source, id: makeId(), version: 1, versionId: makeVersionId(), name: `${source.name} Copy`, columns: source.columns.map(column => ({ ...column, data: [...column.data] })), createdAt: now(), updatedAt: now(), history: [historyItem('Dataset duplicated')] });
     setDatasets(previous => [...previous, copy]); setActiveDatasetId(copy.id); return copy.id;
   }, [datasets]);
   const deleteDataset = useCallback(id => { setDatasets(previous => previous.filter(dataset => dataset.id !== id)); setActiveDatasetId(current => current === id ? '' : current); }, []);
   const archiveDataset = useCallback(id => setDatasets(previous => previous.map(dataset => dataset.id === id ? { ...dataset, archivedAt: dataset.archivedAt ? '' : now(),status:dataset.archivedAt?'active':'archived', updatedAt: now(), history: [historyItem(dataset.archivedAt ? 'Dataset restored' : 'Dataset archived'), ...dataset.history].slice(0, 50) } : dataset)), []);
   const assignDatasetProject = useCallback((id, projectId) => setDatasets(previous => previous.map(dataset => dataset.id === id ? { ...dataset, projectId, updatedAt: now(), history: [historyItem('Project assignment changed'), ...dataset.history].slice(0, 50) } : dataset)), []);
-  const changeColumnType = useCallback((colIndex, type) => updateActive(dataset => ({ ...dataset, columns: dataset.columns.map((column, index) => index === colIndex ? { ...column, type } : column) }), `Column type changed to ${type}`), [updateActive]);
-  const sortColumn = useCallback((colIndex, direction) => updateActive(dataset => {
-    const rows = Array.from({ length: rowCountFor(dataset.columns) }, (_, rowIndex) => dataset.columns.map(column => column.data[rowIndex] ?? ''));
-    rows.sort((a, b) => { const av = a[colIndex], bv = b[colIndex]; const an = Number(av), bn = Number(bv); const result = av !== '' && bv !== '' && !Number.isNaN(an) && !Number.isNaN(bn) ? an - bn : String(av).localeCompare(String(bv)); return direction === 'desc' ? -result : result; });
-    return { ...dataset, columns: dataset.columns.map((column, index) => ({ ...column, data: rows.map(row => row[index]) })) };
-  }, `Rows sorted ${direction === 'desc' ? 'descending' : 'ascending'}`), [updateActive]);
+  const changeColumnType = useCallback((colIndex, type) => updateActive(dataset => ({ ...dataset, columns: dataset.columns.map((column, index) => index === colIndex ? typedColumn({ ...column, type }) : column) }), `Column type changed to ${type}`), [updateActive]);
+  const sortColumn = useCallback((colIndex, direction) => { const column = columns[colIndex]; if (column) setViewSort([{ column: column.name, direction }]); }, [columns]);
+  const clearViewSort = useCallback(() => setViewSort([]), []);
+  const switchDataset = useCallback(id => { setViewSort([]); setActiveDatasetId(id); }, []);
+  const deriveCalculatedColumn = useCallback((name, expression) => createDerivedDataset({ name: `${activeDataset.name} — calculated`, derivedColumns: [...columns, calculatedColumn(columns, name, expression)], operation: 'calculated_column', parameters: { name, expression } }), [activeDataset, columns, createDerivedDataset]);
+  const deriveTransformedColumn = useCallback((columnName, operation, parameters = {}) => { const column = columns.find(item => item.name === columnName); if (!column) throw new Error('Column not found.'); return createDerivedDataset({ name: `${activeDataset.name} — ${operation}`, derivedColumns: [...columns, transformColumn(column, operation, parameters)], operation, parameters: { columnName, ...parameters } }); }, [activeDataset, columns, createDerivedDataset]);
+  const deriveRecodedColumn = useCallback((columnName, rules, name) => { const column = columns.find(item => item.name === columnName); if (!column) throw new Error('Column not found.'); return createDerivedDataset({ name: `${activeDataset.name} — recoded`, derivedColumns: [...columns, recodeColumn(column, rules, name)], operation: 'recode', parameters: { columnName, rules, name } }); }, [activeDataset, columns, createDerivedDataset]);
+  const deriveJoinedDataset = useCallback((rightDatasetId, leftKey, rightKey, joinType = 'left') => { const right = datasets.find(item => item.id === rightDatasetId); if (!right) throw new Error('Join dataset not found.'); return createDerivedDataset({ name: `${activeDataset.name} + ${right.name}`, derivedColumns: joinDatasets(columns, right.columns, leftKey, rightKey, joinType), operation: 'join', parameters: { leftKey, rightKey, joinType }, sourceDatasetIds: [activeDataset.id, right.id] }); }, [activeDataset, columns, createDerivedDataset, datasets]);
+  const deriveStackedDataset = useCallback((columnNames, valueName='Value', sourceName='Source') => createDerivedDataset({ name: `${activeDataset.name} — stacked`, derivedColumns: stackColumns(columns,columnNames,valueName,sourceName), operation:'stack', parameters:{columnNames,valueName,sourceName} }),[activeDataset,columns,createDerivedDataset]);
+  const deriveUnpivotedDataset = useCallback((idColumns,valueColumns,variableName='Variable',valueName='Value') => createDerivedDataset({ name:`${activeDataset.name} — unpivoted`,derivedColumns:unpivot(columns,idColumns,valueColumns,variableName,valueName),operation:'unpivot',parameters:{idColumns,valueColumns,variableName,valueName} }),[activeDataset,columns,createDerivedDataset]);
+  const derivePivotedDataset = useCallback((indexColumns,namesFrom,valuesFrom,aggregate='first') => createDerivedDataset({ name:`${activeDataset.name} — pivoted`,derivedColumns:pivot(columns,indexColumns,namesFrom,valuesFrom,aggregate),operation:'pivot',parameters:{indexColumns,namesFrom,valuesFrom,aggregate} }),[activeDataset,columns,createDerivedDataset]);
 
   const getNumericColumns = () => columns.filter(column => column.type === 'numeric' || (column.type === 'auto' && column.data.some(value => value !== '' && !Number.isNaN(parseFloat(value)))));
   const getCategoricalColumns = () => columns.filter(column => column.type === 'categorical' || (column.type === 'auto' && !column.data.every(value => value === '' || !Number.isNaN(parseFloat(value)))));
@@ -134,9 +152,10 @@ export function WorksheetProvider({ children }) {
   const getRawColumnData = name => columns.find(column => column.name === name)?.data || [];
 
   return <WorksheetContext.Provider value={{
-    columns, fileName, rowCount, hasData: columns.length > 0, datasets, activeDataset, activeDatasetId,
+    columns, fileName, rowCount, hasData: columns.length > 0, datasets, activeDataset, activeDatasetId, viewRowIndices, viewSort,
     loadData, clearData, addColumn, updateCell, renameColumn, deleteColumn, addBlankColumn, addBlankRow, deleteRow, startBlankSheet,
-    createDataset, switchDataset: setActiveDatasetId, renameDataset, updateDatasetMetadata, duplicateDataset, archiveDataset, deleteDataset, assignDatasetProject, changeColumnType, sortColumn,
+    createDataset, createDerivedDataset, switchDataset, renameDataset, updateDatasetMetadata, duplicateDataset, archiveDataset, deleteDataset, assignDatasetProject, changeColumnType, sortColumn, clearViewSort,
+    deriveCalculatedColumn, deriveTransformedColumn, deriveRecodedColumn, deriveJoinedDataset, deriveStackedDataset, deriveUnpivotedDataset, derivePivotedDataset,
     getNumericColumns, getCategoricalColumns, getColumnData, getRawColumnData,
   }}>{children}</WorksheetContext.Provider>;
 }

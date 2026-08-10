@@ -5,12 +5,10 @@ import CSVUploader from '../components/CSVUploader';
 import { useWorksheet } from '../context/WorksheetContext';
 import { useReport } from '../context/ReportContext';
 import { interpretControlChart } from '../utils/interpretations';
+import { individualsMovingRange } from '../utils/statisticalEngines';
 import './Tool.css';
 
 // Standard I-MR constants (subgroup size n=2 for moving range)
-const D2 = 1.128;   // used to estimate sigma from mRbar
-const D4_IMR = 3.267;   // moving range UCL multiplier
-const D3_IMR = 0;       // moving range LCL multiplier (0 for n=2)
 
 // Standard X-bar & R control chart constants (Montgomery, "Introduction to Statistical
 // Quality Control" — the standard published table for subgroup sizes n=2 through n=10).
@@ -26,24 +24,6 @@ const XBAR_R_CONSTANTS = {
   9: { A2: 0.337, D3: 0.184, D4: 1.816 },
   10: { A2: 0.308, D3: 0.223, D4: 1.777 },
 };
-
-function calcStats(values) {
-  const n = values.length;
-  const mean = values.reduce((a, b) => a + b, 0) / n;
-
-  const movingRanges = [];
-  for (let i = 1; i < n; i++) movingRanges.push(Math.abs(values[i] - values[i - 1]));
-  const mrBar = movingRanges.reduce((a, b) => a + b, 0) / movingRanges.length;
-
-  const sigma = mrBar / D2;
-
-  const ucl = mean + 3 * sigma;
-  const lcl = mean - 3 * sigma;
-  const mrUcl = D4_IMR * mrBar;
-  const mrLcl = D3_IMR * mrBar;
-
-  return { mean, sigma, mrBar, ucl, lcl, mrUcl, mrLcl, n, movingRanges };
-}
 
 // Groups raw (value, subgroupId) rows into ordered subgroups, computes X-bar (subgroup mean)
 // and R (subgroup range) per subgroup, then derives X-bar/R chart control limits.
@@ -229,7 +209,7 @@ export default function ControlChart() {
     if (!data || !valueCol) return;
     setAddedToReport(false);
     const values = data.map(r => +r[valueCol]).filter(v => !isNaN(v));
-    const s = calcStats(values);
+    const s = individualsMovingRange({ values });
     setStats(s);
 
     const ruleFlags = applyWesternElectricRules(values, s.mean, s.sigma);

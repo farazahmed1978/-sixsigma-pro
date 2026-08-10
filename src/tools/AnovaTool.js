@@ -9,6 +9,8 @@ import {
   pairwisePostHoc, pairwisePostHocPaired, mauchlysTest, simpleEffectsAnalysis, gamesHowell, TEST_EXPLAINERS
 } from '../utils/statTests';
 import { QQPlot, SimpleHistogram, GroupBoxPlot } from '../utils/statViews';
+import { buildAssumptionReport } from '../utils/assumptionDiagnostics';
+import AssumptionReportCard from '../components/AssumptionReportCard';
 import './Tool.css';
 
 // An expandable companion-test card. Shows a plain-English explainer plus the "Run" action —
@@ -160,6 +162,8 @@ export default function AnovaTool() {
         chartImage,
         statsSummary: { 'F': owResult.F.toFixed(3), 'df': `${owResult.dfB}, ${owResult.dfW}`, 'p-value': owResult.p.toFixed(4), 'η²': owResult.etaSq.toFixed(3) },
         interpretation,
+        assumptionReport: buildAssumptionReport({ values: owResult.residuals, groups: owGroups.groups }),
+        provenance: { method: 'one-way-anova', methodVersion: '1.0.0', nAnalyzed: owGroups.groups.reduce((sum, group) => sum + group.length, 0), missingHandling: { policy: 'complete-case', omitted: 0 } },
         rawData: owGroups.labels.map((lab, i) => ({ group: lab, n: owGroups.groups[i].length, mean: owResult.groupStats[i].mean.toFixed(4), sd: owResult.groupStats[i].sd.toFixed(4) })),
       });
     } else if (mode === 'rm' && rmResult) {
@@ -459,6 +463,8 @@ export default function AnovaTool() {
               {showQQ && <div className="card" style={{ padding: '1rem', marginBottom: '1rem' }}><QQPlot data={twResult.residuals} title="Q-Q Plot of Two-Way ANOVA Residuals" /></div>}
             </>
           )}
+
+          {mode === 'oneway' && owResult && owGroups && <AssumptionReportCard report={buildAssumptionReport({ values: owResult.residuals, groups: owGroups.groups })} />}
 
           {/* Companion tests */}
           <div style={{ marginTop: '1.5rem', marginBottom: '0.75rem', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Companion Tests</div>

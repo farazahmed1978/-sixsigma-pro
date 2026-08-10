@@ -4,26 +4,9 @@ import { Scatter, XAxis, YAxis, CartesianGrid, Tooltip, Line, ResponsiveContaine
 import html2canvas from 'html2canvas';
 import { useReport } from '../context/ReportContext';
 import { interpretRegression } from '../utils/interpretations';
-
-const mean = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
-
-function simpleRegression(x, y) {
-  const n = x.length;
-  const mx = mean(x), my = mean(y);
-  const sxy = x.reduce((s, v, i) => s + (v - mx) * (y[i] - my), 0);
-  const sxx = x.reduce((s, v) => s + (v - mx) ** 2, 0);
-  const b1 = sxy / sxx;
-  const b0 = my - b1 * mx;
-  const yhat = x.map(v => b0 + b1 * v);
-  const ssTot = y.reduce((s, v) => s + (v - my) ** 2, 0);
-  const ssRes = y.reduce((s, v, i) => s + (v - yhat[i]) ** 2, 0);
-  const r2 = 1 - ssRes / ssTot;
-  const r = Math.sqrt(r2) * (b1 >= 0 ? 1 : -1);
-  const se = Math.sqrt(ssRes / (n - 2));
-  const seb1 = se / Math.sqrt(sxx);
-  const t = b1 / seb1;
-  return { b0, b1, r, r2, se, t, n, yhat };
-}
+import { simpleLinearRegression } from '../utils/statisticalEngines';
+import { buildAssumptionReport } from '../utils/assumptionDiagnostics';
+import AssumptionReportCard from '../components/AssumptionReportCard';
 
 export default function RegressionTool() {
   const { columns, getColumnData, hasData } = useWorksheet();
@@ -41,7 +24,7 @@ export default function RegressionTool() {
     const y = getColumnData(yCol), x = getColumnData(xCol);
     const n = Math.min(x.length, y.length);
     if (n < 3) return;
-    const res = simpleRegression(x.slice(0, n), y.slice(0, n));
+    const res = simpleLinearRegression({ x: x.slice(0, n), y: y.slice(0, n), predictorName: xCol });
     const plotData = x.slice(0, n).map((v, i) => ({ x: v, y: y[i], yhat: res.yhat[i] })).sort((a, b) => a.x - b.x);
     setResult({ ...res, plotData, xName: xCol, yName: yCol });
   };
@@ -53,6 +36,7 @@ export default function RegressionTool() {
     const chartImage = canvas.toDataURL('image/png');
 
     const interpretation = interpretRegression(result);
+    const assumptionReport = buildAssumptionReport({ values: result.residuals, orderedValues: result.residuals });
 
     addReportItem({
       title: `Regression — ${result.yName} vs ${result.xName}`,
@@ -69,6 +53,8 @@ export default function RegressionTool() {
         'n': result.n,
       },
       interpretation,
+      assumptionReport,
+      provenance: { method: result.method, methodVersion: result.methodVersion, nAnalyzed: result.n, missingHandling: result.missingHandling },
       rawData: result.plotData.map(d => ({ [result.xName]: d.x, [result.yName]: d.y, predicted: d.yhat.toFixed(4) })),
     });
 
@@ -152,6 +138,7 @@ export default function RegressionTool() {
                   `✕ Weak fit: R² = ${(result.r2 * 100).toFixed(1)}%. ${result.xName} has limited predictive power for ${result.yName}.`}
             </div>
           </div>
+          <AssumptionReportCard report={buildAssumptionReport({ values: result.residuals, orderedValues: result.residuals })} />
           <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
             <button className="btn-secondary no-print" onClick={() => window.print()}>🖨️ Print Results</button>
             <button className="btn-primary no-print" onClick={handleAddToReport}>

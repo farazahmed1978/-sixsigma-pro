@@ -2,18 +2,18 @@ import React, { useState, useCallback, useRef } from 'react';
 import html2canvas from 'html2canvas';
 import { useWorksheet } from '../context/WorksheetContext';
 import { useReport } from '../context/ReportContext';
-import { tCDF, normCDF, chiSquareCDF } from '../utils/statMath';
+import { normCDF, chiSquareCDF } from '../utils/statMath';
 import { oneWayAnova as verifiedOneWayAnova, pairedTTest, twoPropTest, wilcoxonSignedRank, friedmanTest, chiSquareIndependence, fishersExact, pearsonCorrelationTest, spearmanCorrelationTest, kendallTauTest, dunnsTest } from '../utils/statTests';
+import { oneSampleTTest, welchTwoSampleTTest } from '../utils/statisticalEngines';
 import { BOOK_EXCERPTS } from '../utils/bookExcerpts';
+import { buildAssumptionReport } from '../utils/assumptionDiagnostics';
+import AssumptionReportCard from '../components/AssumptionReportCard';
+import '../tools/Tool.css';
 import './HypothesisTesting.css';
 
 // Statistical helpers — descriptive only. All p-value math below now comes from
 // the numerically-verified engine in statMath.js / statTests.js (same one used by
 // AnovaTool.js), instead of the approximations this file used to compute locally.
-const mean = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
-const variance = arr => { const m = mean(arr); return arr.reduce((a, b) => a + (b - m) ** 2, 0) / (arr.length - 1); };
-const stddev = arr => Math.sqrt(variance(arr));
-
 function mannWhitney(a, b) {
   let u1 = 0;
   for (let i = 0; i < a.length; i++)
@@ -29,24 +29,14 @@ function mannWhitney(a, b) {
 }
 
 function oneSampleT(data, mu0) {
-  const n = data.length, m = mean(data), s = stddev(data);
-  const t = (m - mu0) / (s / Math.sqrt(n));
-  const df = n - 1;
-  const p = 2 * (1 - tCDF(Math.abs(t), df));
-  const ci95 = 1.96 * s / Math.sqrt(n);
-  return { n, mean: m, stddev: s, t, df, p, ci: [m - ci95, m + ci95] };
+  const result = oneSampleTTest({ values: data, mu0 });
+  return { ...result, t: result.statistic, p: result.pValue, ci: result.confidenceInterval, stddev: result.standardDeviation };
 }
 
 function twoSampleT(a, b) {
-  const na = a.length, nb = b.length;
-  const ma = mean(a), mb = mean(b);
-  const va = variance(a), vb = variance(b);
-  const se = Math.sqrt(va / na + vb / nb);
-  const t = (ma - mb) / se;
+  const result = welchTwoSampleTTest({ a, b });
   // Welch-Satterthwaite df — matches the 2-sample approach used elsewhere in the app.
-  const df = Math.round((va / na + vb / nb) ** 2 / ((va / na) ** 2 / (na - 1) + (vb / nb) ** 2 / (nb - 1)));
-  const p = 2 * (1 - tCDF(Math.abs(t), df));
-  return { na, nb, ma, mb, sa: Math.sqrt(va), sb: Math.sqrt(vb), t, df, p, diff: ma - mb };
+  return { ...result, na: result.nA, nb: result.nB, ma: result.meanA, mb: result.meanB, sa: Math.sqrt(result.varianceA), sb: Math.sqrt(result.varianceB), t: result.statistic, p: result.pValue, diff: result.difference };
 }
 
 // Thin wrapper around the shared, verified oneWayAnova (statTests.js) — remaps its
@@ -380,6 +370,8 @@ export default function HypothesisTesting() {
       chartImage,
       statsSummary: summary,
       interpretation,
+      assumptionReport: result.assumptionReport || null,
+      provenance: result.method ? { method: result.method, methodVersion: result.methodVersion, nAnalyzed: result.n || result.nA + result.nB, missingHandling: result.missingHandling } : null,
       rawData: [],
     });
     setAddedToReport(true);
@@ -401,10 +393,10 @@ export default function HypothesisTesting() {
 
       if (test.id === '1t') {
         if (d1.length < 2) throw new Error('Need at least 2 data points');
-        res = oneSampleT(d1, parseFloat(inputs.mu0) || 0);
+        res = { ...oneSampleT(d1, parseFloat(inputs.mu0) || 0), assumptionReport: buildAssumptionReport({ values: d1 }) };
       } else if (test.id === '2t') {
         if (d1.length < 2 || d2.length < 2) throw new Error('Need at least 2 data points in each group');
-        res = twoSampleT(d1, d2);
+        res = { ...twoSampleT(d1, d2), assumptionReport: buildAssumptionReport({ values: [...d1, ...d2], groups: [d1, d2] }) };
       } else if (test.id === 'pairedt') {
         if (d1.length < 2 || d2.length < 2) throw new Error('Need at least 2 paired data points in each column');
         const minLen = Math.min(d1.length, d2.length);
@@ -755,6 +747,7 @@ export default function HypothesisTesting() {
               {result && (
                 <div ref={resultRef}>
                   <ResultBox result={result} testId={selectedTest} />
+                  {result.assumptionReport && <AssumptionReportCard report={result.assumptionReport} />}
                 </div>
               )}
               {result && (
