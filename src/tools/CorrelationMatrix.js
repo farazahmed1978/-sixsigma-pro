@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import html2canvas from 'html2canvas';
 import { useWorksheet } from '../context/WorksheetContext';
-import { useReport } from '../context/ReportContext';
+import { useProjectReportPlacement as useReport } from '../context/ProjectPlacementContext';
 import { interpretCorrelationMatrix } from '../utils/interpretations';
 
 const mean = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
@@ -132,7 +132,7 @@ export default function CorrelationMatrix() {
           <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem', flexWrap: 'wrap' }}>
             <button className="btn-secondary no-print" onClick={() => window.print()}>🖨️ Print Matrix</button>
             <button className="btn-primary no-print" onClick={handleAddToReport}>
-              {addedToReport ? '✓ Added to Report' : '📄 Add to Report'}
+              {addedToReport ? 'Manage Placement' : 'Add to Project'}
             </button>
           </div>
         </>

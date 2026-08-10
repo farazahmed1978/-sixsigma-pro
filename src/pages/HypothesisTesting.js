@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom';
 import html2canvas from 'html2canvas';
 import { useWorksheet } from '../context/WorksheetContext';
-import { useReport } from '../context/ReportContext';
+import { useProjectReportPlacement as useReport } from '../context/ProjectPlacementContext';
 import { normCDF, chiSquareCDF } from '../utils/statMath';
 import { oneWayAnova as verifiedOneWayAnova, fishersExact, pearsonCorrelationTest, spearmanCorrelationTest, kendallTauTest, dunnsTest } from '../utils/statTests';
 import {oneSampleTTest,welchTwoSampleTTest} from '../utils/statisticalEngines';
@@ -385,7 +385,7 @@ function ResultBox({ result, testId }) {
 export default function HypothesisTesting() {
   const [searchParams,setSearchParams]=useSearchParams();
   const { activeDataset, columns, getColumnData, hasData } = useWorksheet();
-  const { addReportItem } = useReport();
+  const { addReportItem, addReportOnly } = useReport();
   const resultRef = useRef(null);
   const requestedMethod=HYPOTHESIS_METHOD_CONTEXT[searchParams.get('method')]||null;
   const [selectedTest, setSelectedTest] = useState(requestedMethod);
@@ -400,14 +400,14 @@ export default function HypothesisTesting() {
   useEffect(()=>{const context=HYPOTHESIS_METHOD_CONTEXT[searchParams.get('method')];if(context){setSelectedTest(context);setInputs(previous=>({...previous,pooled:searchParams.get('method')==='pooled-two-sample-t'}));setResult(null);setError('')}},[searchParams]);
   const selectMethod=id=>{setSelectedTest(id);setResult(null);setError('');const catalogId=Object.keys(HYPOTHESIS_METHOD_CONTEXT).find(key=>HYPOTHESIS_METHOD_CONTEXT[key]===id);if(catalogId)setSearchParams({method:catalogId},{replace:true});else setSearchParams({}, {replace:true});if(id==='fisher')setInputs(previous=>({...previous,tableRows:2,tableCols:2,table:[['',''],['','']]}))};
 
-  const handleAddToReport = useCallback(async () => {
+  const handleAddToReport = useCallback(async (reportOnly=false) => {
     if (!resultRef.current || !result) return;
     const test = TESTS.find(t => t.id === selectedTest);
     const canvas = await html2canvas(resultRef.current, { backgroundColor: null, scale: 2 });
     const chartImage = canvas.toDataURL('image/png');
     const { summary, interpretation } = buildReportContent(test, result);
     const catalogId=Object.keys(HYPOTHESIS_METHOD_CONTEXT).find(id=>HYPOTHESIS_METHOD_CONTEXT[id]===selectedTest),validationStatus=analyticsById(catalogId)?.validationStatus||'UNVALIDATED';
-    addReportItem({
+    (reportOnly?addReportOnly:addReportItem)({
       title: test.name,
       toolId: 'hypothesis',
       timestamp: new Date().toISOString(),
@@ -418,8 +418,8 @@ export default function HypothesisTesting() {
       provenance: result.method ? { method: result.method, methodVersion: result.methodVersion, datasetId:activeDataset?.id||null,datasetVersionId:activeDataset?.versionId||null,variableMapping:{first:inputs.col1||null,second:inputs.col2||null,groups:inputs.groups.filter(Boolean)},parameters:{mu0:inputs.mu0,p0:inputs.p0,sigma0:inputs.sigma0,pooled:inputs.pooled},nAnalyzed:[result.n,result.nA+result.nB,result.n1+result.n2].find(Number.isFinite)||null,missingHandling: result.missingHandling||{policy:'finite worksheet values or explicit manual input'},validationStatus} : null,
       rawData: [],
     });
-    setAddedToReport(true);
-  }, [result, selectedTest, addReportItem,activeDataset,inputs]);
+    if(reportOnly)setAddedToReport(previous=>!previous);
+  }, [result, selectedTest, addReportItem,addReportOnly,activeDataset,inputs]);
 
   const numCols = columns.filter(c => c.data.some(v => !isNaN(parseFloat(v))));
 
@@ -801,9 +801,7 @@ export default function HypothesisTesting() {
                 </div>
               )}
               {result && (
-                <button className="btn-primary no-print" style={{ marginTop: '1rem' }} onClick={handleAddToReport}>
-                  {addedToReport ? '✓ Added to Report' : 'Add to Report'}
-                </button>
+                <div style={{display:'flex',gap:'.75rem',marginTop:'1rem'}}><button className="btn-primary no-print" onClick={()=>handleAddToReport(false)}>Add to Project</button><button className="btn-secondary no-print" onClick={()=>handleAddToReport(true)}>{addedToReport?'Remove from Report':'Add to Report'}</button></div>
               )}
             </div>
           )}

@@ -2,7 +2,7 @@ import React, { useState, useCallback, useRef } from 'react';
 import { useWorksheet } from '../context/WorksheetContext';
 import { Scatter, XAxis, YAxis, CartesianGrid, Tooltip, Line, ResponsiveContainer, ComposedChart } from 'recharts';
 import html2canvas from 'html2canvas';
-import { useReport } from '../context/ReportContext';
+import { useProjectReportPlacement as useReport } from '../context/ProjectPlacementContext';
 import { interpretRegression } from '../utils/interpretations';
 import { simpleLinearRegression } from '../utils/statisticalEngines';
 import { buildAssumptionReport } from '../utils/assumptionDiagnostics';
@@ -10,7 +10,7 @@ import AssumptionReportCard from '../components/AssumptionReportCard';
 
 export default function RegressionTool() {
   const { columns, getColumnData, hasData } = useWorksheet();
-  const { addReportItem } = useReport();
+  const { addReportItem, addReportOnly } = useReport();
   const chartWrapperRef = useRef(null);
   const [yCol, setYCol] = useState('');
   const [xCol, setXCol] = useState('');
@@ -29,7 +29,7 @@ export default function RegressionTool() {
     setResult({ ...res, plotData, xName: xCol, yName: yCol });
   };
 
-  const handleAddToReport = useCallback(async () => {
+  const handleAddToReport = useCallback(async (reportOnly=false) => {
     if (!chartWrapperRef.current || !result) return;
 
     const canvas = await html2canvas(chartWrapperRef.current, { backgroundColor: null, scale: 2 });
@@ -38,7 +38,7 @@ export default function RegressionTool() {
     const interpretation = interpretRegression(result);
     const assumptionReport = buildAssumptionReport({ values: result.residuals, orderedValues: result.residuals });
 
-    addReportItem({
+    (reportOnly?addReportOnly:addReportItem)({
       title: `Regression — ${result.yName} vs ${result.xName}`,
       toolId: 'regression',
       timestamp: new Date().toISOString(),
@@ -58,8 +58,8 @@ export default function RegressionTool() {
       rawData: result.plotData.map(d => ({ [result.xName]: d.x, [result.yName]: d.y, predicted: d.yhat.toFixed(4) })),
     });
 
-    setAddedToReport(true);
-  }, [result, addReportItem]);
+    if(reportOnly)setAddedToReport(previous=>!previous);
+  }, [result, addReportItem, addReportOnly]);
 
   return (
     <div style={{ padding: '1.5rem' }}>
@@ -141,9 +141,8 @@ export default function RegressionTool() {
           <AssumptionReportCard report={buildAssumptionReport({ values: result.residuals, orderedValues: result.residuals })} />
           <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
             <button className="btn-secondary no-print" onClick={() => window.print()}>🖨️ Print Results</button>
-            <button className="btn-primary no-print" onClick={handleAddToReport}>
-              {addedToReport ? '✓ Added to Report' : '📄 Add to Report'}
-            </button>
+            <button className="btn-primary no-print" onClick={()=>handleAddToReport(false)}>Add to Project</button>
+            <button className="btn-secondary no-print" onClick={()=>handleAddToReport(true)}>{addedToReport?'Remove from Report':'Add to Report'}</button>
           </div>
         </>
       )}

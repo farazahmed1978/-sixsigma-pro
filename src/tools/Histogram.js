@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { useWorksheet } from '../context/WorksheetContext';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import html2canvas from 'html2canvas';
-import { useReport } from '../context/ReportContext';
+import { useProjectReportPlacement as useReport } from '../context/ProjectPlacementContext';
 import { interpretDescriptiveStats } from '../utils/interpretations';
 
 const mean = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
@@ -168,7 +168,7 @@ export default function DescriptiveStats() {
           <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
             <button className="btn-secondary no-print" onClick={() => window.print()}>🖨️ Print Results</button>
             <button className="btn-primary no-print" onClick={handleAddToReport}>
-              {addedToReport ? '✓ Added to Report' : '📄 Add to Report'}
+              {addedToReport ? 'Manage Placement' : 'Add to Project'}
             </button>
           </div>
         </>

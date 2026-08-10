@@ -5,6 +5,7 @@ import { WorksheetProvider } from './context/WorksheetContext';
 import { ReportProvider } from './context/ReportContext';
 import { ProjectsProvider } from './context/ProjectsContext';
 import { AnalysisProvider } from './context/AnalysisContext';
+import {ProjectPlacementProvider} from './context/ProjectPlacementContext';
 import { IntelligenceProvider } from './context/IntelligenceContext';
 import Layout from './components/Layout';
 import {AuthProvider} from './context/AuthContext';
@@ -119,6 +120,7 @@ export default function App() {
         <ReportProvider>
           <ProjectsProvider>
             <AnalysisProvider>
+              <ProjectPlacementProvider>
               <IntelligenceProvider>
               <Router>
                 <Layout>
@@ -156,6 +158,7 @@ export default function App() {
                 </Layout>
               </Router>
               </IntelligenceProvider>
+              </ProjectPlacementProvider>
             </AnalysisProvider>
           </ProjectsProvider>
         </ReportProvider>

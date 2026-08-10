@@ -2,7 +2,7 @@ import React, { useState, useCallback, useRef } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer } from 'recharts';
 import html2canvas from 'html2canvas';
 import { useWorksheet } from '../context/WorksheetContext';
-import { useReport } from '../context/ReportContext';
+import { useProjectReportPlacement as useReport } from '../context/ProjectPlacementContext';
 import { attributeChart } from '../utils/spcEngine';
 import './Tool.css';
 
@@ -70,7 +70,7 @@ const CHART_META = {
 
 export default function AttributeChart() {
   const { getColumnData, getNumericColumns, hasData } = useWorksheet();
-  const { addReportItem } = useReport();
+  const { addReportItem, addReportOnly } = useReport();
   const chartWrapperRef = useRef(null);
 
   const [chartType, setChartType] = useState('p'); // 'p' | 'np' | 'c' | 'u'
@@ -118,7 +118,7 @@ export default function AttributeChart() {
   const violationCount = result ? result.points.filter(p => p.outOfControl).length : 0;
 
   const centerLine = result?.center || 0;
-  const yLabel = result ? (result.type === 'p' ? 'Proportion Defective' : result.type === 'np' ? 'Number Defective' : result.type === 'c' ? 'Defect Count' : 'Defects per Unit') : '';const handleAddToReport = useCallback(async () => {
+  const yLabel = result ? (result.type === 'p' ? 'Proportion Defective' : result.type === 'np' ? 'Number Defective' : result.type === 'c' ? 'Defect Count' : 'Defects per Unit') : '';const handleAddToReport = useCallback(async (reportOnly=false) => {
     if (!chartWrapperRef.current || !result) return;
     const canvas = await html2canvas(chartWrapperRef.current, { backgroundColor: null, scale: 2 });
     const chartImage = canvas.toDataURL('image/png');
@@ -126,7 +126,7 @@ export default function AttributeChart() {
       ? `${violationCount} point(s) fell outside the control limits on this ${CHART_META[result.type].name} — investigate for special cause variation before treating the process as stable.`
       : `No points fell outside the control limits on this ${CHART_META[result.type].name} — consistent with the process running in statistical control (center line = ${centerLine.toFixed(4)}).`;
 
-    addReportItem({
+    (reportOnly?addReportOnly:addReportItem)({
       title: `${CHART_META[result.type].name} — ${countCol}`,
       toolId: 'attribute-chart',
       timestamp: new Date().toISOString(),
@@ -135,8 +135,8 @@ export default function AttributeChart() {
       interpretation,
       rawData: result.points.map(p => ({ label: p.label, value: p.value.toFixed(4), ucl: p.ucl.toFixed(4), lcl: p.lcl.toFixed(4) })),
     });
-    setAddedToReport(true);
-  }, [result, countCol, violationCount, centerLine, addReportItem]);
+    if(reportOnly)setAddedToReport(previous=>!previous);
+  }, [result, countCol, violationCount, centerLine, addReportItem, addReportOnly]);
 
   if (!hasData) {
     return <div style={{ padding: '1.5rem' }}><div className="alert alert-info">Load data into the Worksheet first, then return here to build an attribute control chart.</div></div>;
@@ -223,7 +223,7 @@ export default function AttributeChart() {
           )}
           <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
             <button className="btn-secondary no-print" onClick={() => window.print()}>🖨️ Print</button>
-            <button className="btn-primary no-print" onClick={handleAddToReport}>{addedToReport ? '✓ Added to Report' : '📄 Add to Report'}</button>
+            <button className="btn-primary no-print" onClick={()=>handleAddToReport(false)}>Add to Project</button><button className="btn-secondary no-print" onClick={()=>handleAddToReport(true)}>{addedToReport?'Remove from Report':'Add to Report'}</button>
           </div>
         </div>
       )}

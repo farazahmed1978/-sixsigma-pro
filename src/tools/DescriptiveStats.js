@@ -2,7 +2,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import html2canvas from 'html2canvas';
 import { useWorksheet } from '../context/WorksheetContext';
-import { useReport } from '../context/ReportContext';
+import { useProjectReportPlacement as useReport } from '../context/ProjectPlacementContext';
 import { interpretAnova, interpretRMAnova } from '../utils/interpretations';
 import {
   oneWayAnova, rmAnova, levenesTest, bartlettsTest, andersonDarling,
@@ -383,7 +383,7 @@ export default function AnovaTool() {
           )}
 
           <button className="btn-primary no-print" style={{ marginTop: '1rem' }} onClick={handleAddToReport}>
-            {addedToReport ? '✓ Added to Report' : 'Add to Report'}
+            {addedToReport ? 'Manage Placement' : 'Add to Project'}
           </button>
         </div>
       )}

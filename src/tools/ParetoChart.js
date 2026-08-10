@@ -3,7 +3,7 @@ import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Respons
 import html2canvas from 'html2canvas';
 import CSVUploader from '../components/CSVUploader';
 import { useWorksheet } from '../context/WorksheetContext';
-import { useReport } from '../context/ReportContext';
+import { useProjectReportPlacement as useReport } from '../context/ProjectPlacementContext';
 import { interpretPareto } from '../utils/interpretations';
 import './Tool.css';
 
@@ -129,7 +129,7 @@ export default function ParetoChart() {
           <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
             <button className="btn-secondary no-print" onClick={() => window.print()}>🖨️ Print</button>
             <button className="btn-primary no-print" onClick={handleAddToReport}>
-              {addedToReport ? '✓ Added to Report' : '📄 Add to Report'}
+              {addedToReport ? 'Manage Placement' : 'Add to Project'}
             </button>
           </div>
         </div>

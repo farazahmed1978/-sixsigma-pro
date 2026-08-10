@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import html2canvas from 'html2canvas';
 import { useWorksheet } from '../context/WorksheetContext';
-import { useReport } from '../context/ReportContext';
+import { useProjectReportPlacement as useReport } from '../context/ProjectPlacementContext';
 import { buildRocCurve, fitLogisticModel } from '../utils/modelEngine';
 import './Tool.css';
 
@@ -13,7 +13,7 @@ const sigBadge = (p) => (
 
 export default function LogisticRegressionTool() {
   const { getNumericColumns, getCategoricalColumns, getRawColumnData, hasData } = useWorksheet();
-  const { addReportItem } = useReport();
+  const { addReportItem, addReportOnly } = useReport();
   const resultsRef = useRef(null);
 
   const [outcomeVar, setOutcomeVar] = useState('');
@@ -41,7 +41,7 @@ export default function LogisticRegressionTool() {
     }
   };
 
-  const handleAddToReport = useCallback(async () => {
+  const handleAddToReport = useCallback(async (reportOnly=false) => {
     if (!resultsRef.current || !result) return;
     const canvas = await html2canvas(resultsRef.current, { backgroundColor: null, scale: 2 });
     const chartImage = canvas.toDataURL('image/png');
@@ -50,7 +50,7 @@ export default function LogisticRegressionTool() {
     const sigVerdict = result.lrP < 0.05 ? '' : 'not ';
     const interpretation = `Logit(${outcomeVar}) = ${eqn}. The overall model is ${sigVerdict}statistically significant (likelihood-ratio χ²(${result.lrDf})=${result.lrChi2.toFixed(3)}, p=${result.lrP < 0.001 ? '<0.001' : result.lrP.toFixed(4)}), explaining ${(result.mcFaddenR2 * 100).toFixed(1)}% of the variation (McFadden's R²=${result.mcFaddenR2.toFixed(4)}). Classification accuracy at a 0.5 threshold: ${(result.accuracy * 100).toFixed(1)}%. ${result.coefStats.filter((c, i) => i > 0 && c.p < 0.05).map(c => c.name).join(', ') || 'No predictors'} individually reach significance at α=0.05.`;
 
-    addReportItem({
+    (reportOnly?addReportOnly:addReportItem)({
       title: `Logistic Regression — ${outcomeVar} on ${predictorVars.join(', ')}`,
       toolId: 'logistic',
       timestamp: new Date().toISOString(),
@@ -61,8 +61,8 @@ export default function LogisticRegressionTool() {
       diagnostics: { converged:result.converged, iterations:result.iterations, separation:result.separation, threshold:result.threshold, sensitivity:result.sensitivity, specificity:result.specificity, auc:result.auc, rocCurve:result.rocCurve, warnings:result.warnings },
       provenance: { method:result.method, methodVersion:result.methodVersion, omittedRowIndices:result.omittedRowIndices, variableMappings:{response:outcomeVar,predictors:predictorVars} },
     });
-    setAddedToReport(true);
-  }, [result, outcomeVar, predictorVars, addReportItem]);
+    if(reportOnly)setAddedToReport(previous=>!previous);
+  }, [result, outcomeVar, predictorVars, addReportItem, addReportOnly]);
 
   if (!hasData) {
     return <div style={{ padding: '1.5rem' }}><div className="alert alert-info">Load data into the Worksheet first, then return here to run a logistic regression.</div></div>;
@@ -178,9 +178,8 @@ export default function LogisticRegressionTool() {
             </table>
           </div>
 
-          <button className="btn-primary no-print" onClick={handleAddToReport}>
-            {addedToReport ? '✓ Added to Report' : 'Add to Report'}
-          </button>
+          <button className="btn-primary no-print" onClick={()=>handleAddToReport(false)}>Add to Project</button>
+          <button className="btn-secondary no-print" onClick={()=>handleAddToReport(true)}>{addedToReport?'Remove from Report':'Add to Report'}</button>
         </div>
       )}
     </div>

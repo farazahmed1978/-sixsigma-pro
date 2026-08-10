@@ -3,8 +3,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, R
 import html2canvas from 'html2canvas';
 import CSVUploader from '../components/CSVUploader';
 import { useWorksheet } from '../context/WorksheetContext';
-import { useReport } from '../context/ReportContext';
-import { useAnalysis } from '../context/AnalysisContext';
+import { useProjectReportPlacement as useReport } from '../context/ProjectPlacementContext';
 import { interpretControlChart } from '../utils/interpretations';
 import { imrChart, xbarRChart, xbarSChart } from '../utils/spcEngine';
 import { buildSpcSignalPresentation, chartTabClass, createControlChartUiDefaults, formatMetric, prepareImrMeasurement, structuredReportPayload, validateStages } from '../utils/practitionerWorkflow';
@@ -145,8 +144,7 @@ const CONTROL_CHART_UI_DEFAULTS = createControlChartUiDefaults();
 
 export default function ControlChart() {
   const { columns, getColumnData, getRawColumnData, getNumericColumns, hasData, activeDataset } = useWorksheet();
-  const { addReportItem } = useReport();
-  const { registerAnalysisResult } = useAnalysis();
+  const { addReportItem, addReportOnly } = useReport();
   const chartWrapperRef = useRef(null);
 
   const [chartType, setChartType] = useState('imr'); // 'imr' | 'xbarR' | 'xbarS' | 'cusum' | 'ewma'
@@ -338,13 +336,12 @@ export default function ControlChart() {
     : (ewmaResult ? ewmaResult.points.filter(d => d.outOfControl).length : 0);
   const imrSignalPresentation = useMemo(() => buildSpcSignalPresentation(stats?.violations || []), [stats]);
 
-  const handleAddToReport = useCallback(async () => {
+  const handleAddToReport = useCallback(async (reportOnly=false) => {
     if (!chartWrapperRef.current) return;
     const canvas = await html2canvas(chartWrapperRef.current, { backgroundColor: null, scale: 2 });
     const chartImage = canvas.toDataURL('image/png');
 
-    const sourceResult = chartType === 'imr' ? stats : (chartType === 'xbarR' || chartType === 'xbarS') ? xbarRStats : chartType === 'cusum' ? cusumResult : ewmaResult;
-    const analysisId = registerAnalysisResult({ title: `${chartType === 'xbarS' ? 'Xbar-S' : chartType === 'xbarR' ? 'Xbar-R' : chartType.toUpperCase()} Control Chart — ${valueCol}`, toolId: 'control-chart', phase: 'Control', method: sourceResult?.method || chartType, methodVersion: sourceResult?.methodVersion || 'legacy-1', inputConfiguration: { variable: valueCol, subgroup: subgroupCol || null, chartType }, variableMapping: { value: valueCol, subgroup: subgroupCol || null }, result: sourceResult, interpretation: violationCount ? `${violationCount} special-cause signals detected.` : 'No configured special-cause signals detected.' });
+    const analysisId = '';
     if (chartType === 'imr') {
       if (!stats || !chartData) return;
       const ruleBreakdown = { rule1: 0, rule2: 0, rule3: 0, rule4: 0 };
@@ -356,7 +353,7 @@ export default function ControlChart() {
       }));
       const interpretation = interpretControlChart({ violationCount, totalPoints: chartData.length, ruleBreakdown });
 
-      addReportItem({
+      (reportOnly?addReportOnly:addReportItem)({
         title: `I-MR Control Chart — ${valueCol}`,
         toolId: 'control-chart',
         timestamp: new Date().toISOString(),
@@ -374,7 +371,7 @@ export default function ControlChart() {
         ? `${violationCount} point(s) across the X-bar and R charts triggered a Western Electric rule — investigate for special cause variation before treating the process as stable.`
         : `No Western Electric rule violations on either the X-bar or R chart — the process mean and within-subgroup variation both appear to be in statistical control (subgroup size n=${xbarRStats.n}).`;
 
-      addReportItem({
+      (reportOnly?addReportOnly:addReportItem)({
         title: `${chartType === 'xbarS' ? 'Xbar-S' : 'Xbar-R'} Control Chart — ${valueCol} (subgroup: ${subgroupCol})`,
         toolId: 'control-chart',
         timestamp: new Date().toISOString(),
@@ -394,7 +391,7 @@ export default function ControlChart() {
       const interpretation = violationCount > 0
         ? `${violationCount} point(s) exceeded the decision interval (H=${cusumResult.H.toFixed(4)}) — this signals a sustained shift away from the target of ${cusumResult.target.toFixed(4)}, worth investigating for special cause.`
         : `No CUSUM signal — the cumulative sums stayed within the decision interval (H=${cusumResult.H.toFixed(4)}), consistent with the process running on target at ${cusumResult.target.toFixed(4)}.`;
-      addReportItem({
+      (reportOnly?addReportOnly:addReportItem)({
         title: `CUSUM Chart — ${valueCol}`,
         toolId: 'control-chart',
         timestamp: new Date().toISOString(),
@@ -408,7 +405,7 @@ export default function ControlChart() {
       const interpretation = violationCount > 0
         ? `${violationCount} point(s) fell outside the EWMA control limits — this signals a shift away from the target of ${ewmaResult.target.toFixed(4)}, worth investigating for special cause.`
         : `No EWMA signal — the smoothed statistic stayed within its control limits throughout, consistent with the process running on target at ${ewmaResult.target.toFixed(4)}.`;
-      addReportItem({
+      (reportOnly?addReportOnly:addReportItem)({
         title: `EWMA Chart — ${valueCol}`,
         toolId: 'control-chart',
         timestamp: new Date().toISOString(),chartImage,
@@ -417,8 +414,8 @@ export default function ControlChart() {
         rawData: ewmaResult.points.map(p => ({ label: p.label, value: p.x, ewma: p.z.toFixed(4) })),
       });
     }
-    setAddedToReport(true);
-  }, [chartType, stats, chartData, xbarRStats, xbarChartData, cusumResult, ewmaResult, valueCol, subgroupCol, violationCount, addReportItem, activeDataset, registerAnalysisResult, imrSignalPresentation]);
+    if(reportOnly)setAddedToReport(previous=>!previous);
+  }, [chartType, stats, chartData, xbarRStats, xbarChartData, cusumResult, ewmaResult, valueCol, subgroupCol, violationCount, addReportItem, addReportOnly, activeDataset, imrSignalPresentation]);
 
   return (
     <div style={{ padding: '1.5rem' }}>
@@ -682,7 +679,7 @@ export default function ControlChart() {
           )}
           <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
             <button className="btn-secondary no-print" onClick={() => window.print()}>🖨️ Print</button>
-            <button className="btn-primary no-print" onClick={handleAddToReport}>{addedToReport ? '✓ Added to Report' : '📄 Add to Report'}</button>
+            <button className="btn-primary no-print" onClick={()=>handleAddToReport(false)}>Add to Project</button><button className="btn-secondary no-print" onClick={()=>handleAddToReport(true)}>{addedToReport?'Remove from Report':'Add to Report'}</button>
           </div>
         </div>
       )}
@@ -736,7 +733,7 @@ export default function ControlChart() {
           )}
           <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
             <button className="btn-secondary no-print" onClick={() => window.print()}>🖨️ Print</button>
-            <button className="btn-primary no-print" onClick={handleAddToReport}>{addedToReport ? '✓ Added to Report' : '📄 Add to Report'}</button>
+            <button className="btn-primary no-print" onClick={()=>handleAddToReport(false)}>Add to Project</button><button className="btn-secondary no-print" onClick={()=>handleAddToReport(true)}>{addedToReport?'Remove from Report':'Add to Report'}</button>
           </div>
         </div>
       )}
@@ -773,7 +770,7 @@ export default function ControlChart() {
           )}
           <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
             <button className="btn-secondary no-print" onClick={() => window.print()}>🖨️ Print</button>
-            <button className="btn-primary no-print" onClick={handleAddToReport}>{addedToReport ? '✓ Added to Report' : '📄 Add to Report'}</button>
+            <button className="btn-primary no-print" onClick={()=>handleAddToReport(false)}>Add to Project</button><button className="btn-secondary no-print" onClick={()=>handleAddToReport(true)}>{addedToReport?'Remove from Report':'Add to Report'}</button>
           </div>
         </div>
       )}
@@ -806,7 +803,7 @@ export default function ControlChart() {
           )}
           <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
             <button className="btn-secondary no-print" onClick={() => window.print()}>🖨️ Print</button>
-            <button className="btn-primary no-print" onClick={handleAddToReport}>{addedToReport ? '✓ Added to Report' : '📄 Add to Report'}</button>
+            <button className="btn-primary no-print" onClick={()=>handleAddToReport(false)}>Add to Project</button><button className="btn-secondary no-print" onClick={()=>handleAddToReport(true)}>{addedToReport?'Remove from Report':'Add to Report'}</button>
           </div>
         </div>
       )}

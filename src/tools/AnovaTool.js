@@ -2,7 +2,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import html2canvas from 'html2canvas';
 import { useWorksheet } from '../context/WorksheetContext';
-import { useReport } from '../context/ReportContext';
+import { useProjectReportPlacement as useReport } from '../context/ProjectPlacementContext';
 import { interpretAnova, interpretRMAnova, interpretTwoWayAnova } from '../utils/interpretations';
 import {
   oneWayAnova, rmAnova, twoWayAnova, levenesTest, bartlettsTest, andersonDarling,
@@ -57,7 +57,7 @@ const assumptionBadge = (p) => sigBadge(p, 'Assumption violated', 'Assumption ho
 
 export default function AnovaTool() {
   const { columns, getColumnData, getRawColumnData, getNumericColumns, getCategoricalColumns, hasData } = useWorksheet();
-  const { addReportItem } = useReport();
+  const { addReportItem, addReportOnly } = useReport();
   const location = useLocation();
   const resultsRef = useRef(null);
 
@@ -150,14 +150,14 @@ export default function AnovaTool() {
     }
   };
 
-  const handleAddToReport = useCallback(async () => {
+  const handleAddToReport = useCallback(async (reportOnly=false) => {
     if (!resultsRef.current) return;
     const canvas = await html2canvas(resultsRef.current, { backgroundColor: null, scale: 2 });
     const chartImage = canvas.toDataURL('image/png');
 
     if (mode === 'oneway' && owResult && owGroups) {
       const interpretation = interpretAnova(owResult, groupingVar, outcomeVar, owGroups.labels);
-      addReportItem({
+      (reportOnly?addReportOnly:addReportItem)({
         title: `One-Way ANOVA — ${outcomeVar} by ${groupingVar}`,
         toolId: 'anova',
         timestamp: new Date().toISOString(),
@@ -170,7 +170,7 @@ export default function AnovaTool() {
       });
     } else if (mode === 'rm' && rmResult) {
       const interpretation = interpretRMAnova(rmResult, conditionVars);
-      addReportItem({
+      (reportOnly?addReportOnly:addReportItem)({
         title: `Repeated-Measures ANOVA — ${conditionVars.join(', ')}`,
         toolId: 'anova',
         timestamp: new Date().toISOString(),
@@ -181,7 +181,7 @@ export default function AnovaTool() {
       });
     } else if (mode === 'twoway' && twResult) {
       const interpretation = interpretTwoWayAnova(twResult, factorAVar, factorBVar, twOutcomeVar);
-      addReportItem({
+      (reportOnly?addReportOnly:addReportItem)({
         title: `Two-Way ANOVA — ${twOutcomeVar} by ${factorAVar} × ${factorBVar}`,
         toolId: 'anova',
         timestamp: new Date().toISOString(),
@@ -195,8 +195,8 @@ export default function AnovaTool() {
         rawData: twResult.cellStats.map(c => ({ [factorAVar]: c.a, [factorBVar]: c.b, n: c.n, mean: c.mean.toFixed(4) })),
       });
     }
-    setAddedToReport(true);
-  }, [mode, owResult, owGroups, rmResult, twResult, groupingVar, outcomeVar, conditionVars, factorAVar, factorBVar, twOutcomeVar, addReportItem]);
+    if(reportOnly)setAddedToReport(previous=>!previous);
+  }, [mode, owResult, owGroups, rmResult, twResult, groupingVar, outcomeVar, conditionVars, factorAVar, factorBVar, twOutcomeVar, addReportItem, addReportOnly]);
 
   if (!hasData) {
     return <div style={{ padding: '1.5rem' }}><div className="alert alert-info">Load data into the Worksheet first, then return here to run ANOVA.</div></div>;
@@ -643,9 +643,7 @@ export default function AnovaTool() {
             </>
           )}
 
-          <button className="btn-primary no-print" style={{ marginTop: '1rem' }} onClick={handleAddToReport}>
-            {addedToReport ? '✓ Added to Report' : 'Add to Report'}
-          </button>
+          <div style={{display:'flex',gap:'.75rem',marginTop:'1rem'}}><button className="btn-primary no-print" onClick={()=>handleAddToReport(false)}>Add to Project</button><button className="btn-secondary no-print" onClick={()=>handleAddToReport(true)}>{addedToReport?'Remove from Report':'Add to Report'}</button></div>
         </div>
       )}
     </div>

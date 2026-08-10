@@ -1,0 +1,14 @@
+import React,{useEffect,useRef,useState} from 'react';
+import {inspectReportPrintDom,ReportPrintDocument} from './ReportPrintDocument';
+import './ReportPrintPreview.css';
+
+const waitForAssets=async target=>{const images=[...(target?.querySelectorAll('img')||[])];await Promise.all(images.map(image=>image.complete?(image.decode?.().catch(()=>{})||Promise.resolve()):new Promise(resolve=>{image.addEventListener('load',resolve,{once:true});image.addEventListener('error',resolve,{once:true})})));await document.fonts?.ready;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))};
+
+export const inspectPrintAncestorStyles=target=>{const nodes=[],seen=new Set();for(let node=target;node&&!seen.has(node);node=node.parentElement){seen.add(node);const style=getComputedStyle(node);nodes.push({element:node===document.documentElement?'html':node===document.body?'body':node.id?`#${node.id}`:node.className?`.${String(node.className).trim().replace(/\s+/g,'.')}`:node.tagName.toLowerCase(),display:style.display,position:style.position,height:style.height,maxHeight:style.maxHeight,overflow:style.overflow,overflowX:style.overflowX,overflowY:style.overflowY,contain:style.contain})}return nodes};
+
+export default function ReportPrintPreview({reportTitle,preparedBy,project,reportModel,onBack}){
+ const documentRef=useRef(null),[error,setError]=useState('');
+ useEffect(()=>{const audit=()=>console.info('[Report print computed ancestor styles]',inspectPrintAncestorStyles(documentRef.current));window.addEventListener('beforeprint',audit);return()=>window.removeEventListener('beforeprint',audit)},[]);
+ const print=async()=>{const diagnostics=inspectReportPrintDom(documentRef.current);if(process.env.NODE_ENV!=='production')console.info('[Report print preview DOM]',diagnostics);if(diagnostics.artifactCount!==reportModel.items.length||diagnostics.duplicateIds.length){setError(`Print preview is incomplete (${diagnostics.artifactCount} of ${reportModel.items.length} artifacts). Printing was stopped.`);return}setError('');await waitForAssets(documentRef.current);window.print()};
+ return <main className="report-print-preview"><header className="report-print-preview-bar no-print"><div><span>Dedicated Print View</span><h1>Print Preview · {reportModel.items.length} {reportModel.items.length===1?'artifact':'artifacts'}</h1>{error&&<p className="report-print-options-error" role="alert">{error}</p>}</div><div className="report-print-preview-actions"><button type="button" className="btn-secondary" onClick={onBack}>Back</button><button type="button" className="btn-primary" onClick={print}>Print</button></div></header><div className="report-print-document-host" ref={documentRef}><ReportPrintDocument reportTitle={reportTitle} preparedBy={preparedBy} project={project} reportModel={reportModel}/></div></main>;
+}

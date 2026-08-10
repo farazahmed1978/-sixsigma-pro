@@ -6,6 +6,8 @@ const STORAGE_KEY = 'sixsigmapro_report_items';
 const MAX_IMAGE_WIDTH = 1000;   // px — chart snapshots are captured at scale:2, far larger than needed for storage
 const IMAGE_QUALITY = 0.72;     // JPEG quality — typically cuts base64 size 70-90% vs the original PNG
 const PHASE_ORDER = ['Define','Measure','Analyze','Improve','Control'];
+export const sortReportItemsByPhase=items=>[...items].sort((a,b)=>{const left=PHASE_ORDER.indexOf(a.phase),right=PHASE_ORDER.indexOf(b.phase);return(left<0?99:left)-(right<0?99:right)});
+export const reportIdentity=item=>item.analysisId?`analysis:${item.projectId||''}:${item.analysisId}`:item.documentId?`document:${item.projectId||''}:${item.documentId}`:item.reportKey?`source:${item.reportKey}`:'';
 
 function loadItems() {
   try {
@@ -83,16 +85,18 @@ export function ReportProvider({ children }) {
   }, [items]);
 
   const addReportItem = useCallback(async (item) => {
+    const identity=reportIdentity(item),existing=identity?items.find(entry=>reportIdentity(entry)===identity):null;
+    if(existing)return existing.id;
     const id = `${item.toolId}-${Date.now()}`;
     const compressedImage = await compressImage(item.chartImage);
     setItems(prev => {
       const next={ id, includeRawData: false,organizationId:item.organizationId||profile?.default_organization_id||'',createdBy:item.createdBy||user?.id||'',status:item.status||'active',methodology:item.methodology||'lean-six-sigma',createdAt:item.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString(), assetType:item.documentId?'document':item.assetType||'analysis', ...item, chartImage: compressedImage };
-      const withoutDuplicate=item.documentId?prev.filter(existing=>existing.documentId!==item.documentId):prev;
+      const withoutDuplicate=identity?prev.filter(existing=>reportIdentity(existing)!==identity):prev;
       const updated=[...withoutDuplicate,next];
-      return updated.sort((a,b)=>{const left=PHASE_ORDER.indexOf(a.phase),right=PHASE_ORDER.indexOf(b.phase);return(left<0?99:left)-(right<0?99:right)});
+      return sortReportItemsByPhase(updated);
     });
     return id;
-  }, [profile,user]);
+  }, [items,profile,user]);
 
   const removeReportItem = useCallback((id) => {
     setItems(prev => prev.filter(i => i.id !== id));

@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import html2canvas from 'html2canvas';
 import { useWorksheet } from '../context/WorksheetContext';
-import { useReport } from '../context/ReportContext';
+import { useProjectReportPlacement as useReport } from '../context/ProjectPlacementContext';
 import { fitLinearModel, predictLinearScenarios } from '../utils/modelEngine';
 import {getAnalysisHandoff,normalizeDoeRegressionHandoff} from '../services/analysisHandoff';
 import { QQPlot, SimpleHistogram } from '../utils/statViews';
@@ -180,7 +180,7 @@ export default function MultipleRegressionTool() {
           {showQQ && <div className="card" style={{ padding: '1rem', marginBottom: '1rem' }}><QQPlot data={result.residuals} title="Q-Q Plot of Residuals" /></div>}
 
           <button className="btn-primary no-print" onClick={handleAddToReport}>
-            {addedToReport ? '✓ Added to Report' : 'Add to Report'}
+            {addedToReport ? 'Manage Placement' : 'Add to Project'}
           </button>
         </div>
       )}
