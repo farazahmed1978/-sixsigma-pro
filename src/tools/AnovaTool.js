@@ -6,7 +6,7 @@ import { useReport } from '../context/ReportContext';
 import { interpretAnova, interpretRMAnova, interpretTwoWayAnova } from '../utils/interpretations';
 import {
   oneWayAnova, rmAnova, twoWayAnova, levenesTest, bartlettsTest, andersonDarling,
-  pairwisePostHoc, pairwisePostHocPaired, mauchlysTest, simpleEffectsAnalysis, gamesHowell, TEST_EXPLAINERS
+  pairwisePostHoc, pairwisePostHocPaired, mauchlysTest, simpleEffectsAnalysis, gamesHowell, tukeyHsd, TEST_EXPLAINERS
 } from '../utils/statTests';
 import { QQPlot, SimpleHistogram, GroupBoxPlot } from '../utils/statViews';
 import { buildAssumptionReport } from '../utils/assumptionDiagnostics';
@@ -18,9 +18,10 @@ import './Tool.css';
 function CompanionTest({ label, explainer, onRun, renderResult }) {
   const [open, setOpen] = useState(false);
   const [result, setResult] = useState(null);
+  const [error, setError] = useState('');
 
   const handleClick = () => {
-    if (!open && !result) setResult(onRun());
+    if (!open && !result) { try { setError(''); setResult(onRun()); } catch (runError) { setError(runError.message); } }
     setOpen(o => !o);
   };
 
@@ -40,6 +41,7 @@ function CompanionTest({ label, explainer, onRun, renderResult }) {
             {explainer}
           </div>
           {result && renderResult(result)}
+          {error && <div className="alert alert-danger" role="alert"><strong>Unable to run this companion analysis</strong><div>{error}</div></div>}
         </div>
       )}
     </div>
@@ -482,6 +484,10 @@ export default function AnovaTool() {
               <CompanionTest label="Check Equal Variance — Bartlett's Test" explainer={TEST_EXPLAINERS.bartlett}
                 onRun={() => bartlettsTest(owGroups.groups)}
                 renderResult={(r) => (<div style={{ fontSize: '0.85rem' }}>χ² ({r.df}) = {r.chi2.toFixed(4)}, p = {r.p.toFixed(4)} &nbsp; {assumptionBadge(r.p)}</div>)}
+              />
+              <CompanionTest label="Post-Hoc — Tukey HSD (equal-variance simultaneous inference)" explainer="Uses the studentized-range distribution and Tukey-Kramer standard errors. Use after an equal-variance one-way ANOVA to identify which group means differ while controlling family-wise error."
+                onRun={() => tukeyHsd(owGroups.groups, owGroups.labels)}
+                renderResult={(result) => (<table style={{width:'100%',borderCollapse:'collapse',fontSize:'.82rem'}}><thead><tr><th>Comparison</th><th>Difference</th><th>95% simultaneous CI</th><th>Adjusted p</th></tr></thead><tbody>{result.pairs.map(pair=><tr key={`${pair.a}-${pair.b}`}><td>{pair.a} vs {pair.b}</td><td>{pair.difference.toFixed(4)}</td><td>{pair.confidenceInterval.map(value=>value.toFixed(4)).join(' to ')}</td><td>{pair.pAdjusted<.001?'<0.001':pair.pAdjusted.toFixed(4)}</td></tr>)}</tbody></table>)}
               />
               <CompanionTest label="Post-Hoc — Bonferroni-Corrected Pairwise Comparisons (simple approximation)" explainer={TEST_EXPLAINERS.posthoc}
                 onRun={() => pairwisePostHoc(owGroups.groups, owGroups.labels)}

@@ -1,5 +1,5 @@
 import {NAVIGATION} from '../config/navigation';
-import {addRecentTool,canonicalNavigationItems,navigationItems,reconcileStoredTools,searchTools,toggleFavoriteTool,toolIndex} from './navigationTools';
+import {addRecentTool,canonicalNavigationItems,navigationContextFor,navigationItems,navigationPlacementsForRoute,readStoredTools,reconcileStoredTools,resolveNavigationPlacement,searchTools,toggleFavoriteTool,toolIndex} from './navigationTools';
 
 const legacyNavigation=[{section:'Operational Excellence',suiteId:'operational-excellence',groups:[{id:'measure',name:'Measure',subgroups:[{label:'Tools',items:[{id:'tool-msa',name:'Gage R&R',path:'/tool/msa',aliases:['gage','gauge']},{id:'tool-control-chart',name:'Control Chart',path:'/tool/control-chart'}]}]},{id:'analyze',name:'Analyze',subgroups:[{label:'Tools',items:[{id:'tool-anova',name:'ANOVA',path:'/tool/anova',aliases:['analysis of variance']}]}]}]}];
 
@@ -46,4 +46,40 @@ test('recent and favorites use route identity and reconcile old stored metadata'
  expect(toggleFavoriteTool([],gage)).toEqual([gage]);
  expect(toggleFavoriteTool([gage],gage)).toEqual([]);
  expect(reconcileStoredTools([{id:'old-id',path:'/tool/msa',name:'Old label'},{path:'/missing'}],canonical)).toEqual([gage]);
+});
+
+test('direct and refresh-equivalent routes resolve without navigation origin state',()=>{
+ expect(()=>resolveNavigationPlacement(NAVIGATION,'/tool/control-chart')).not.toThrow();
+ expect(resolveNavigationPlacement(NAVIGATION,'/tool/control-chart')).toEqual(expect.objectContaining({phase:'Measure',cluster:'Process Performance'}));
+ expect(resolveNavigationPlacement(NAVIGATION,'/documents/data-collection-plan')).toEqual(expect.objectContaining({phase:'Measure'}));
+});
+
+test('shared routes honor valid origin context and otherwise use a canonical fallback',()=>{
+ const placements=navigationPlacementsForRoute(NAVIGATION,'/tool/fmea');
+ expect(placements).toHaveLength(2);
+ expect(resolveNavigationPlacement(NAVIGATION,'/tool/fmea',{phaseId:'improve',clusterId:'risk-proofing'})).toEqual(expect.objectContaining({phase:'Improve'}));
+ expect(resolveNavigationPlacement(NAVIGATION,'/tool/fmea',{phaseId:'missing',clusterId:'missing'})).toEqual(placements[0]);
+ expect(navigationContextFor(resolveNavigationPlacement(NAVIGATION,'/tool/fmea'))).toEqual(expect.objectContaining({phaseId:'analyze'}));
+});
+
+test('malformed legacy recent and favorite entries are ignored during initialization',()=>{
+ const canonical=toolIndex(NAVIGATION),gage=canonical.find(item=>item.path==='/tool/msa');
+ expect(reconcileStoredTools([null,7,'old',{name:'missing path'},{path:'/missing'},gage],canonical)).toEqual([gage]);
+ expect(addRecentTool([null,{path:'/missing'},gage],gage)).toEqual([gage,{path:'/missing'}]);
+ expect(toggleFavoriteTool([null,'bad',gage],gage)).toEqual([]);
+ localStorage.setItem('navigation-hotfix-test',JSON.stringify([null,false,{name:'old'},{path:'/tool/msa'}]));
+ expect(readStoredTools('navigation-hotfix-test')).toEqual([{path:'/tool/msa'}]);
+});
+
+test('Wave 3 navigation resolves from sidebar context and direct URL',()=>{
+ const fromNavigation=resolveNavigationPlacement(NAVIGATION,'/tool/distribution-analysis',{suite:'Operational Excellence',phaseId:'analyze',clusterId:'verification-synthesis'});
+ const direct=resolveNavigationPlacement(NAVIGATION,'/tool/distribution-analysis');
+ expect(fromNavigation).toEqual(expect.objectContaining({id:'tool-distribution-analysis',phase:'Analyze'}));
+ expect(direct).toEqual(expect.objectContaining({path:'/tool/distribution-analysis'}));
+});
+
+test('missing or malformed routes return a safe empty resolution',()=>{
+ expect(resolveNavigationPlacement(NAVIGATION,null)).toBeNull();
+ expect(resolveNavigationPlacement(NAVIGATION,'')).toBeNull();
+ expect(navigationPlacementsForRoute(null,'/tool/anova')).toEqual([]);
 });

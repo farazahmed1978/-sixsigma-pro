@@ -166,6 +166,15 @@ const toolMeta = {
     interpretation: 'p < 0.05 means at least one group/condition mean differs from the others. Run the post-hoc comparison to see which pairs differ, and check the normality/equal-variance (or sphericity, for repeated measures) companion tests to confirm the assumptions hold.',
     csvFormat: 'One-way: one categorical grouping column + one numeric outcome column. Repeated measures: 3+ numeric columns, one per condition, same row order across all (same subjects).',
   },
+  'distribution-analysis': {
+    name: 'Distribution Analysis', icon: '∿', category: 'Analyze', phase: 'Analyze',
+    phaseColor: 'var(--orange)',
+    desc: 'Compare probability models, inspect probability plots, and document distribution-fit limitations.',
+    formulas: ['AIC = 2k − 2 log(L)', 'BIC = k log(n) − 2 log(L)'],
+    whenToUse: 'Use when process data may be nonnormal or when a capability, reliability, or transformation decision depends on distribution shape.',
+    interpretation: 'Compare fit statistics and probability plots together. A recommended candidate is not proof that the distribution generated the data.',
+    csvFormat: 'One numeric worksheet column with at least three finite observations.',
+  },
   'sigma-calculator': {
     name: 'Sigma Level / DPMO Calculator', icon: '🎚️', category: 'Measure', phase: 'Measure',
     phaseColor: 'var(--green)',

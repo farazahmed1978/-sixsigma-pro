@@ -65,6 +65,7 @@ import RegressionTool from './tools/RegressionTool';
 import MultipleRegressionTool from './tools/MultipleRegressionTool';
 import LogisticRegressionTool from './tools/LogisticRegressionTool';
 import AnovaTool from './tools/AnovaTool';
+import DistributionAnalysis from './tools/DistributionAnalysis';
 
 // Bucket 3 — calculators
 import SigmaCalculator from './tools/SigmaCalculator';
@@ -94,6 +95,7 @@ const toolMeta = {
   'multiregression': { title: 'Multiple Regression', phase: 'Analyze', component: <MultipleRegressionTool /> },
   'logistic': { title: 'Logistic Regression', phase: 'Analyze', component: <LogisticRegressionTool /> },
   'anova': { title: 'ANOVA', phase: 'Analyze', component: <AnovaTool /> },
+  'distribution-analysis': { title: 'Distribution Analysis', phase: 'Analyze', component: <DistributionAnalysis /> },
   'sigma-calculator': { title: 'Sigma Level / DPMO Calculator', phase: 'Measure', component: <SigmaCalculator /> },
   'sample-size-calculator': { title: 'Sample Size Calculator', phase: 'Measure', component: <SampleSizeCalculator /> },
   'power-calculator': { title: 'Power / Sample Size Calculator', phase: 'Measure', component: <PowerCalculator /> },

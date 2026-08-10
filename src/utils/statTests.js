@@ -785,7 +785,7 @@ function rangeCDF(w, k, steps = 2000) {
   return k * (h / 3) * sum;
 }
 // CDF of the studentized range statistic Q for k groups and df error degrees of freedom.
-function ptukey(q, k, df) {
+export function ptukey(q, k, df) {
   if (df > 400) return rangeCDF(q, k);const steps = 400;
   const logC = Math.log(2) + (df / 2) * Math.log(df / 2) - logGamma(df / 2);
   const hi = 6;
@@ -800,6 +800,30 @@ function ptukey(q, k, df) {
     sum += weight * val;
   }
   return (h / 2) * sum;
+}
+
+const TUKEY_QUANTILE_CACHE=new Map();
+function qtukey(probability,k,df){
+  const cacheKey=`${probability}|${k}|${df}`;if(TUKEY_QUANTILE_CACHE.has(cacheKey))return TUKEY_QUANTILE_CACHE.get(cacheKey);
+  let low=0,high=2;
+  while(ptukey(high,k,df)<probability&&high<100)high*=2;
+  for(let i=0;i<18;i++){const middle=(low+high)/2;if(ptukey(middle,k,df)<probability)low=middle;else high=middle}
+  const value=(low+high)/2;TUKEY_QUANTILE_CACHE.set(cacheKey,value);return value;
+}
+
+// Tukey-Kramer simultaneous pairwise inference using the studentized-range distribution.
+// This is not the earlier Bonferroni/Welch approximation. Unequal sample sizes use the
+// Tukey-Kramer standard error with the one-way ANOVA pooled residual mean square.
+export function tukeyHsd(groups,labels,confidence=.95){
+  if(!Array.isArray(groups)||groups.length<2||groups.some(group=>!Array.isArray(group)||group.length<2||group.some(value=>!Number.isFinite(value))))throw new Error('Tukey HSD requires at least two finite observations in every group.');
+  const omnibus=oneWayAnova(groups),k=groups.length,df=omnibus.dfW,mse=omnibus.msW;
+  if(!(mse>0))throw new Error('Tukey HSD is undefined when pooled residual variance is zero.');
+  const critical=qtukey(confidence,k,df),pairs=[];
+  for(let i=0;i<k;i++)for(let j=i+1;j<k;j++){
+    const difference=mean(groups[i])-mean(groups[j]),standardError=Math.sqrt(mse/2*(1/groups[i].length+1/groups[j].length)),q=Math.abs(difference)/standardError,pAdjusted=Math.min(1,Math.max(0,1-ptukey(q,k,df))),margin=critical*standardError;
+    pairs.push({a:labels?.[i]??`Group ${i+1}`,b:labels?.[j]??`Group ${j+1}`,difference,diff:difference,standardError,q,df,pAdjusted,p:pAdjusted,confidenceInterval:[difference-margin,difference+margin],significant:pAdjusted<1-confidence});
+  }
+  return{method:'tukey-hsd',methodVersion:'1.0.0',confidence,k,df,mse,critical,pairs};
 }
 
 export function gamesHowell(groups, labels) {

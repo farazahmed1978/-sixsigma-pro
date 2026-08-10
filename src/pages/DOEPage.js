@@ -4,26 +4,18 @@ import {useWorksheet} from '../context/WorksheetContext';
 import {useAnalysis} from '../context/AnalysisContext';
 import {createAnalysisHandoff} from '../services/analysisHandoff';
 import { BOOK_EXCERPTS } from '../utils/bookExcerpts';
-import { doeFullFactorialAnalysis } from '../utils/statTests';
+import {
+  analyzeFactorial,
+  generateFractionalFactorial as generateFractionalEngine,
+  generateFullFactorial as generateFullEngine,
+  optimizeFactorial,
+  recordConfirmationRun,
+} from '../utils/doeEngine';
 import './DOEPage.css';
 
-function generateFullFactorial(factors) {
-  const k = factors.length;
-  const runs = Math.pow(2, k);
-  const design = [];
-  for (let i = 0; i < runs; i++) {
-    const run = { run: i + 1 };
-    factors.forEach((f, j) => {
-      const period = Math.pow(2, k - j - 1);
-      run[f.name] = Math.floor(i / period) % 2 === 0 ? f.low : f.high;
-      run[`_${f.name}_coded`] = Math.floor(i / period) % 2 === 0 ? -1 : 1;
-    });
-    design.push(run);
-  }
-  return design;
-}
-
 function generateFractional(factors) {
+  return generateFractionalEngine(factors);
+  /* Legacy generator retained in history; the engine now owns reproducibility and alias metadata.
   // 2^(k-1) resolution IV design — drop last factor as alias of other interactions
   const k = factors.length;
   const runs = Math.pow(2, k - 1);
@@ -43,7 +35,7 @@ function generateFractional(factors) {
     run[last.name] = product === -1 ? last.low : last.high;
     design.push(run);
   }
-  return design;
+  return design; */
 }
 
 const EMPTY_FACTOR = { name: '', low: '', high: '' };
@@ -59,8 +51,12 @@ export default function DOEPage() {
   const [design, setDesign] = useState('full');
   const [response, setResponse] = useState('Yield');
   const [replicates, setReplicates] = useState(1);
+  const [randomSeed, setRandomSeed] = useState(20260809);
   const [matrix, setMatrix] = useState(null);
   const [results, setResults] = useState([]);
+  const [error, setError] = useState('');
+  const [optimization, setOptimization] = useState(null);
+  const [confirmationValue, setConfirmationValue] = useState('');
   const [showGuide, setShowGuide] = useState(false);
   const bookExcerpt = BOOK_EXCERPTS.doe;
 
@@ -69,47 +65,55 @@ export default function DOEPage() {
   const updateFactor = (i, field, val) => setFactors(p => p.map((f, j) => j === i ? { ...f, [field]: val } : f));
 
   const generate = () => {
-    const valid = factors.filter(f => f.name && f.low !== '' && f.high !== '');
-    if (valid.length < 2) return;
-    let rows = design === 'full' ? generateFullFactorial(valid) : generateFractional(valid);
-    if (replicates > 1) rows = Array.from({ length: replicates }, (_, r) => rows.map(row => ({ ...row, run: row.run + r * rows.length, replicate: r + 1 }))).flat();
-    // Randomize
-    const randomized = [...rows].map(r => ({ ...r, response: '' })).sort(() => Math.random() - 0.5).map((r, i) => ({ ...r, runOrder: i + 1 }));
-    setMatrix({ rows: randomized, factors: valid });
-    setResults(randomized.map(r => ({ run: r.runOrder, response: '' })));
+    setError('');
+    try {
+      const valid = factors.filter(f => f.name && f.low !== '' && f.high !== '').map(f => ({...f, low: Number(f.low), high: Number(f.high)}));
+      if (valid.length < 2) throw new Error('Define at least two factors with low and high levels.');
+      const model = design === 'full'
+        ? generateFullEngine({factors: valid, replicates, randomSeed, response})
+        : generateFractional({factors: valid, replicates, randomSeed, response});
+      const rows = model.runs.map(run => ({...run.factorSettings, run: run.standardOrder, runOrder: run.runOrder, replicate: run.replicate}));
+      setMatrix({rows, factors: valid, doeModel: model});
+      setResults(rows.map(row => ({run: row.runOrder, response: ''})));
+      setOptimization(null);
+      setConfirmationValue('');
+    } catch (generationError) {
+      setError(generationError.message);
+    }
+  };
+
+  const optimize = () => {
+    try {
+      setError('');
+      setOptimization(optimizeFactorial(matrix.doeModel, matrix.fullAnalysis, {type: 'maximize'}));
+    } catch (optimizationError) {
+      setError(optimizationError.message);
+    }
+  };
+
+  const confirm = () => {
+    try {
+      setError('');
+      const updatedModel = recordConfirmationRun(matrix.doeModel, optimization, {observed: confirmationValue, responseName: response});
+      setMatrix(previous => ({...previous, doeModel: updatedModel}));
+      setConfirmationValue('');
+    } catch (confirmationError) {
+      setError(confirmationError.message);
+    }
   };
 
   const updateResult = (i, val) => setResults(p => p.map((r, j) => j === i ? { ...r, response: val } : r));
 
   const analyze = () => {
-    if (!matrix) return;
-    const filled = results.filter(r => r.response !== '' && !isNaN(parseFloat(r.response)));if (filled.length < matrix.rows.length / 2) return;
-    const withResp = matrix.rows.map((row, i) => ({ ...row, response: parseFloat(results[i]?.response) })).filter(r => !isNaN(r.response));
-
-    if (design === 'full') {
-      // Full factorial: every main effect and every interaction can be estimated cleanly
-      // (no aliasing), so run the complete effects + ANOVA engine.
-      const rows = withResp.map(r => ({
-        factorCodes: Object.fromEntries(matrix.factors.map(f => [f.name, r[f.name] === f.high ? 1 : -1])),
-        value: r.response,
-      }));
-      const analysis = doeFullFactorialAnalysis(rows, matrix.factors.map(f => f.name));
-      setMatrix(p => ({ ...p, fullAnalysis: analysis, effects: null }));
-    } else {
-      // Fractional factorial: main effects here are aliased with higher-order interactions
-      // (and interactions with each other), so a clean full-effects ANOVA isn't valid without
-      // tracking the specific alias structure. Keep the simpler main-effects-only view.
-      const grandMean = withResp.reduce((s, r) => s + r.response, 0) / withResp.length;
-      const effects = matrix.factors.map(f => {
-        const high = withResp.filter(r => r[f.name] === f.high).map(r => r.response);
-        const low = withResp.filter(r => r[f.name] === f.low).map(r => r.response);
-        const meanHigh = high.reduce((s, v) => s + v, 0) / high.length;
-        const meanLow = low.reduce((s, v) => s + v, 0) / low.length;
-        const effect = meanHigh - meanLow;
-        return { factor: f.name, effect, meanHigh: meanHigh.toFixed(3), meanLow: meanLow.toFixed(3) };
-      });
-      effects.sort((a, b) => Math.abs(b.effect) - Math.abs(a.effect));
-      setMatrix(p => ({ ...p, effects, grandMean, fullAnalysis: null }));
+    setError('');
+    try {
+      if (!matrix) throw new Error('Generate a design before analyzing results.');
+      if (results.some(r => r.response === '' || !Number.isFinite(Number(r.response)))) throw new Error('Enter a finite response for every run before analysis.');
+      const modelWithResponses = {...matrix.doeModel, runs: matrix.doeModel.runs.map((run, index) => ({...run, response: Number(results[index].response)}))};
+      const analysis = analyzeFactorial(modelWithResponses, response);
+      setMatrix(previous => ({...previous, doeModel: modelWithResponses, fullAnalysis: analysis, effects: null}));
+    } catch (analysisError) {
+      setError(analysisError.message);
     }
   };
 
@@ -178,6 +182,12 @@ export default function DOEPage() {
             </select>
           </div>
 
+          <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+            <label>Randomization seed</label>
+            <input type="number" value={randomSeed} onChange={event => setRandomSeed(Number(event.target.value))} />
+            <small style={{color:'var(--text-muted)'}}>Use the same seed to reproduce the exact run order.</small>
+          </div>
+
           <div className="section-title" style={{ marginBottom: '0.75rem' }}>Factors</div>{factors.map((f, i) => (
             <div key={i} className="doe-factor-row">
               <input type="text" placeholder="Factor name" value={f.name} onChange={e => updateFactor(i, 'name', e.target.value)} style={{ flex: 2 }} />
@@ -196,6 +206,7 @@ export default function DOEPage() {
           )}
 
           <button className="btn-primary" style={{ width: '100%', marginTop: '0.75rem' }} onClick={generate}>Generate Design Matrix</button>
+          {error && <div className="validation-alert error" role="alert" style={{marginTop:'.75rem'}}><strong>Unable to complete DOE workflow</strong><span>{error}</span></div>}
         </div>
 
         {/* Matrix + results */}
@@ -246,9 +257,18 @@ export default function DOEPage() {
                 </div>
               </div>
 
+              {matrix.doeModel?.designType === 'fractional-factorial-2-level' && (
+                <div className="card" style={{marginTop:'1.25rem'}}>
+                  <div className="section-title">Fractional design structure</div>
+                  <p>Resolution <strong>{matrix.doeModel.resolution}</strong> · Generator <strong>{Object.entries(matrix.doeModel.generators || {}).map(([target,sources]) => `${target}=${sources.join('×')}`).join(', ')}</strong></p>
+                  <p style={{color:'var(--text-muted)',fontSize:'.84rem'}}>Alias structure: {matrix.doeModel.aliases?.map(alias => `${alias.term} = ${alias.aliases.join(', ')}`).join('; ')}</p>
+                  {matrix.doeModel.warnings?.map(warning => <div className="validation-alert warning" key={warning}>{warning}</div>)}
+                </div>
+              )}
+
               {matrix.fullAnalysis && (
                 <div className="card" style={{ marginTop: '1.25rem' }}>
-                  <div className="section-title" style={{ marginBottom: '0.5rem' }}>Effects &amp; ANOVA — Full Factorial</div>
+                  <div className="section-title" style={{ marginBottom: '0.5rem' }}>Effects &amp; ANOVA — {design === 'full' ? 'Full Factorial' : 'Fractional Factorial'}</div>
                   <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
                     Grand mean: <strong style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{matrix.fullAnalysis.grandMean.toFixed(3)}</strong>
                     {matrix.fullAnalysis.hasReplication
@@ -285,6 +305,21 @@ export default function DOEPage() {
                       })}
                     </tbody>
                   </table>
+                  <div style={{marginTop:'1rem',display:'flex',gap:'.75rem',alignItems:'center',flexWrap:'wrap'}}>
+                    <button className="btn-secondary" onClick={optimize}>Recommend maximum-response settings</button>
+                    {optimization && <span>Predicted {response}: <strong>{optimization.recommended.predicted.toFixed(3)}</strong></span>}
+                  </div>
+                  {optimization && (
+                    <div className="info-panel" style={{marginTop:'1rem'}}>
+                      <strong>Confirmation run required</strong>
+                      <p>Recommended settings: {Object.entries(optimization.recommended.factorSettings).map(([name,value]) => `${name}=${value}`).join(', ')}</p>
+                      <div style={{display:'flex',gap:'.5rem',alignItems:'center',flexWrap:'wrap'}}>
+                        <input type="number" step="any" value={confirmationValue} onChange={event => setConfirmationValue(event.target.value)} placeholder={`Observed ${response}`} />
+                        <button className="btn-primary" onClick={confirm}>Record confirmation</button>
+                      </div>
+                      {(matrix.doeModel.confirmationRuns || []).map(run => <p key={run.id}>Observed {run.observed.toFixed(3)} · deviation {run.deviation.toFixed(3)}</p>)}
+                    </div>
+                  )}
                 </div>
               )}
 
