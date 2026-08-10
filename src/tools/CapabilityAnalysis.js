@@ -1,148 +1,57 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useMemo, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer } from 'recharts';
-import html2canvas from 'html2canvas';
 import CSVUploader from '../components/CSVUploader';
 import { useWorksheet } from '../context/WorksheetContext';
 import { useReport } from '../context/ReportContext';
-import { interpretCapability } from '../utils/interpretations';
+import { useAnalysis } from '../context/AnalysisContext';
+import { normalCapability, lognormalCapability, approximateCpkInterval, CAPABILITY_VALIDATION_STATUS } from '../utils/capabilityEngine';
+import { createPractitionerFinding, evidenceMatches, formatMetric, structuredReportPayload } from '../utils/practitionerWorkflow';
 import './Tool.css';
 
-const mean = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
-const stddev = arr => { const m = mean(arr); return Math.sqrt(arr.reduce((a, b) => a + (b - m) ** 2, 0) / (arr.length - 1)); };
+function histogram(values, bins = 12) { const min = Math.min(...values), max = Math.max(...values), width = (max - min) / bins || 1, counts = Array(bins).fill(0); values.forEach(value => { counts[Math.min(bins - 1, Math.floor((value - min) / width))] += 1; }); return counts.map((count, index) => ({ bin: min + (index + .5) * width, label: formatMetric(min + (index + .5) * width, 3), count })); }
+const optionalNumber = value => value === '' ? null : Number(value);
 
 export default function CapabilityAnalysis() {
-  const { getNumericColumns, getColumnData, hasData } = useWorksheet();
+  const { getNumericColumns, getColumnData, getRawColumnData, hasData, activeDataset, columns } = useWorksheet();
   const { addReportItem } = useReport();
-  const chartWrapperRef = useRef(null);
-  const [values, setValues] = useState(null);
-  const [colName, setColName] = useState('');
-  const [lsl, setLsl] = useState('');
-  const [usl, setUsl] = useState('');
-  const [results, setResults] = useState(null);
-  const [addedToReport, setAddedToReport] = useState(false);
+  const { analysisResults, registerAnalysisResult } = useAnalysis();
+  const [upload, setUpload] = useState({ values: [], name: '' });
+  const [variable, setVariable] = useState('');
+  const [subgroup, setSubgroup] = useState('');
+  const [distribution, setDistribution] = useState('normal');
+  const [specs, setSpecs] = useState({ lsl: '', usl: '', target: '' });
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const values = hasData ? (variable ? getColumnData(variable) : []) : upload.values;
+  const variableName = variable || upload.name;
+  const candidates = useMemo(() => analysisResults.filter(analysis => ['control-chart', 'msa'].includes(analysis.toolId || analysis.toolType) && evidenceMatches({ datasetId: analysis.datasetIds?.[0], datasetVersionId: analysis.datasetVersionIds?.[0], variable: analysis.variableMapping?.measurement || analysis.variableMapping?.value || analysis.inputConfiguration?.variable }, activeDataset, variableName)), [activeDataset, analysisResults, variableName]);
+  const stabilitySource = candidates.find(item => item.toolId === 'control-chart');
+  const msaSource = candidates.find(item => item.toolId === 'msa');
 
-  const numericWsCols = getNumericColumns();
+  const run = () => { setError(''); setNotice(''); try { const base = { values, lsl: optionalNumber(specs.lsl), usl: optionalNumber(specs.usl), stabilityEvidence: stabilitySource ? { id: stabilitySource.id, stable: stabilitySource.result?.stable === true } : null }; if (distribution === 'lognormal') setResult(lognormalCapability(base)); else { let subgroups = null; if (hasData && subgroup) { const ids = getRawColumnData(subgroup); const groups = new Map(); values.forEach((value, index) => { const id = ids[index]; if (!groups.has(id)) groups.set(id, []); groups.get(id).push(value); }); subgroups = [...groups.values()]; } const grr = msaSource?.result?.percentStudyVariation?.gageRR; setResult(normalCapability({ ...base, target: optionalNumber(specs.target), subgroups, msaEvidence: msaSource ? { id: msaSource.id, adequate: Number.isFinite(grr) && grr < 30 } : null })); } } catch (runError) { setResult(null); setError(runError.message); } };
+  const indices = result?.indices || {};
+  const primary = result && distribution === 'normal' ? [['Cpk', indices.cpk], ['Ppk', indices.ppk]] : [['Cnpk', indices.cnpk]];
+  const secondary = result && distribution === 'normal' ? [['Cp', indices.cp], ['Pp', indices.pp], ['Cpm', indices.cpm], ['Cpu', indices.cpu], ['Cpl', indices.cpl]] : [['Cnp', indices.cnp]];
+  const assessmentIndex = distribution === 'normal' ? indices.cpk : indices.cnpk;
+  const status = Number.isFinite(assessmentIndex) ? assessmentIndex >= 1.33 ? 'Capable against the entered specifications' : assessmentIndex >= 1 ? 'Marginal capability—improvement recommended' : 'Capability below requirement' : 'Review one-sided capability result';
+  const chartData = result ? histogram(values) : [];
+  const persist = () => registerAnalysisResult({ title: `Capability Analysis — ${variableName}`, toolId: 'capability-analysis', phase: 'Measure', method: result.method, methodVersion: result.methodVersion, validationStatus: CAPABILITY_VALIDATION_STATUS[distribution], inputConfiguration: { variable: variableName, subgroup, distribution, ...specs }, variableMapping: { measurement: variableName, subgroup }, result, interpretation: status, evidenceIds: [stabilitySource?.id, msaSource?.id].filter(Boolean) });
+  const addToReport = async () => { const analysisId = persist(); await addReportItem({ title: `Capability Analysis — ${variableName}`, toolId: 'capability-analysis', projectId: activeDataset?.projectId, phase: 'Measure', timestamp: new Date().toISOString(), statsSummary: Object.fromEntries([...primary, ...secondary].map(([key, value]) => [key, formatMetric(value, 3)])), interpretation: status, structuredOutput: structuredReportPayload({ method: result.method, methodVersion: result.methodVersion, configuration: { variable: variableName, subgroup, distribution, specifications: result.limits }, metrics: result, plots: { histogram: chartData }, interpretation: status, warnings: result.warnings || [result.warning].filter(Boolean), evidence: { stability: stabilitySource?.id || null, measurementSystem: msaSource?.id || null } }), provenance: { analysisId, datasetId: activeDataset?.id, datasetVersionId: activeDataset?.versionId, validationStatus: CAPABILITY_VALIDATION_STATUS[distribution] } }); setNotice('Structured capability result added to the report binder.'); };
+  const createFindingAction = () => { const analysisId = persist(); const finding = createPractitionerFinding({ analysisId, dataset: activeDataset, variable: variableName, type: 'capability_below_target', severity: assessmentIndex < 1 ? 'critical' : 'warning', statement: status, evidence: { resultPath: 'indices', specifications: result.limits, indices: result.indices } }); localStorage.setItem('aureqin_latest_finding', JSON.stringify(finding)); setNotice('Capability finding created with strict dataset-version provenance.'); };
 
-  const loadValues = (vals, name) => { setValues(vals); setColName(name); setResults(null); setAddedToReport(false); };
-
-  const handleData = (rows, fields) => {
-    const numCol = fields.find(f => !isNaN(+rows[0]?.[f])) || fields[0];
-    loadValues(rows.map(r => +r[numCol]).filter(v => !isNaN(v)), numCol);
-  };
-
-  const analyze = () => {
-    if (!values || !lsl || !usl) return;
-    setAddedToReport(false);
-    const m = mean(values), s = stddev(values);
-    const LSL = +lsl, USL = +usl;
-    const Cp = (USL - LSL) / (6 * s);
-    const Cpu = (USL - m) / (3 * s);
-    const Cpl = (m - LSL) / (3 * s);
-    const Cpk = Math.min(Cpu, Cpl);
-    const sigmaLevel = Cpk * 3;
-    const pctBelowLSL = values.filter(v => v < LSL).length / values.length * 100;
-    const pctAboveUSL = values.filter(v => v > USL).length / values.length * 100;
-    const bins = 12, min = Math.min(...values), max = Math.max(...values), range = max - min;
-    const counts = Array(bins).fill(0);
-    values.forEach(v => { const i = Math.min(bins - 1, Math.floor((v - min) / range * bins)); counts[i]++; });
-    const chartData = counts.map((c, i) => ({ bin: (min + i * range / bins).toFixed(2), count: c }));
-    setResults({ m, s, Cp, Cpk, Cpu, Cpl, sigmaLevel, pctBelowLSL, pctAboveUSL, chartData, LSL, USL });
-  };
-
-  const handleAddToReport = useCallback(async () => {
-    if (!chartWrapperRef.current || !results) return;
-
-    const canvas = await html2canvas(chartWrapperRef.current, { backgroundColor: null, scale: 2 });
-    const chartImage = canvas.toDataURL('image/png');
-
-    const interpretation = interpretCapability({ cpk: results.Cpk, cp: results.Cp });
-
-    addReportItem({
-      title: `Capability Analysis — ${colName}`,
-      toolId: 'capability-analysis',
-      timestamp: new Date().toISOString(),
-      chartImage,
-      statsSummary: {
-        'Cp': results.Cp.toFixed(3),
-        'Cpk': results.Cpk.toFixed(3),
-        'Cpu': results.Cpu.toFixed(3),
-        'Cpl': results.Cpl.toFixed(3),
-        'Sigma Level': results.sigmaLevel.toFixed(2),
-        'Mean': results.m.toFixed(4),
-        'Std Dev': results.s.toFixed(4),
-        '% Out of Spec': (results.pctBelowLSL + results.pctAboveUSL).toFixed(2) + '%',
-        'LSL': results.LSL,
-        'USL': results.USL,
-      },
-      interpretation,
-      rawData: values ? values.map((v, i) => ({ sample: i + 1, value: v })) : [],
-    });
-
-    setAddedToReport(true);
-  }, [results, colName, values, addReportItem]);
-
-  return (
-    <div style={{ padding: '1.5rem' }}>
-      {hasData && numericWsCols.length > 0 && (
-        <div className="ws-banner">
-          <span>📊 Worksheet data available</span>
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            {numericWsCols.map(c => (
-              <button key={c.name} className="btn-secondary" style={{ fontSize: '0.8rem', padding: '0.3rem 0.75rem' }}
-                onClick={() => loadValues(getColumnData(c.name), c.name)}>
-                Use "{c.name}"
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-      <div className="card" style={{ marginBottom: '1.5rem' }}>
-        <h3 className="section-title" style={{ marginBottom: '1rem' }}>Capability Analysis {colName && `— ${colName}`}</h3>
-        {!hasData && <CSVUploader onData={handleData} />}
-        <div className="form-grid" style={{ marginTop: '0.75rem' }}>
-          <div className="form-group"><label>Lower Spec Limit (LSL)</label><input type="number" step="any" value={lsl} onChange={e => setLsl(e.target.value)} placeholder="e.g. 11.5" /></div>
-          <div className="form-group"><label>Upper Spec Limit (USL)</label><input type="number" step="any" value={usl} onChange={e => setUsl(e.target.value)} placeholder="e.g. 13.5" /></div>
-        </div>
-        <button className="btn-primary" style={{ marginTop: '0.75rem' }} onClick={analyze} disabled={!values || !lsl || !usl}>Run Capability Analysis</button>
-      </div>
-
-      {results && (
-        <>
-          <div className="chart-wrapper">
-            <div ref={chartWrapperRef}>
-              <div className="stat-grid">
-                {[['Cp', results.Cp.toFixed(3)], ['Cpk', results.Cpk.toFixed(3)], ['Cpu', results.Cpu.toFixed(3)], ['Cpl', results.Cpl.toFixed(3)], ['Sigma Level', results.sigmaLevel.toFixed(2)], ['Mean', results.m.toFixed(4)], ['Std Dev', results.s.toFixed(4)], ['% Out of Spec', (results.pctBelowLSL + results.pctAboveUSL).toFixed(2) + '%']].map(([l, v]) => (
-                  <div key={l} className="stat-card"><div className="stat-value" style={{ fontSize: '1.1rem', fontFamily: 'var(--font-mono)' }}>{v}</div><div className="stat-label">{l}</div></div>
-                ))}
-              </div>
-              <ResponsiveContainer width="100%" height={260}>
-                <BarChart data={results.chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis dataKey="bin" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
-                  <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
-                  <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px' }} />
-                  <ReferenceLine x={results.LSL.toFixed(2)} stroke="var(--red)" label={{ value: 'LSL', fill: 'var(--red)', fontSize: 11 }} />
-                  <ReferenceLine x={results.USL.toFixed(2)} stroke="var(--red)" label={{ value: 'USL', fill: 'var(--red)', fontSize: 11 }} />
-                  <Bar dataKey="count" fill="var(--accent)" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-
-            <div className={`alert ${results.Cpk >= 1.33 ? 'alert-success' : results.Cpk >= 1.0 ? 'alert-warning' : 'alert-danger'}`}>
-              {results.Cpk >= 1.33 ? `✓ Capable process — Cpk = ${results.Cpk.toFixed(3)} ≥ 1.33. Process meets specification reliably.` :
-               results.Cpk >= 1.0 ? `⚠ Marginally capable — Cpk = ${results.Cpk.toFixed(3)}. Process meets spec but improvement recommended.` :
-               `✕ Not capable — Cpk = ${results.Cpk.toFixed(3)} < 1.0. Process is producing out-of-spec product.`}
-            </div>
-
-            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
-              <button className="btn-secondary no-print" onClick={() => window.print()}>🖨️ Print</button>
-              <button className="btn-primary no-print" onClick={handleAddToReport}>
-                {addedToReport ? '✓ Added to Report' : '📄 Add to Report'}
-              </button>
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  );
+  return <div className="practitioner-workflow"><header className="practitioner-hero"><div><span className="eyebrow">Process capability study</span><h1>Assess predictable process performance</h1><p>Map specifications, review stability and measurement evidence, then distinguish within capability from overall performance.</p></div><div className="context-chip"><strong>{activeDataset?.name || 'Uploaded capability data'}</strong><span>{activeDataset?.versionId ? `Version ${activeDataset.version || 1}` : 'Local analysis'}</span></div></header>
+    <section className="workflow-card"><div className="workflow-card-heading"><div><span className="step-kicker">1 · Data and specifications</span><h2>Configure the study</h2><p>Only one specification limit is required. Target and subgroup structure are optional.</p></div></div>
+      {!hasData && <CSVUploader onData={(rows, fields) => { const name = fields.find(field => Number.isFinite(Number(rows[0]?.[field]))) || fields[0]; setUpload({ name, values: rows.map(row => Number(row[name])).filter(Number.isFinite) }); }} />}
+      <div className="form-grid">{hasData && <div className="form-group"><label>Measurement <span className="required-indicator">*</span></label><select value={variable} onChange={event => { setVariable(event.target.value); setResult(null); }}><option value="">— select —</option>{getNumericColumns().map(column => <option key={column.name}>{column.name}</option>)}</select></div>}<div className="form-group"><label>Distribution</label><select value={distribution} onChange={event => setDistribution(event.target.value)}><option value="normal">Normal</option><option value="lognormal">Lognormal (requires fit review)</option></select></div><div className="form-group"><label>LSL</label><input type="number" step="any" value={specs.lsl} onChange={event => setSpecs(previous => ({ ...previous, lsl: event.target.value }))}/></div><div className="form-group"><label>USL</label><input type="number" step="any" value={specs.usl} onChange={event => setSpecs(previous => ({ ...previous, usl: event.target.value }))}/></div>{distribution === 'normal' && <><div className="form-group"><label>Target (optional)</label><input type="number" step="any" value={specs.target} onChange={event => setSpecs(previous => ({ ...previous, target: event.target.value }))}/></div>{hasData && <div className="form-group"><label>Subgroup identifier (optional)</label><select value={subgroup} onChange={event => setSubgroup(event.target.value)}><option value="">Use overall variation</option>{columns.map(column => <option key={column.name}>{column.name}</option>)}</select></div>}</>}</div>
+      <div className="evidence-grid"><div className={`evidence-card ${stabilitySource ? 'linked' : ''}`}><span>Stability evidence</span><strong>{stabilitySource ? `${stabilitySource.title || 'SPC analysis'} · ${stabilitySource.result?.stable ? 'Stable' : 'Unstable'}` : 'No linked control chart'}</strong><p>{stabilitySource ? 'Matched by dataset ID, immutable version ID, and variable.' : 'Optional — Aureqin will still assess capability and identify limitations.'}</p></div><div className={`evidence-card ${msaSource ? 'linked' : ''}`}><span>Measurement system evidence</span><strong>{msaSource ? `${msaSource.title || 'MSA study'} · ${formatMetric(msaSource.result?.percentStudyVariation?.gageRR, 1)}% GRR` : 'No linked MSA study'}</strong><p>{msaSource ? 'Matched by dataset ID, immutable version ID, and variable.' : 'Optional — linked measurement evidence strengthens the assessment.'}</p></div></div>
+      <button className="btn-primary" type="button" onClick={run} disabled={!values.length || (specs.lsl === '' && specs.usl === '')}>Run capability study</button>
+    </section>{error && <div className="alert alert-danger" role="alert">{error}</div>}
+    {result && <section className="workflow-card results-card"><div className={`assessment-banner ${assessmentIndex >= 1.33 ? 'success' : assessmentIndex >= 1 ? 'warning' : 'danger'}`}><span>Capability assessment</span><strong>{status}</strong></div>
+      <div className="metric-hierarchy"><div><h3>Primary</h3><div className="stat-grid">{primary.map(([label, value]) => <div className="stat-card primary-metric" key={label}><div className="stat-value">{formatMetric(value, 3)}</div><div className="stat-label">{label}</div></div>)}</div></div><div><h3>Supporting indices</h3><div className="stat-grid">{secondary.map(([label, value]) => <div className="stat-card" key={label}><div className="stat-value">{formatMetric(value, 3)}</div><div className="stat-label">{label}</div></div>)}</div></div></div>
+      {distribution === 'normal' && <div className="definition-callout"><strong>Cp/Cpk</strong> use within-subgroup variation to describe potential short-term capability. <strong>Pp/Ppk</strong> use overall variation and describe observed long-term performance. {approximateCpkInterval(indices.cpk, result.n) && `Approximate 95% Cpk interval: ${approximateCpkInterval(indices.cpk, result.n).map(value => formatMetric(value, 3)).join(' to ')}.`}</div>}
+      <div className="table-scroll"><table className="professional-table"><tbody><tr><th>LSL</th><td>{formatMetric(result.limits.lsl)}</td><th>USL</th><td>{formatMetric(result.limits.usl)}</td><th>Target</th><td>{formatMetric(result.limits.target)}</td></tr><tr><th>Mean</th><td>{formatMetric(result.mean)}</td><th>Within sigma</th><td>{formatMetric(result.withinSigma)}</td><th>Overall sigma</th><td>{formatMetric(result.overallSigma)}</td></tr><tr><th>Observed nonconformance</th><td>{formatMetric(result.observedNonconformance.totalPercent, 3)}%</td><th>Expected nonconformance</th><td>{formatMetric(result.expectedNonconformance.totalPpm, 1)} ppm</td><th>Distribution status</th><td>{result.diagnostics?.distribution?.status || 'Fit review required'}</td></tr></tbody></table></div>
+      <ResponsiveContainer width="100%" height={280}><BarChart data={chartData}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="label"/><YAxis/><Tooltip/><ReferenceLine x={result.limits.lsl === null ? undefined : formatMetric(result.limits.lsl, 3)} stroke="var(--red)"/><ReferenceLine x={result.limits.usl === null ? undefined : formatMetric(result.limits.usl, 3)} stroke="var(--red)"/><Bar dataKey="count" fill="var(--accent)"/></BarChart></ResponsiveContainer>
+      {(result.warnings || [result.warning]).filter(Boolean).map(warning => <div className="alert alert-warning" key={warning}>{warning}</div>)}<div className="workflow-actions"><button className="btn-secondary" type="button" onClick={() => window.print()}>Print</button><button className="btn-secondary" type="button" onClick={createFindingAction}>Create Finding</button><button className="btn-primary" type="button" onClick={addToReport}>Add structured result to report</button></div>{notice && <div className="inline-notice" role="status">{notice}</div>}</section>}
+  </div>;
 }

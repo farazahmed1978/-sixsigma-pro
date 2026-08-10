@@ -3,6 +3,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, R
 import html2canvas from 'html2canvas';
 import { useWorksheet } from '../context/WorksheetContext';
 import { useReport } from '../context/ReportContext';
+import { attributeChart } from '../utils/spcEngine';
 import './Tool.css';
 
 // ---------- Attribute (count/proportion) control charts ----------
@@ -12,7 +13,7 @@ import './Tool.css';
 // mean ± 3·SE arithmetic — no probability distribution involved).
 
 // p chart — proportion defective, sample size (n) may vary point to point.
-function pChart(defectives, sampleSizes) {
+export function legacyPChart(defectives, sampleSizes) {
   const totalDef = defectives.reduce((a, b) => a + b, 0);
   const totalN = sampleSizes.reduce((a, b) => a + b, 0);
   const pBar = totalDef / totalN;
@@ -27,7 +28,7 @@ function pChart(defectives, sampleSizes) {
 }
 
 // np chart — number defective, requires a constant sample size n across all points.
-function npChart(defectives, n) {
+export function legacyNpChart(defectives, n) {
   const npBar = defectives.reduce((a, b) => a + b, 0) / defectives.length;
   const pBar = npBar / n;
   const se = Math.sqrt(npBar * (1 - pBar));
@@ -37,7 +38,7 @@ function npChart(defectives, n) {
 }
 
 // c chart — count of defects per constant inspection unit (area, length, etc).
-function cChart(counts) {
+export function legacyCChart(counts) {
   const cBar = counts.reduce((a, b) => a + b, 0) / counts.length;
   const se = Math.sqrt(cBar);
   const ucl = cBar + 3 * se, lcl = Math.max(0, cBar - 3 * se);
@@ -46,7 +47,7 @@ function cChart(counts) {
 }
 
 // u chart — defects per unit, sample size (n, i.e. units inspected) may vary point to point.
-function uChart(counts, sampleSizes) {
+export function legacyUChart(counts, sampleSizes) {
   const totalC = counts.reduce((a, b) => a + b, 0);
   const totalN = sampleSizes.reduce((a, b) => a + b, 0);
   const uBar = totalC / totalN;
@@ -96,18 +97,18 @@ export default function AttributeChart() {
       if (counts.length < 2) throw new Error('Need at least 2 data points.');
 
       if (chartType === 'c') {
-        setResult({ type: 'c', ...cChart(counts) });
+        setResult(attributeChart({ type: 'c', counts }));
       } else if (chartType === 'np') {
         const n = parseFloat(constantN);
         if (isNaN(n) || n <= 0) throw new Error('Enter a valid constant sample size (n).');
-        setResult({ type: 'np', ...npChart(counts, n) });
+        setResult(attributeChart({ type: 'np', counts, constantN: n }));
       } else {
         if (!sampleCol) throw new Error('Select a sample size column.');
         const samples = getColumnData(sampleCol).map(Number);
         const minLen = Math.min(counts.length, samples.length);
         const c = counts.slice(0, minLen), s = samples.slice(0, minLen);
         if (s.some(n => n <= 0)) throw new Error('Sample sizes must all be positive.');
-        setResult(chartType === 'p' ? { type: 'p', ...pChart(c, s) } : { type: 'u', ...uChart(c, s) });
+        setResult(attributeChart({ type: chartType, counts: c, sampleSizes: s }));
       }
     } catch (e) {
       setError(e.message);
@@ -116,7 +117,7 @@ export default function AttributeChart() {
 
   const violationCount = result ? result.points.filter(p => p.outOfControl).length : 0;
 
-  const centerLine = result ? (result.type === 'p' ? result.pBar : result.type === 'np' ? result.npBar : result.type === 'c' ? result.cBar : result.uBar) : 0;
+  const centerLine = result?.center || 0;
   const yLabel = result ? (result.type === 'p' ? 'Proportion Defective' : result.type === 'np' ? 'Number Defective' : result.type === 'c' ? 'Defect Count' : 'Defects per Unit') : '';const handleAddToReport = useCallback(async () => {
     if (!chartWrapperRef.current || !result) return;
     const canvas = await html2canvas(chartWrapperRef.current, { backgroundColor: null, scale: 2 });

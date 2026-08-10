@@ -1,11 +1,13 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer } from 'recharts';
 import html2canvas from 'html2canvas';
 import CSVUploader from '../components/CSVUploader';
 import { useWorksheet } from '../context/WorksheetContext';
 import { useReport } from '../context/ReportContext';
+import { useAnalysis } from '../context/AnalysisContext';
 import { interpretControlChart } from '../utils/interpretations';
-import { individualsMovingRange } from '../utils/statisticalEngines';
+import { imrChart, xbarRChart, xbarSChart } from '../utils/spcEngine';
+import { buildSpcSignalPresentation, chartTabClass, createControlChartUiDefaults, formatMetric, prepareImrMeasurement, structuredReportPayload, validateStages } from '../utils/practitionerWorkflow';
 import './Tool.css';
 
 // Standard I-MR constants (subgroup size n=2 for moving range)
@@ -13,7 +15,7 @@ import './Tool.css';
 // Standard X-bar & R control chart constants (Montgomery, "Introduction to Statistical
 // Quality Control" — the standard published table for subgroup sizes n=2 through n=10).
 // A2 scales R-bar into X-bar chart limits; D3/D4 scale R-bar into R-chart limits.
-const XBAR_R_CONSTANTS = {
+export const XBAR_R_CONSTANTS = {
   2: { A2: 1.880, D3: 0,     D4: 3.267 },
   3: { A2: 1.023, D3: 0,     D4: 2.574 },
   4: { A2: 0.729, D3: 0,     D4: 2.282 },
@@ -29,7 +31,7 @@ const XBAR_R_CONSTANTS = {
 // and R (subgroup range) per subgroup, then derives X-bar/R chart control limits.
 // Requires every subgroup to have the same size — mixed subgroup sizes aren't supported
 // by the standard A2/D3/D4 constant table used here.
-function calcXbarRStats(rows) {
+export function calcXbarRStats(rows) {
   const bySubgroup = new Map();
   rows.forEach(r => {
     if (!bySubgroup.has(r.subgroup)) bySubgroup.set(r.subgroup, []);
@@ -103,7 +105,7 @@ function ewmaChart(values, target, sigma, lambda, L) {
 }
 
 // Western Electric Rules (applied to the Individuals chart, or the X-bar chart in X-bar/R mode)
-function applyWesternElectricRules(values, mean, sigma) {
+export function applyWesternElectricRules(values, mean, sigma) {
   const n = values.length;
   const flags = values.map(() => []);
   const zone = (v) => (v - mean) / sigma;
@@ -139,12 +141,15 @@ function applyWesternElectricRules(values, mean, sigma) {
   return flags;
 }
 
+const CONTROL_CHART_UI_DEFAULTS = createControlChartUiDefaults();
+
 export default function ControlChart() {
-  const { columns, getColumnData, getNumericColumns, hasData } = useWorksheet();
+  const { columns, getColumnData, getRawColumnData, getNumericColumns, hasData, activeDataset } = useWorksheet();
   const { addReportItem } = useReport();
+  const { registerAnalysisResult } = useAnalysis();
   const chartWrapperRef = useRef(null);
 
-  const [chartType, setChartType] = useState('imr'); // 'imr' | 'xbarR' | 'cusum' | 'ewma'
+  const [chartType, setChartType] = useState('imr'); // 'imr' | 'xbarR' | 'xbarS' | 'cusum' | 'ewma'
 
   const [data, setData] = useState(null);
   const [cols, setCols] = useState([]);
@@ -171,9 +176,25 @@ export default function ControlChart() {
   const [cusumEwmaError, setCusumEwmaError] = useState('');
 
   const [addedToReport, setAddedToReport] = useState(false);
+  const [rules, setRules] = useState(['WE1', 'WE2', 'WE3', 'WE4', 'N5', 'N6']);
+  const [advancedOpen, setAdvancedOpen] = useState(CONTROL_CHART_UI_DEFAULTS.advancedOpen);
+  const [useHistorical, setUseHistorical] = useState(CONTROL_CHART_UI_DEFAULTS.useHistorical);
+  const [historical, setHistorical] = useState(CONTROL_CHART_UI_DEFAULTS.historical);
+  const [stages, setStages] = useState(CONTROL_CHART_UI_DEFAULTS.stages);
 
   const numericWsCols = getNumericColumns();
   const allWsCols = columns || [];
+  const measurementPreview = useMemo(() => {
+    if (!valueCol) return prepareImrMeasurement();
+    if (hasData) return prepareImrMeasurement({ selectedColumn: valueCol, columnExists: columns.some(column => column.name === valueCol), rawValues: getRawColumnData(valueCol) });
+    return prepareImrMeasurement({ selectedColumn: valueCol, columnExists: cols.includes(valueCol), rawValues: (data || []).map(row => row[valueCol]) });
+  }, [cols, columns, data, getRawColumnData, hasData, valueCol]);
+
+  useEffect(() => {
+    setValueCol(''); setSubgroupCol(''); setData(null); setCols([]);
+    setChartData(null); setMrChartData(null); setStats(null); setXbarChartData(null); setRChartData(null); setXbarRStats(null);
+    setXbarRError(''); setCusumResult(null); setEwmaResult(null); setCusumEwmaError(''); setAddedToReport(false);
+  }, [activeDataset?.id]);
 
   const handleData = useCallback((rows, fields) => {
     setData(rows);
@@ -184,9 +205,6 @@ export default function ControlChart() {
 
   const loadFromWorksheet = (colName) => {
     const vals = getColumnData(colName);
-    const rows = vals.map((v, i) => ({ value: v, label: `Sample ${i + 1}` }));
-    setData(rows);
-    setCols([colName]);
     setValueCol(colName);
     resetOutputs();
     // Pre-fill CUSUM/EWMA target & sigma with the column's own mean/sd — user can override.
@@ -206,18 +224,27 @@ export default function ControlChart() {
   };
 
   const analyzeIMR = useCallback(() => {
-    if (!data || !valueCol) return;
     setAddedToReport(false);
-    const values = data.map(r => +r[valueCol]).filter(v => !isNaN(v));
-    const s = individualsMovingRange({ values });
+    setXbarRError('');
+    try {
+    if (!measurementPreview.isValid) { setXbarRError(`Unable to generate I-MR chart. ${measurementPreview.message}`); return; }
+    const { values, points } = measurementPreview;
+    const configuredStages = stages.length ? validateStages(stages, values.length).map(stage => ({ ...stage, label: stage.name })) : undefined;
+    const historicalParameters = useHistorical ? { center: Number(historical.center), sigma: Number(historical.sigma) } : undefined;
+    if (historicalParameters && (!Number.isFinite(historicalParameters.center) || !(historicalParameters.sigma > 0))) throw new Error('Historical center and a positive historical sigma are required.');
+    const engineResult = imrChart({ values, rules, stages: configuredStages, historical: historicalParameters });
+    const stageResults = engineResult.stages || [engineResult];
+    const violations = stageResults.flatMap((stageResult, stageIndex) => { const offset = configuredStages?.[stageIndex]?.start || 0; return stageResult.violations.map(violation => ({ ...violation, pointIndices: violation.pointIndices.map(index => index + offset) })); });
+    const s = engineResult.stages ? { ...stageResults[0], method: engineResult.method, methodVersion: engineResult.methodVersion, stages: stageResults, violations, stable: violations.length === 0, limitBasis: stageResults.every(item => item.limitBasis === 'historical') ? 'historical' : 'estimated' } : engineResult;
     setStats(s);
+    const ruleFlags = values.map((_,index)=>violations.filter(violation=>violation.pointIndices.includes(index)).map(violation=>`${violation.ruleId}: ${violation.explanation}`));
 
-    const ruleFlags = applyWesternElectricRules(values, s.mean, s.sigma);
-
-    const cd = data.map((r, i) => {
-      const v = +r[valueCol];
+    const cd = points.map((point, i) => {
+      const v = point.value;
       const flags = ruleFlags[i] || [];
-      return { label: r.label || `${i + 1}`, value: v, ucl: s.ucl, lcl: s.lcl, mean: s.mean, outOfControl: flags.length > 0, flags };
+      const stageIndex = configuredStages?.findIndex(stage => i >= stage.start && i <= stage.end) ?? -1;
+      const limits = stageIndex >= 0 ? stageResults[stageIndex] : s;
+      return { label: `${point.sourceIndex + 1}`, sourceRow: point.sourceIndex + 1, value: v, ucl: limits.ucl, lcl: limits.lcl, mean: limits.centerLine ?? limits.mean, stage: configuredStages?.[stageIndex]?.name || 'All observations', outOfControl: flags.length > 0, flags };
     });
     setChartData(cd);
 
@@ -227,7 +254,8 @@ export default function ControlChart() {
       outOfControl: mr > s.mrUcl || mr < s.mrLcl,
     }));
     setMrChartData(mrd);
-  }, [data, valueCol]);
+    } catch (analysisError) { setChartData(null); setMrChartData(null); setStats(null); setXbarRError(`Unable to generate I-MR chart. ${analysisError.message}`); }
+  }, [historical, measurementPreview, rules, stages, useHistorical]);
 
   const analyzeXbarR = useCallback(() => {
     if (!valueCol || !subgroupCol) return;
@@ -246,17 +274,12 @@ export default function ControlChart() {
       } else {
         rows = (data || []).map(r => ({ value: +r[valueCol], subgroup: r[subgroupCol] }));
       }rows = rows.filter(r => !isNaN(r.value) && r.subgroup !== undefined && r.subgroup !== '');
-      const s = calcXbarRStats(rows);
+      const engineResult = chartType === 'xbarS' ? xbarSChart({ rows }) : xbarRChart({ rows });
+      const s = { ...engineResult, subgroupStats: engineResult.subgroups.map(group => ({ ...group, xbar: group.mean, r: chartType === 'xbarS' ? group.sd : group.range })), rBar: chartType === 'xbarS' ? engineResult.sBar : engineResult.rBar, rUcl: chartType === 'xbarS' ? engineResult.sUcl : engineResult.rUcl, rLcl: chartType === 'xbarS' ? engineResult.sLcl : engineResult.rLcl };
       setXbarRStats(s);
-
-      // Sigma for X-bar chart Western Electric rules, estimated the standard way: sigma = Rbar / d2(n).
-      const D2_TABLE = { 2: 1.128, 3: 1.693, 4: 2.059, 5: 2.326, 6: 2.534, 7: 2.704, 8: 2.847, 9: 2.970, 10: 3.078 };
-      const sigmaXbar = (s.rBar / D2_TABLE[s.n]) / Math.sqrt(s.n);
-      const xbarFlags = applyWesternElectricRules(s.subgroupStats.map(sg => sg.xbar), s.xbarBar, sigmaXbar);
-
       const xcd = s.subgroupStats.map((sg, i) => ({
         label: `${sg.id}`, value: sg.xbar, ucl: s.xbarUcl, lcl: s.xbarLcl, mean: s.xbarBar,
-        outOfControl: (xbarFlags[i] || []).length > 0, flags: xbarFlags[i] || [],
+        outOfControl: s.violations.some(violation => violation.pointIndices.includes(i)), flags: s.violations.filter(violation => violation.pointIndices.includes(i)).map(violation => `${violation.ruleId}: ${violation.explanation}`),
       }));
       setXbarChartData(xcd);
 
@@ -267,7 +290,7 @@ export default function ControlChart() {
     } catch (e) {
       setXbarRError(e.message);
     }
-  }, [data, valueCol, subgroupCol, getColumnData, hasData]);
+  }, [chartType, data, valueCol, subgroupCol, getColumnData, hasData]);
 
   const getRawValues = useCallback(() => {
     if (hasData) return getColumnData(valueCol).map(Number);
@@ -308,17 +331,20 @@ export default function ControlChart() {
 
   const violationCount = chartType === 'imr'
     ? (chartData ? chartData.filter(d => d.outOfControl).length : 0)
-    : chartType === 'xbarR'
+    : chartType === 'xbarR' || chartType === 'xbarS'
     ? (xbarChartData ? xbarChartData.filter(d => d.outOfControl).length + (rChartData ? rChartData.filter(d => d.outOfControl).length : 0) : 0)
     : chartType === 'cusum'
     ? (cusumResult ? cusumResult.points.filter(d => d.outOfControl).length : 0)
     : (ewmaResult ? ewmaResult.points.filter(d => d.outOfControl).length : 0);
+  const imrSignalPresentation = useMemo(() => buildSpcSignalPresentation(stats?.violations || []), [stats]);
 
   const handleAddToReport = useCallback(async () => {
     if (!chartWrapperRef.current) return;
     const canvas = await html2canvas(chartWrapperRef.current, { backgroundColor: null, scale: 2 });
     const chartImage = canvas.toDataURL('image/png');
 
+    const sourceResult = chartType === 'imr' ? stats : (chartType === 'xbarR' || chartType === 'xbarS') ? xbarRStats : chartType === 'cusum' ? cusumResult : ewmaResult;
+    const analysisId = registerAnalysisResult({ title: `${chartType === 'xbarS' ? 'Xbar-S' : chartType === 'xbarR' ? 'Xbar-R' : chartType.toUpperCase()} Control Chart — ${valueCol}`, toolId: 'control-chart', phase: 'Control', method: sourceResult?.method || chartType, methodVersion: sourceResult?.methodVersion || 'legacy-1', inputConfiguration: { variable: valueCol, subgroup: subgroupCol || null, chartType }, variableMapping: { value: valueCol, subgroup: subgroupCol || null }, result: sourceResult, interpretation: violationCount ? `${violationCount} special-cause signals detected.` : 'No configured special-cause signals detected.' });
     if (chartType === 'imr') {
       if (!stats || !chartData) return;
       const ruleBreakdown = { rule1: 0, rule2: 0, rule3: 0, rule4: 0 };
@@ -340,27 +366,28 @@ export default function ControlChart() {
           'Sigma (from MR)': stats.sigma.toFixed(4), 'MR-bar': stats.mrBar.toFixed(4), 'n': stats.n, 'Violations': violationCount,
         },
         interpretation,
-        rawData: chartData.map(d => ({ label: d.label, value: d.value })),
+        rawData: chartData.map(d => ({ label: d.label, value: d.value })), provenance: { analysisId, datasetId: activeDataset?.id, datasetVersionId: activeDataset?.versionId }, structuredOutput: structuredReportPayload({ method: stats.method, methodVersion: stats.methodVersion, configuration: { variable: valueCol, chartType }, metrics: { ...stats, stabilityStatus: stats.stable ? 'stable' : 'special-cause-variation', affectedObservationCount: imrSignalPresentation.affectedObservationCount, distinctRuleCount: imrSignalPresentation.distinctRuleCount, totalOccurrenceCount: imrSignalPresentation.totalOccurrenceCount }, tables: { ruleSummary: imrSignalPresentation.ruleSummary }, signals: stats.violations, interpretation, evidence: { prioritizedSignals: imrSignalPresentation.prioritized, fullSignalOccurrences: stats.violations } }),
       });
-    } else if (chartType === 'xbarR') {
+    } else if (chartType === 'xbarR' || chartType === 'xbarS') {
       if (!xbarRStats || !xbarChartData) return;
       const interpretation = violationCount > 0
         ? `${violationCount} point(s) across the X-bar and R charts triggered a Western Electric rule — investigate for special cause variation before treating the process as stable.`
         : `No Western Electric rule violations on either the X-bar or R chart — the process mean and within-subgroup variation both appear to be in statistical control (subgroup size n=${xbarRStats.n}).`;
 
       addReportItem({
-        title: `X-bar & R Control Chart — ${valueCol} (subgroup: ${subgroupCol})`,
+        title: `${chartType === 'xbarS' ? 'Xbar-S' : 'Xbar-R'} Control Chart — ${valueCol} (subgroup: ${subgroupCol})`,
         toolId: 'control-chart',
         timestamp: new Date().toISOString(),
         chartImage,
         statsSummary: {
-          'X-bar-bar': xbarRStats.xbarBar.toFixed(4), 'R-bar': xbarRStats.rBar.toFixed(4),
+          'X-bar-bar': formatMetric(xbarRStats.xbarBar), [chartType === 'xbarS' ? 'S-bar' : 'R-bar']: formatMetric(xbarRStats.rBar),
           'X-bar UCL': xbarRStats.xbarUcl.toFixed(4), 'X-bar LCL': xbarRStats.xbarLcl.toFixed(4),
           'R UCL': xbarRStats.rUcl.toFixed(4), 'R LCL': xbarRStats.rLcl.toFixed(4),
           'Subgroup size (n)': xbarRStats.n, 'Subgroups (k)': xbarRStats.k, 'Violations': violationCount,
         },
         interpretation,
-        rawData: xbarRStats.subgroupStats.map(sg => ({ subgroup: sg.id, xbar: sg.xbar.toFixed(4), range: sg.r.toFixed(4) })),
+        rawData: xbarRStats.subgroupStats.map(sg => ({ subgroup: sg.id, xbar: sg.xbar, [chartType === 'xbarS' ? 'standardDeviation' : 'range']: sg.r })),
+        structuredOutput: structuredReportPayload({ method: xbarRStats.method, methodVersion: xbarRStats.methodVersion, configuration: { variable: valueCol, subgroup: subgroupCol, chartType }, metrics: xbarRStats, signals: xbarRStats.violations, interpretation }),
       });
     } else if (chartType === 'cusum') {
       if (!cusumResult) return;
@@ -391,7 +418,7 @@ export default function ControlChart() {
       });
     }
     setAddedToReport(true);
-  }, [chartType, stats, chartData, xbarRStats, xbarChartData, cusumResult, ewmaResult, valueCol, subgroupCol, violationCount, addReportItem]);
+  }, [chartType, stats, chartData, xbarRStats, xbarChartData, cusumResult, ewmaResult, valueCol, subgroupCol, violationCount, addReportItem, activeDataset, registerAnalysisResult, imrSignalPresentation]);
 
   return (
     <div style={{ padding: '1.5rem' }}>
@@ -412,21 +439,25 @@ export default function ControlChart() {
       <div className="card" style={{ marginBottom: '1.5rem' }}>
         <h3 className="section-title" style={{ marginBottom: '0.75rem' }}>Control Chart</h3>
 
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-          <button className={chartType === 'imr' ? 'btn-primary' : 'btn-secondary'} style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
+        <div className="chart-type-tabs" role="tablist" aria-label="Control chart type">
+          <button role="tab" aria-selected={chartType === 'imr'} className={chartTabClass(chartType === 'imr')}
             onClick={() => { setChartType('imr'); resetOutputs(); }}>Individuals &amp; Moving Range (I-MR)</button>
-          <button className={chartType === 'xbarR' ? 'btn-primary' : 'btn-secondary'} style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
+          <button role="tab" aria-selected={chartType === 'xbarR'} className={chartTabClass(chartType === 'xbarR')}
             onClick={() => { setChartType('xbarR'); resetOutputs(); }}>X-bar &amp; R</button>
-          <button className={chartType === 'cusum' ? 'btn-primary' : 'btn-secondary'} style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
+          <button role="tab" aria-selected={chartType === 'xbarS'} className={chartTabClass(chartType === 'xbarS')}
+            onClick={() => { setChartType('xbarS'); resetOutputs(); }}>X-bar &amp; S</button>
+          <button role="tab" aria-selected={chartType === 'cusum'} className={chartTabClass(chartType === 'cusum')}
             onClick={() => { setChartType('cusum'); resetOutputs(); }}>CUSUM</button>
-          <button className={chartType === 'ewma' ? 'btn-primary' : 'btn-secondary'} style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
+          <button role="tab" aria-selected={chartType === 'ewma'} className={chartTabClass(chartType === 'ewma')}
             onClick={() => { setChartType('ewma'); resetOutputs(); }}>EWMA</button>
         </div>
 
         {!hasData && <CSVUploader onData={handleData} />}
 
+        {hasData && chartType === 'imr' && <div className="form-group imr-measurement-select"><label>Measurement</label><select value={valueCol} onChange={event=>loadFromWorksheet(event.target.value)}><option value="">— select measurement —</option>{numericWsCols.map(column=><option key={column.name} value={column.name}>{column.name}</option>)}</select></div>}
+
         {/* X-bar & R + Worksheet data: both columns picked directly, no pre-load needed */}
-        {hasData && chartType === 'xbarR' && (
+        {hasData && (chartType === 'xbarR' || chartType === 'xbarS') && (
           <div className="form-grid" style={{ marginBottom: '0.75rem' }}>
             <div className="form-group">
               <label>Value Column</label>
@@ -466,7 +497,7 @@ export default function ControlChart() {
         )}
 
         {/* I-MR, or X-bar & R / CUSUM / EWMA without worksheet data (manual CSV upload) */}
-        {(!hasData || chartType === 'imr') && cols.length > 0 && (
+        {!hasData && cols.length > 0 && (
           <div className="form-grid" style={{ marginBottom: '0.75rem' }}>
             <div className="form-group">
               <label>Value Column</label>
@@ -474,7 +505,7 @@ export default function ControlChart() {
                 {cols.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
-            {chartType === 'xbarR' && (
+            {(chartType === 'xbarR' || chartType === 'xbarS') && (
               <div className="form-group">
                 <label>Subgroup Column (groups rows into subgroups of equal size, e.g. "subgroup")</label>
                 <select value={subgroupCol} onChange={e => setSubgroupCol(e.target.value)}>
@@ -484,6 +515,18 @@ export default function ControlChart() {
               </div>)}
           </div>
         )}
+
+        {chartType === 'imr' && <div className="imr-configuration">
+          <div className="definition-callout"><strong>Suggested chart: I-MR.</strong> Individual continuous observations are collected one at a time.</div>
+          <button type="button" className="advanced-settings-toggle" aria-expanded={advancedOpen} onClick={()=>setAdvancedOpen(open=>!open)}>Advanced settings <span aria-hidden="true">{advancedOpen ? '▴' : '▾'}</span></button>
+          {advancedOpen&&<div className="spc-advanced-config">
+            <section><h4>Special-cause rules</h4><p className="field-help">Rules identify patterns that may indicate special-cause variation.</p><div className="rule-grid">{[['WE1','Beyond 3σ'],['WE2','2 of 3 beyond 2σ'],['WE3','4 of 5 beyond 1σ'],['WE4','8 on one side'],['N5','6-point trend'],['N6','14 alternating']].map(([id,label])=><label key={id}><input type="checkbox" checked={rules.includes(id)} onChange={event=>setRules(previous=>event.target.checked?[...previous,id]:previous.filter(rule=>rule!==id))}/>{label}</label>)}</div></section>
+            <section><h4>Historical parameters</h4><p className="field-help"><strong>What are historical parameters?</strong> Use previously established process statistics instead of estimating them from this dataset.</p><label className="toggle-row"><input type="checkbox" checked={useHistorical} onChange={event=>setUseHistorical(event.target.checked)}/><span><strong>Use historical process parameters</strong><small>Use these only when your organization has established historical process parameters. Otherwise Aureqin estimates them from the current data.</small></span></label>{useHistorical&&<div className="form-grid"><div className="form-group"><label>Historical center</label><input type="number" step="any" value={historical.center} placeholder="Previously established mean" onChange={event=>setHistorical(previous=>({...previous,center:event.target.value}))}/><small>Previously established process mean (center line).</small></div><div className="form-group"><label>Historical sigma</label><input type="number" step="any" value={historical.sigma} placeholder="Previously established standard deviation" onChange={event=>setHistorical(previous=>({...previous,sigma:event.target.value}))}/><small>Previously established process standard deviation.</small></div></div>}</section>
+            <section><div className="advanced-section-heading"><div><h4>Process stages</h4><p className="field-help"><strong>When should I use stages?</strong> When a known process change divides the data into meaningful periods.</p><p className="field-help">Use stages when the process changed during the observation period—for example, before and after an improvement.</p></div><button type="button" className="btn-secondary" onClick={()=>setStages(previous=>[...previous,{id:`stage-${Date.now()}`,name:'',start:'',end:''}])}>+ Add Stage</button></div>{stages.length>0&&<><p className="observation-range">Available observation range: 1–{measurementPreview.validCount}</p><div className="stage-editor">{stages.map((stage,index)=><div className="stage-row" key={stage.id}><div className="form-grid"><div className="form-group"><label>Stage name</label><input placeholder="e.g. Before improvement" value={stage.name} onChange={event=>setStages(previous=>previous.map((item,itemIndex)=>itemIndex===index?{...item,name:event.target.value}:item))}/></div><div className="form-group"><label>Start observation</label><input type="number" min="1" max={measurementPreview.validCount || undefined} value={stage.start} onChange={event=>setStages(previous=>previous.map((item,itemIndex)=>itemIndex===index?{...item,start:event.target.value}:item))}/></div><div className="form-group"><label>End observation</label><input type="number" min="1" max={measurementPreview.validCount || undefined} value={stage.end} onChange={event=>setStages(previous=>previous.map((item,itemIndex)=>itemIndex===index?{...item,end:event.target.value}:item))}/></div></div><button type="button" className="stage-remove" onClick={()=>setStages(previous=>previous.filter(item=>item.id!==stage.id))}>Remove stage</button></div>)}</div></>}</section>
+          </div>}
+        </div>}
+
+        {chartType === 'imr' && valueCol && <div className={`measurement-summary ${measurementPreview.isValid ? 'valid' : 'invalid'}`}><span>{measurementPreview.totalRows} rows</span><span>{measurementPreview.validCount} valid observations</span><span>{measurementPreview.omittedCount} omitted</span></div>}
 
         {(chartType === 'cusum' || chartType === 'ewma') && (
           <div className="form-grid" style={{ marginBottom: '0.75rem' }}>
@@ -523,20 +566,21 @@ export default function ControlChart() {
 
         <button
           className="btn-primary"
-          onClick={chartType === 'imr' ? analyzeIMR : chartType === 'xbarR' ? analyzeXbarR : chartType === 'cusum' ? analyzeCusum : analyzeEwma}disabled={
+          onClick={chartType === 'imr' ? analyzeIMR : (chartType === 'xbarR' || chartType === 'xbarS') ? analyzeXbarR : chartType === 'cusum' ? analyzeCusum : analyzeEwma}disabled={
             chartType === 'imr'
-              ? (!data || !valueCol)
-              : chartType === 'xbarR'
+              ? (!valueCol)
+              : (chartType === 'xbarR' || chartType === 'xbarS')
               ? (!valueCol || !subgroupCol || (!hasData && !data))
               : (!valueCol || !targetVal || !sigmaVal || (!hasData && !data))
           }
         >
-          Generate Charts
+          Generate Chart
         </button>
         {xbarRError && <div className="alert alert-danger" style={{ marginTop: '0.75rem' }}>⚠️ {xbarRError}</div>}
         {cusumEwmaError && <div className="alert alert-danger" style={{ marginTop: '0.75rem' }}>⚠️ {cusumEwmaError}</div>}
       </div>
 
+      {chartType === 'imr' && stats && <div className="limit-basis">{stats.limitBasis === 'historical' ? 'Historical limits' : 'Estimated limits'}{stats.stages?.length ? ` · ${stats.stages.length} stages` : ''}</div>}
       {chartType === 'imr' && stats && (
         <div className="stat-grid">
           {[
@@ -548,10 +592,10 @@ export default function ControlChart() {
         </div>
       )}
 
-      {chartType === 'xbarR' && xbarRStats && (
+      {(chartType === 'xbarR' || chartType === 'xbarS') && xbarRStats && (
         <div className="stat-grid">
           {[
-            ['X-bar-bar', xbarRStats.xbarBar.toFixed(4)], ['R-bar', xbarRStats.rBar.toFixed(4)],
+            ['X-bar-bar', xbarRStats.xbarBar.toFixed(4)], [chartType === 'xbarS' ? 'S-bar' : 'R-bar', xbarRStats.rBar.toFixed(4)],
             ['X-bar UCL', xbarRStats.xbarUcl.toFixed(4)], ['X-bar LCL', xbarRStats.xbarLcl.toFixed(4)],
             ['R UCL', xbarRStats.rUcl.toFixed(4)], ['Subgroup n / k', `${xbarRStats.n} / ${xbarRStats.k}`],
           ].map(([l, v]) => (
@@ -626,11 +670,12 @@ export default function ControlChart() {
           </div>
 
           {violationCount > 0 ? (
-            <div className="alert alert-danger">
-              ⚠ {violationCount} point(s) triggered a Western Electric rule — investigate for special cause variation.
-              <ul style={{ marginTop: '0.5rem', paddingLeft: '1.2rem', fontSize: '0.85rem' }}>
-                {chartData.filter(d => d.outOfControl).map((d, i) => (<li key={i}>{d.label}: {d.flags.join('; ')}</li>))}
-              </ul>
+            <div className="spc-signal-results">
+              <div className="stability-assessment unstable"><span>Process stability</span><strong>Special-cause variation detected</strong><p>This process shows evidence of special-cause variation. Several observations and patterns are inconsistent with a stable process. Investigate the highlighted signals before using the process as a predictable baseline.</p></div>
+              <div className="signal-metrics"><div><strong>{imrSignalPresentation.affectedObservationCount}</strong><span>Affected observations</span></div><div><strong>{imrSignalPresentation.distinctRuleCount}</strong><span>Distinct signal patterns</span></div><div><strong>{imrSignalPresentation.totalOccurrenceCount}</strong><span>Total rule occurrences</span></div></div>
+              <section className="signal-section"><h4>Signal summary</h4><div className="rule-summary-grid">{imrSignalPresentation.ruleSummary.map(rule=><article key={rule.ruleId}><span className="signal-severity-dot"/><div><strong>{rule.label}</strong><b>{rule.occurrenceCount} occurrence{rule.occurrenceCount === 1 ? '' : 's'}</b><p>{rule.description}</p></div></article>)}</div></section>
+              <section className="signal-section"><h4>Most important signals</h4><div className="priority-signals">{imrSignalPresentation.prioritized.map(signal=><article key={`${signal.ruleId}-${signal.occurrenceIndex}`}><span className={`severity-marker ${signal.severity || 'warning'}`}/><div><strong>{signal.observationLabel}</strong><b>{signal.rule.label}</b><p>{signal.explanation}</p></div></article>)}</div></section>
+              <details className="technical-evidence"><summary>View all rule occurrences ({imrSignalPresentation.totalOccurrenceCount})</summary><div className="technical-evidence-list">{imrSignalPresentation.fullEvidence.map(signal=><article key={`${signal.ruleId}-${signal.occurrenceIndex}`}><header><strong>{signal.observationLabel}</strong><span className={`evidence-severity ${signal.severity || 'warning'}`}>{signal.severity || 'warning'}</span></header><h5>{signal.rule.label}</h5><p>{signal.explanation}</p><dl><div><dt>Values</dt><dd>{(signal.points || []).map(value=>formatMetric(value, 4)).join(', ') || '—'}</dd></div><div><dt>Rule</dt><dd>{signal.ruleId} · version {signal.ruleVersion || '—'}</dd></div><div><dt>Numerical evidence</dt><dd>{signal.evidence ? JSON.stringify(signal.evidence) : '—'}</dd></div></dl></article>)}</div></details>
             </div>
           ) : (
             <div className="alert alert-success">✓ No Western Electric rule violations — process appears to be in statistical control.</div>
@@ -642,7 +687,7 @@ export default function ControlChart() {
         </div>
       )}
 
-      {chartType === 'xbarR' && xbarChartData && (
+      {(chartType === 'xbarR' || chartType === 'xbarS') && xbarChartData && (
         <div className="chart-wrapper">
           <div ref={chartWrapperRef}>
           <h4 style={{ margin: '1rem 0 0.5rem' }}>X-bar Chart (Subgroup Means)</h4>
