@@ -15,10 +15,14 @@
 
 .doe-run-preview { display: flex; gap: 1rem; padding: 0.65rem 0.85rem; background: var(--bg-2); border-radius: var(--radius); font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.75rem; }
 .doe-run-preview strong { color: var(--text-primary); font-family: var(--font-mono); }
+.rsm-progressive{display:grid;gap:.85rem;margin-bottom:1rem;padding:1rem;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius)}
+.rsm-results{overflow:hidden}.rsm-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.75rem;margin:1rem 0}.rsm-metrics span{display:flex;flex-direction:column;gap:.25rem;padding:.75rem;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-muted);font-size:.78rem}.rsm-metrics strong{color:var(--text-primary);font:600 .95rem var(--font-mono)}
+.contour-plot{display:block;width:100%;max-width:680px;height:auto;margin:1rem auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-2)}.contour-plot text{fill:var(--text-secondary);font:13px var(--font-body)}
 
 @media (max-width: 768px) {
   .doe-page { padding: 1rem; }
   .doe-layout { grid-template-columns: 1fr; }
   .doe-header h1 { font-size: 1.4rem; }
   .doe-factor-row { flex-wrap: wrap; }
+  .rsm-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
 }

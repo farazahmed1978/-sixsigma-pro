@@ -2,7 +2,7 @@ import React, { useState, useCallback, useRef } from 'react';
 import html2canvas from 'html2canvas';
 import { useWorksheet } from '../context/WorksheetContext';
 import { useReport } from '../context/ReportContext';
-import { fitLogisticModel } from '../utils/modelEngine';
+import { buildRocCurve, fitLogisticModel } from '../utils/modelEngine';
 import './Tool.css';
 
 const sigBadge = (p) => (
@@ -21,6 +21,7 @@ export default function LogisticRegressionTool() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [addedToReport, setAddedToReport] = useState(false);
+  const [threshold,setThreshold]=useState(.5);
 
   const numCols = getNumericColumns ? getNumericColumns() : [];
   const catCols = getCategoricalColumns ? getCategoricalColumns() : [];
@@ -34,7 +35,7 @@ export default function LogisticRegressionTool() {
     if (!outcomeVar || predictorVars.length < 1) return;
     try {
       const sourceNames=[outcomeVar,...predictorVars],source=sourceNames.map(getRawColumnData),rowCount=Math.max(...source.map(values=>values.length)),rows=Array.from({length:rowCount},(_,index)=>Object.fromEntries(sourceNames.map((name,columnIndex)=>[name,source[columnIndex][index]])));
-      setResult(fitLogisticModel({rows,specification:{response:outcomeVar,predictors:predictorVars.map(name => ({name,type:catCols.some(column => column.name === name) ? 'categorical' : 'continuous'}))}}));
+      const fitted=fitLogisticModel({rows,threshold,specification:{response:outcomeVar,predictors:predictorVars.map(name => ({name,type:catCols.some(column => column.name === name) ? 'categorical' : 'continuous'}))}}),outcomes=fitted.sourceIndices.map(index=>Number(rows[index][outcomeVar]));setResult({...fitted,rocCurve:buildRocCurve(outcomes,fitted.fitted)});
     } catch (e) {
       setError(e.message);
     }
@@ -57,7 +58,7 @@ export default function LogisticRegressionTool() {
       statsSummary: { 'McFadden R²': result.mcFaddenR2.toFixed(4), 'LR χ²': result.lrChi2.toFixed(3), 'p (model)': result.lrP < 0.001 ? '<0.001' : result.lrP.toFixed(4), 'Accuracy': `${(result.accuracy * 100).toFixed(1)}%` },
       interpretation,
       rawData: result.coefStats.map(c => ({ term: c.name, coefficient: c.coef.toFixed(4), oddsRatio: c.oddsRatio.toFixed(4), se: c.se.toFixed(4), z: c.z.toFixed(4), p: c.p.toFixed(4) })),
-      diagnostics: { converged:result.converged, iterations:result.iterations, separation:result.separation, sensitivity:result.sensitivity, specificity:result.specificity, auc:result.auc, warnings:result.warnings },
+      diagnostics: { converged:result.converged, iterations:result.iterations, separation:result.separation, threshold:result.threshold, sensitivity:result.sensitivity, specificity:result.specificity, auc:result.auc, rocCurve:result.rocCurve, warnings:result.warnings },
       provenance: { method:result.method, methodVersion:result.methodVersion, omittedRowIndices:result.omittedRowIndices, variableMappings:{response:outcomeVar,predictors:predictorVars} },
     });
     setAddedToReport(true);
@@ -100,6 +101,7 @@ export default function LogisticRegressionTool() {
         </div>
 
         <button className="btn-primary" disabled={!outcomeVar || predictorVars.length < 1} onClick={run}>Run Logistic Regression</button>
+        <div className="form-group" style={{marginTop:'.75rem',maxWidth:'280px'}}><label>Classification threshold: {threshold.toFixed(2)}</label><input type="range" min="0.05" max="0.95" step="0.05" value={threshold} onChange={event=>setThreshold(Number(event.target.value))}/><small>0.50 remains the default. Threshold choice changes classification trade-offs, not fitted probabilities or AUC.</small></div>
         {error && <div className="alert alert-danger" style={{ marginTop: '0.75rem' }}>⚠️ {error}</div>}
       </div>
 
@@ -149,8 +151,10 @@ export default function LogisticRegressionTool() {
 
           <div className="card" style={{padding:'1.25rem',marginBottom:'1rem'}}><h3 className="section-title">Model diagnostics</h3><div style={{display:'flex',gap:'1rem',flexWrap:'wrap'}}><span>Converged <b>{result.converged?'Yes':'No'}</b></span><span>Iterations <b>{result.iterations}</b></span><span>ROC AUC <b>{result.auc?.toFixed(3)||'—'}</b></span><span>Sensitivity <b>{Number.isFinite(result.sensitivity)?(result.sensitivity*100).toFixed(1)+'%':'—'}</b></span><span>Specificity <b>{Number.isFinite(result.specificity)?(result.specificity*100).toFixed(1)+'%':'—'}</b></span></div>{result.warnings.map(warning=><div className="alert alert-warning" key={warning}>{warning}</div>)}</div>
 
+          <div className="card" style={{padding:'1.25rem',marginBottom:'1rem'}}><h3 className="section-title">ROC curve</h3><svg className="roc-chart" viewBox="0 0 520 360" role="img" aria-label={`ROC curve with area under curve ${result.auc?.toFixed(3)}`}><line className="roc-grid" x1="55" y1="305" x2="485" y2="305"/><line className="roc-grid" x1="55" y1="305" x2="55" y2="25"/><line className="roc-reference" x1="55" y1="305" x2="485" y2="25"/><polyline className="roc-line" points={result.rocCurve.map(point=>`${55+430*point.falsePositiveRate},${305-280*point.truePositiveRate}`).join(' ')}/>{result.rocCurve.filter((_,index)=>index%Math.max(1,Math.floor(result.rocCurve.length/10))===0).map((point,index)=><circle className="roc-point" key={index} cx={55+430*point.falsePositiveRate} cy={305-280*point.truePositiveRate} r="3"><title>{`Threshold ${Number.isFinite(point.threshold)?point.threshold.toFixed(3):'boundary'} · sensitivity ${(point.sensitivity*100).toFixed(1)}% · specificity ${(point.specificity*100).toFixed(1)}%`}</title></circle>)}<text x="225" y="345">False positive rate</text><text transform="translate(15 235) rotate(-90)">True positive rate</text><text x="365" y="48">AUC {result.auc?.toFixed(3)}</text></svg><p style={{color:'var(--text-secondary)',fontSize:'.84rem'}}>The ROC curve summarizes discrimination across thresholds. AUC alone does not establish calibration, business value, or overall model adequacy.</p></div>
+
           <div className="card" style={{ padding: '1.25rem 1.5rem', marginBottom: '1rem' }}>
-            <div className="section-title" style={{ marginBottom: '0.75rem' }}>Confusion Matrix (0.5 threshold)</div>
+            <div className="section-title" style={{ marginBottom: '0.75rem' }}>Confusion Matrix ({result.threshold.toFixed(2)} threshold)</div>
             <table style={{ borderCollapse: 'collapse', fontSize: '0.85rem' }}>
               <thead>
                 <tr>

@@ -1,10 +1,13 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import html2canvas from 'html2canvas';
 import { useWorksheet } from '../context/WorksheetContext';
 import { useReport } from '../context/ReportContext';
 import { normCDF, chiSquareCDF } from '../utils/statMath';
-import { oneWayAnova as verifiedOneWayAnova, pairedTTest, twoPropTest, wilcoxonSignedRank, friedmanTest, chiSquareIndependence, fishersExact, pearsonCorrelationTest, spearmanCorrelationTest, kendallTauTest, dunnsTest } from '../utils/statTests';
-import { oneSampleTTest, welchTwoSampleTTest } from '../utils/statisticalEngines';
+import { oneWayAnova as verifiedOneWayAnova, fishersExact, pearsonCorrelationTest, spearmanCorrelationTest, kendallTauTest, dunnsTest } from '../utils/statTests';
+import {oneSampleTTest,welchTwoSampleTTest} from '../utils/statisticalEngines';
+import {categoricalAssociation,goodnessOfFit,independentMeans,kruskalWallis,mannWhitney as mannWhitneyInference,oneProportion,oneSampleMean,oneVariance,pairedMean,repeatedRanks,signTest,signedRank,twoProportions,twoVariances} from '../utils/inferenceEngine';
+import {analyticsById} from '../config/analyticsCatalog';
 import { BOOK_EXCERPTS } from '../utils/bookExcerpts';
 import { buildAssumptionReport } from '../utils/assumptionDiagnostics';
 import AssumptionReportCard from '../components/AssumptionReportCard';
@@ -14,7 +17,7 @@ import './HypothesisTesting.css';
 // Statistical helpers — descriptive only. All p-value math below now comes from
 // the numerically-verified engine in statMath.js / statTests.js (same one used by
 // AnovaTool.js), instead of the approximations this file used to compute locally.
-function mannWhitney(a, b) {
+export function mannWhitney(a, b) {
   let u1 = 0;
   for (let i = 0; i < a.length; i++)
     for (let j = 0; j < b.length; j++)
@@ -28,12 +31,12 @@ function mannWhitney(a, b) {
   return { u: Math.min(u1, u2), z, p: 2 * (1 - normCDF(Math.abs(z))) };
 }
 
-function oneSampleT(data, mu0) {
+export function oneSampleT(data, mu0) {
   const result = oneSampleTTest({ values: data, mu0 });
   return { ...result, t: result.statistic, p: result.pValue, ci: result.confidenceInterval, stddev: result.standardDeviation };
 }
 
-function twoSampleT(a, b) {
+export function twoSampleT(a, b) {
   const result = welchTwoSampleTTest({ a, b });
   // Welch-Satterthwaite df — matches the 2-sample approach used elsewhere in the app.
   return { ...result, na: result.nA, nb: result.nB, ma: result.meanA, mb: result.meanB, sa: Math.sqrt(result.varianceA), sb: Math.sqrt(result.varianceB), t: result.statistic, p: result.pValue, diff: result.difference };
@@ -54,14 +57,14 @@ function oneWayAnova(groups) {
   };
 }
 
-function chiSquareGoF(observed, expected) {
+export function chiSquareGoF(observed, expected) {
   const chi2 = observed.reduce((acc, o, i) => acc + (o - expected[i]) ** 2 / expected[i], 0);
   const df = observed.length - 1;
   const p = 1 - chiSquareCDF(chi2, df);
   return { chi2, df, p };
 }
 
-function proportionTest(x, n, p0) {
+export function proportionTest(x, n, p0) {
   const phat = x / n;
   const se = Math.sqrt(p0 * (1 - p0) / n);
   const z = (phat - p0) / se;
@@ -70,24 +73,40 @@ function proportionTest(x, n, p0) {
   return { phat, z, p, ci: [Math.max(0, phat - ci95), Math.min(1, phat + ci95)] };
 }
 
-const TESTS = [
+export const TESTS = [
   { id: '1t', name: '1-Sample t-Test', type: 'Continuous', desc: 'Test if a population mean equals a target value', inputs: 'single' },
   { id: '2t', name: '2-Sample t-Test', type: 'Continuous', desc: 'Compare means of two independent groups', inputs: 'two' },
   { id: 'pairedt', name: 'Paired t-Test', type: 'Continuous', desc: 'Compare two related/paired measurements (e.g. before vs. after on the same subjects)', inputs: 'two' },
   { id: 'anova', name: 'One-Way ANOVA', type: 'Continuous', desc: 'Compare means across 3 or more groups', inputs: 'multi' },
   { id: 'mw', name: 'Mann-Whitney', type: 'Nonparametric', desc: 'Non-parametric alternative to 2-sample t-test', inputs: 'two' },
   { id: 'wilcoxon', name: 'Wilcoxon Signed-Rank', type: 'Nonparametric', desc: 'Non-parametric alternative to the paired t-test', inputs: 'two' },
+  { id: 'sign', name: 'Sign Test', type: 'Nonparametric', desc: 'Compare paired measurements using only the direction of each non-zero difference', inputs: 'two' },
   { id: 'kw', name: 'Kruskal-Wallis', type: 'Nonparametric', desc: 'Non-parametric alternative to one-way ANOVA', inputs: 'multi' },
   { id: 'friedman', name: 'Friedman Test', type: 'Nonparametric', desc: 'Non-parametric alternative to repeated-measures ANOVA (3+ paired conditions)', inputs: 'multi' },
   { id: 'chi2gof', name: 'Chi-Square Goodness of Fit', type: 'Discrete', desc: 'Test if observed counts match expected distribution', inputs: 'chi2gof' },
   { id: '1prop', name: '1-Proportion Test', type: 'Discrete', desc: 'Test if a proportion equals a target value', inputs: '1prop' },
   { id: '2prop', name: '2-Proportion Test', type: 'Discrete', desc: 'Compare two proportions from two independent samples', inputs: '2prop' },
+  { id: '1variance', name: 'One Variance / Standard Deviation', type: 'Continuous', desc: 'Estimate or test one population variance or standard deviation', inputs: 'variance1' },
+  { id: '2variance', name: 'Two Variances', type: 'Continuous', desc: 'Compare the variability of two independent groups', inputs: 'two' },
   { id: 'chi2indep', name: 'Chi-Square Test of Independence', type: 'Discrete', desc: 'Test whether two categorical variables are associated', inputs: 'contingency' },
   { id: 'fisher', name: "Fisher's Exact Test", type: 'Discrete', desc: 'Exact test of association for a 2×2 table — more reliable than chi-square when counts are small', inputs: 'contingency' },
   { id: 'pearson', name: 'Pearson Correlation', type: 'Continuous', desc: 'Test whether a linear correlation between two continuous variables is significant', inputs: 'two' },
   { id: 'spearman', name: 'Spearman Correlation', type: 'Nonparametric', desc: 'Test whether a monotonic (rank-based) correlation between two variables is significant', inputs: 'two' },
   { id: 'kendall', name: "Kendall's Tau", type: 'Nonparametric', desc: 'Rank correlation based on concordant/discordant pairs — robust alternative to Spearman for small samples or many tied ranks', inputs: 'two' },
   { id: 'dunn', name: "Dunn's Test", type: 'Nonparametric', desc: 'Post-hoc pairwise comparisons following a significant Kruskal-Wallis result (3+ groups)', inputs: 'multi' },
+];
+
+export const HYPOTHESIS_METHOD_CONTEXT={
+ 'one-sample-t':'1t','paired-t':'pairedt','welch-two-sample-t':'2t','pooled-two-sample-t':'2t','one-proportion':'1prop','two-proportions':'2prop','variance-inference':'1variance','chi-square':'chi2indep','fisher-exact':'fisher','mann-whitney':'mw','wilcoxon-signed-rank':'wilcoxon','sign-test':'sign','kruskal-wallis':'kw','friedman':'friedman',
+};
+export const GUIDED_HYPOTHESIS_CHOICES=[
+ {label:'Compare a mean to a target',method:'1t'},
+ {label:'Compare two independent groups',method:'2t'},
+ {label:'Compare paired measurements',method:'pairedt'},
+ {label:'Compare one or two proportions',method:'1prop'},
+ {label:'Compare variability',method:'1variance'},
+ {label:'Compare categorical outcomes',method:'chi2indep'},
+ {label:'Use a nonparametric method',method:'mw'},
 ];
 
 const typeColor = { Continuous: 'var(--green)', Nonparametric: 'var(--orange)', Discrete: 'var(--purple)' };
@@ -102,6 +121,9 @@ const HYPOTHESIS_STATEMENTS = {
   anova: { h0: 'H\u2080: All group means are equal (\u03BC\u2081 = \u03BC\u2082 = ... = \u03BC\u2096).', h1: 'H\u2081: At least one group mean differs from the others.' },
   mw: { h0: 'H\u2080: The two groups come from the same distribution.', h1: 'H\u2081: The two groups come from different distributions (one is stochastically greater than the other).' },
   wilcoxon: { h0: 'H\u2080: The median difference between the paired measurements is zero.', h1: 'H\u2081: The median difference between the paired measurements is not zero.' },
+  sign: { h0: 'H\u2080: Positive and negative paired differences are equally likely.', h1: 'H\u2081: Positive and negative paired differences are not equally likely.' },
+  '1variance': { h0: 'H\u2080: The population standard deviation equals the target.', h1: 'H\u2081: The population standard deviation differs from the target.' },
+  '2variance': { h0: 'H\u2080: The two population variances are equal.', h1: 'H\u2081: The two population variances differ.' },
   kw: { h0: 'H\u2080: All groups come from the same distribution.', h1: 'H\u2081: At least one group comes from a different distribution.' },
   friedman: { h0: 'H\u2080: All conditions come from the same distribution (no treatment effect).', h1: 'H\u2081: At least one condition differs from the others.' },
   chi2gof: { h0: 'H\u2080: The observed counts follow the expected distribution.', h1: 'H\u2081: The observed counts do not follow the expected distribution.' },
@@ -157,12 +179,12 @@ function buildReportContent(test, result) {
       interpretation = `Comparing observed counts to the expected distribution gave ${verdict} (χ²(${result.df})=${result.chi2.toFixed(3)}, p=${pStr}).`;
       break;
     case '1prop':
-      summary = { 'p̂': result.phat.toFixed(4), 'Z': result.z.toFixed(4), 'p': pStr, '95% CI': `[${result.ci[0].toFixed(3)}, ${result.ci[1].toFixed(3)}]` };
-      interpretation = `The sample proportion (p̂=${result.phat.toFixed(4)}) was tested against the hypothesized value. This is ${verdict} (Z=${result.z.toFixed(3)}, p=${pStr}).`;
+      summary = { 'p̂': result.phat.toFixed(4), 'Statistic': Number.isFinite(result.z)?`Z=${result.z.toFixed(4)}`:'Exact binomial', 'p': pStr, '95% CI': `[${result.ci[0].toFixed(3)}, ${result.ci[1].toFixed(3)}]` };
+      interpretation = `The sample proportion (p̂=${result.phat.toFixed(4)}) was tested against the hypothesized value using ${Number.isFinite(result.z)?`a normal approximation (Z=${result.z.toFixed(3)})`:'an exact binomial pathway'}; this is ${verdict} (p=${pStr}).`;
       break;
     case '2prop':
-      summary = { 'p̂₁': result.p1.toFixed(4), 'p̂₂': result.p2.toFixed(4), 'Difference': result.diff.toFixed(4), 'Z': result.z.toFixed(4), 'p': pStr };
-      interpretation = `Comparing two proportions (${result.p1.toFixed(4)} vs ${result.p2.toFixed(4)}, difference=${result.diff.toFixed(4)}) gave ${verdict} (Z=${result.z.toFixed(3)}, p=${pStr}).`;
+      summary = { 'p̂₁': result.p1.toFixed(4), 'p̂₂': result.p2.toFixed(4), 'Difference': result.diff.toFixed(4), 'Statistic': Number.isFinite(result.z)?`Z=${result.z.toFixed(4)}`:'Fisher exact', 'p': pStr };
+      interpretation = `Comparing two proportions (${result.p1.toFixed(4)} vs ${result.p2.toFixed(4)}, difference=${result.diff.toFixed(4)}) gave ${verdict} using ${Number.isFinite(result.z)?`Z=${result.z.toFixed(3)}`:'the sparse-count Fisher exact pathway'} (p=${pStr}).`;
       break;
     case 'chi2indep':
       summary = { 'χ²': result.chi2.toFixed(4), 'df': result.df, 'N': result.grandTotal, 'p': pStr };
@@ -206,6 +228,7 @@ function ResultBox({ result, testId }) {
 
   return (
     <div className="ht-result-box">
+      <span className="results-eyebrow">WHAT AUREQIN FOUND</span>
       {hyp && (
         <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', background: 'var(--bg-3)', padding: '0.65rem 0.85rem', borderRadius: '8px', marginBottom: '0.85rem', lineHeight: 1.6 }}>
           <div>{hyp.h0}</div>
@@ -218,6 +241,7 @@ function ResultBox({ result, testId }) {
       </div>
 
       <div className="ht-result-stats">
+        <h4 style={{width:'100%',margin:'.25rem 0'}}>KEY RESULTS</h4>
         {testId === '1t' && <>
           <div><span>n</span><strong>{result.n}</strong></div>
           <div><span>Mean</span><strong>{result.mean.toFixed(4)}</strong></div>
@@ -243,6 +267,9 @@ function ResultBox({ result, testId }) {
           <div><span>df</span><strong>{result.df}</strong></div>
           <div><span>95% CI</span><strong>[{result.ci[0].toFixed(3)}, {result.ci[1].toFixed(3)}]</strong></div>
         </>}
+        {testId === 'sign' && <><div><span>Usable pairs</span><strong>{result.n}</strong></div><div><span>Positive differences</span><strong>{result.positive}</strong></div><div><span>Negative differences</span><strong>{result.negative}</strong></div><div><span>Zero differences omitted</span><strong>{result.zeros}</strong></div></>}
+        {testId === '1variance' && <><div><span>n</span><strong>{result.n}</strong></div><div><span>Variance</span><strong>{result.variance.toFixed(4)}</strong></div><div><span>Standard deviation</span><strong>{result.standardDeviation.toFixed(4)}</strong></div><div><span>95% SD interval</span><strong>{result.standardDeviationConfidenceInterval.map(value=>value.toFixed(3)).join(' to ')}</strong></div></>}
+        {testId === '2variance' && <><div><span>Variance A</span><strong>{result.varianceA.toFixed(4)}</strong></div><div><span>Variance B</span><strong>{result.varianceB.toFixed(4)}</strong></div><div><span>Variance ratio</span><strong>{result.ratio.toFixed(4)}</strong></div><div><span>95% ratio interval</span><strong>{result.confidenceInterval.map(value=>value.toFixed(3)).join(' to ')}</strong></div></>}
         {testId === 'anova' && <>
           <div><span>Groups</span><strong>{result.k}</strong></div>
           <div><span>N</span><strong>{result.N}</strong></div>
@@ -253,14 +280,14 @@ function ResultBox({ result, testId }) {
         </>}
         {testId === 'mw' && <>
           <div><span>U statistic</span><strong>{result.u.toFixed(2)}</strong></div>
-          <div><span>Z</span><strong>{result.z.toFixed(4)}</strong></div>
+          <div><span>Method</span><strong>{Number.isFinite(result.z)?`Z = ${result.z.toFixed(4)}`:'Exact binomial'}</strong></div>
         </>}
         {testId === 'wilcoxon' && <>
           <div><span>n (non-zero pairs)</span><strong>{result.n}</strong></div>
           <div><span>W+ (sum, positive)</span><strong>{result.wPlus.toFixed(2)}</strong></div>
           <div><span>W− (sum, negative)</span><strong>{result.wMinus.toFixed(2)}</strong></div>
           <div><span>W statistic</span><strong>{result.W.toFixed(2)}</strong></div>
-          <div><span>Z</span><strong>{result.z.toFixed(4)}</strong></div>
+          <div><span>Method</span><strong>{Number.isFinite(result.z)?`Z = ${result.z.toFixed(4)}`:'Fisher exact'}</strong></div>
         </>}
         {testId === 'friedman' && <>
           <div><span>Conditions (k)</span><strong>{result.k}</strong></div>
@@ -270,22 +297,25 @@ function ResultBox({ result, testId }) {
           <div><span>df</span><strong>{result.df}</strong></div>
         </>}
         {testId === 'chi2gof' && <>
+          <div><span>Largest contributor</span><strong>{result.largestContributor?.category||'—'}</strong></div>
           <div><span>χ²</span><strong>{result.chi2.toFixed(4)}</strong></div>
           <div><span>df</span><strong>{result.df}</strong></div>
         </>}
         {testId === '1prop' && <>
           <div><span>p̂ (sample)</span><strong>{result.phat.toFixed(4)}</strong></div>
-          <div><span>Z</span><strong>{result.z.toFixed(4)}</strong></div>
+          <div><span>Z / exact method</span><strong>{Number.isFinite(result.z)?result.z.toFixed(4):'Exact pathway'}</strong></div>
           <div><span>95% CI</span><strong>[{result.ci[0].toFixed(3)}, {result.ci[1].toFixed(3)}]</strong></div>
         </>}
         {testId === '2prop' && <>
           <div><span>p̂₁</span><strong>{result.p1.toFixed(4)}</strong></div>
           <div><span>p̂₂</span><strong>{result.p2.toFixed(4)}</strong></div>
           <div><span>Difference</span><strong>{result.diff.toFixed(4)}</strong></div>
-          <div><span>Z</span><strong>{result.z.toFixed(4)}</strong></div>
+          <div><span>Z / exact method</span><strong>{Number.isFinite(result.z)?result.z.toFixed(4):'Exact pathway'}</strong></div>
           <div><span>95% CI (diff)</span><strong>[{result.ci[0].toFixed(3)}, {result.ci[1].toFixed(3)}]</strong></div>
         </>}
         {testId === 'chi2indep' && <>
+          <div><span>Cramér's V</span><strong>{result.cramersV.toFixed(4)}</strong></div>
+          <div><span>Association strength</span><strong>{result.associationStrength}</strong></div>
           <div><span>χ²</span><strong>{result.chi2.toFixed(4)}</strong></div>
           <div><span>df</span><strong>{result.df}</strong></div>
           <div><span>N</span><strong>{result.grandTotal}</strong></div>
@@ -317,6 +347,8 @@ function ResultBox({ result, testId }) {
         </>}
       </div>
 
+      {(result.warnings?.length||result.guidance)&&<div className="alert alert-warning"><strong>ASSUMPTIONS / LIMITATIONS</strong><div>{[...(result.warnings||[]),result.guidance].filter(Boolean).join(' ')}</div></div>}
+
       {testId === 'dunn' && (
         <table className="data-table" style={{ marginTop: '1rem' }}>
           <thead><tr><th>Pair</th><th>Z</th><th>p (raw)</th><th>p (Bonferroni-adjusted)</th></tr></thead>
@@ -335,27 +367,38 @@ function ResultBox({ result, testId }) {
         </table>
       )}
 
+      {testId==='chi2gof'&&result.residualEvidence&&<div className="results-table-wrap" style={{marginTop:'1rem'}}><p><strong>{result.largestContributor.category}</strong> contributes the largest share of the overall difference from the expected distribution. This identifies statistical contribution, not root cause.</p><table><thead><tr><th>Category</th><th>Observed</th><th>Expected</th><th>Raw residual</th><th>Standardized residual</th><th>χ² contribution</th></tr></thead><tbody>{result.residualEvidence.map((item,index)=><tr key={item.category} className={index===0?'highlight-row':''}><td>{item.category}</td><td>{item.observed.toFixed(2)}</td><td>{item.expected.toFixed(2)}</td><td>{item.rawResidual.toFixed(3)}</td><td>{item.standardizedResidual.toFixed(3)}</td><td>{item.contribution.toFixed(3)}</td></tr>)}</tbody></table></div>}
+
+      {testId==='chi2indep'&&result.contributors&&<div style={{marginTop:'1rem'}}><p>The variables show a <strong>{result.associationStrength}</strong> association in this dataset. Interpret Cramér's V in the context of table dimensions and practical consequences.</p><div className="results-table-wrap"><table><thead><tr><th>Row category</th><th>Column category</th><th>Observed</th><th>Expected</th><th>Std. residual</th><th>Direction</th></tr></thead><tbody>{result.contributors.slice(0,5).map(item=><tr key={`${item.row}-${item.column}`}><td>Row {item.row+1}</td><td>Column {item.column+1}</td><td>{item.observed}</td><td>{item.expected.toFixed(2)}</td><td>{item.residual.toFixed(3)}</td><td>{item.direction}</td></tr>)}</tbody></table></div>{result.contributors.length>5&&<details><summary>Show all residual contributors</summary><div className="results-table-wrap"><table><thead><tr><th>Cell</th><th>Observed</th><th>Expected</th><th>Std. residual</th><th>Direction</th></tr></thead><tbody>{result.contributors.map(item=><tr key={`${item.row}-${item.column}`}><td>Row {item.row+1}, Column {item.column+1}</td><td>{item.observed}</td><td>{item.expected.toFixed(2)}</td><td>{item.residual.toFixed(3)}</td><td>{item.direction}</td></tr>)}</tbody></table></div></details>}</div>}
+
       <div className={`alert ${sig ? 'alert-success' : 'alert-info'}`} style={{ marginTop: '1rem' }}>
+        <strong>WHY IT MATTERS</strong><br />
         {sig
           ? `The result is statistically significant at α = 0.05. There is sufficient evidence to reject the null hypothesis (p = ${result.p < 0.001 ? '<0.001' : result.p.toFixed(4)}).`
           : `The result is not statistically significant at α = 0.05. There is insufficient evidence to reject the null hypothesis (p = ${result.p.toFixed(4)}).`}
       </div>
+      <div className="alert alert-info"><strong>WHAT TO CONSIDER NEXT</strong><div>{sig?'Review effect size, confidence interval, assumptions, and operational consequences before acting.':'A non-significant result is not proof of equivalence. Review power, interval width, data quality, and practical effect size.'}</div></div>
     </div>
   );
 }
 
 export default function HypothesisTesting() {
-  const { columns, getColumnData, hasData } = useWorksheet();
+  const [searchParams,setSearchParams]=useSearchParams();
+  const { activeDataset, columns, getColumnData, hasData } = useWorksheet();
   const { addReportItem } = useReport();
   const resultRef = useRef(null);
-  const [selectedTest, setSelectedTest] = useState(null);
-  const [inputs, setInputs] = useState({ col1: '', col2: '', mu0: 0, p0: 0.5, x: 10, n: 100, x1: 10, n1: 100, x2: 10, n2: 100, observed: '', expected: '', groups: ['', '', ''], tableRows: 2, tableCols: 2, table: [['', ''], ['', '']] });
+  const requestedMethod=HYPOTHESIS_METHOD_CONTEXT[searchParams.get('method')]||null;
+  const [selectedTest, setSelectedTest] = useState(requestedMethod);
+  const [inputs, setInputs] = useState({ col1: '', col2: '', mu0: 0, sigma0: 1, p0: 0.5, pooled: searchParams.get('method')==='pooled-two-sample-t', x: 10, n: 100, x1: 10, n1: 100, x2: 10, n2: 100, observed: '', expected: '', groups: ['', '', ''], tableRows: 2, tableCols: 2, table: [['', ''], ['', '']] });
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [typeFilter, setTypeFilter] = useState('All');
+  const [methodSearch,setMethodSearch]=useState('');
   const [showGuide, setShowGuide] = useState(false);
   const [addedToReport, setAddedToReport] = useState(false);
   const bookExcerpt = BOOK_EXCERPTS.hypothesis;
+  useEffect(()=>{const context=HYPOTHESIS_METHOD_CONTEXT[searchParams.get('method')];if(context){setSelectedTest(context);setInputs(previous=>({...previous,pooled:searchParams.get('method')==='pooled-two-sample-t'}));setResult(null);setError('')}},[searchParams]);
+  const selectMethod=id=>{setSelectedTest(id);setResult(null);setError('');const catalogId=Object.keys(HYPOTHESIS_METHOD_CONTEXT).find(key=>HYPOTHESIS_METHOD_CONTEXT[key]===id);if(catalogId)setSearchParams({method:catalogId},{replace:true});else setSearchParams({}, {replace:true});if(id==='fisher')setInputs(previous=>({...previous,tableRows:2,tableCols:2,table:[['',''],['','']]}))};
 
   const handleAddToReport = useCallback(async () => {
     if (!resultRef.current || !result) return;
@@ -363,6 +406,7 @@ export default function HypothesisTesting() {
     const canvas = await html2canvas(resultRef.current, { backgroundColor: null, scale: 2 });
     const chartImage = canvas.toDataURL('image/png');
     const { summary, interpretation } = buildReportContent(test, result);
+    const catalogId=Object.keys(HYPOTHESIS_METHOD_CONTEXT).find(id=>HYPOTHESIS_METHOD_CONTEXT[id]===selectedTest),validationStatus=analyticsById(catalogId)?.validationStatus||'UNVALIDATED';
     addReportItem({
       title: test.name,
       toolId: 'hypothesis',
@@ -371,11 +415,11 @@ export default function HypothesisTesting() {
       statsSummary: summary,
       interpretation,
       assumptionReport: result.assumptionReport || null,
-      provenance: result.method ? { method: result.method, methodVersion: result.methodVersion, nAnalyzed: result.n || result.nA + result.nB, missingHandling: result.missingHandling } : null,
+      provenance: result.method ? { method: result.method, methodVersion: result.methodVersion, datasetId:activeDataset?.id||null,datasetVersionId:activeDataset?.versionId||null,variableMapping:{first:inputs.col1||null,second:inputs.col2||null,groups:inputs.groups.filter(Boolean)},parameters:{mu0:inputs.mu0,p0:inputs.p0,sigma0:inputs.sigma0,pooled:inputs.pooled},nAnalyzed:[result.n,result.nA+result.nB,result.n1+result.n2].find(Number.isFinite)||null,missingHandling: result.missingHandling||{policy:'finite worksheet values or explicit manual input'},validationStatus} : null,
       rawData: [],
     });
     setAddedToReport(true);
-  }, [result, selectedTest, addReportItem]);
+  }, [result, selectedTest, addReportItem,activeDataset,inputs]);
 
   const numCols = columns.filter(c => c.data.some(v => !isNaN(parseFloat(v))));
 
@@ -393,14 +437,13 @@ export default function HypothesisTesting() {
 
       if (test.id === '1t') {
         if (d1.length < 2) throw new Error('Need at least 2 data points');
-        res = { ...oneSampleT(d1, parseFloat(inputs.mu0) || 0), assumptionReport: buildAssumptionReport({ values: d1 }) };
+        const inference=oneSampleMean({values:d1,mu0:parseFloat(inputs.mu0)||0});res={...inference,t:inference.statistic,p:inference.pValue,ci:inference.confidenceInterval,stddev:inference.standardDeviation,assumptionReport:buildAssumptionReport({values:d1})};
       } else if (test.id === '2t') {
         if (d1.length < 2 || d2.length < 2) throw new Error('Need at least 2 data points in each group');
-        res = { ...twoSampleT(d1, d2), assumptionReport: buildAssumptionReport({ values: [...d1, ...d2], groups: [d1, d2] }) };
+        const inference=independentMeans({a:d1,b:d2,pooled:inputs.pooled});res={...inference,na:inference.nA,nb:inference.nB,ma:inference.meanA,mb:inference.meanB,sa:Math.sqrt(inference.varianceA),sb:Math.sqrt(inference.varianceB),t:inference.statistic,p:inference.pValue,diff:inference.difference,assumptionReport:buildAssumptionReport({values:[...d1,...d2],groups:[d1,d2]})};
       } else if (test.id === 'pairedt') {
         if (d1.length < 2 || d2.length < 2) throw new Error('Need at least 2 paired data points in each column');
-        const minLen = Math.min(d1.length, d2.length);
-        res = pairedTTest(d1.slice(0, minLen), d2.slice(0, minLen));
+        const inference=pairedMean({a:d1,b:d2});res={...inference,meanDiff:inference.meanDifference,t:inference.statistic,p:inference.pValue};
       } else if (test.id === 'anova') {
         const groups = inputs.groups.map((g, i) => hasData && g ? getColumnData(g) : parseManual(inputs[`manualG${i}`] || ''));
         const valid = groups.filter(g => g.length >= 2);
@@ -408,41 +451,46 @@ export default function HypothesisTesting() {
         res = oneWayAnova(valid);
       } else if (test.id === 'mw') {
         if (d1.length < 2 || d2.length < 2) throw new Error('Need at least 2 data points in each group');
-        res = mannWhitney(d1, d2);
+        const inference=mannWhitneyInference({a:d1,b:d2});res={...inference,u:inference.U,p:inference.pValue};
       } else if (test.id === 'wilcoxon') {
         if (d1.length < 2 || d2.length < 2) throw new Error('Need at least 2 paired data points in each column');
-        const minLen = Math.min(d1.length, d2.length);
-        res = wilcoxonSignedRank(d1.slice(0, minLen), d2.slice(0, minLen));
+        const inference=signedRank({a:d1,b:d2});res={...inference,p:inference.pValue??inference.p};
+      } else if (test.id === 'sign') {
+        const inference=signTest({a:d1,b:d2});res={...inference,p:inference.pValue};
       } else if (test.id === 'chi2gof') {
         const obs = inputs.observed.split(/[\n,\s]+/).map(Number).filter(v => !isNaN(v));
         const exp = inputs.expected.split(/[\n,\s]+/).map(Number).filter(v => !isNaN(v));
         if (obs.length < 2 || obs.length !== exp.length) throw new Error('Need matching observed/expected counts');
-        res = chiSquareGoF(obs, exp);
+        const inference=goodnessOfFit({observed:obs,expected:exp});res={...inference,chi2:inference.statistic,p:inference.pValue};
       } else if (test.id === '1prop') {
         const x = parseInt(inputs.x), n = parseInt(inputs.n);
         if (isNaN(x) || isNaN(n) || n <= 0 || x < 0 || x > n) throw new Error('Invalid counts');
-        res = proportionTest(x, n, parseFloat(inputs.p0));
+        const inference=oneProportion({successes:x,trials:n,p0:parseFloat(inputs.p0)});res={...inference,phat:inference.estimate,z:inference.statistic,p:inference.pValue,ci:inference.confidenceInterval};
       } else if (test.id === '2prop') {
         const x1 = parseInt(inputs.x1), n1 = parseInt(inputs.n1), x2 = parseInt(inputs.x2), n2 = parseInt(inputs.n2);
         if ([x1, n1, x2, n2].some(isNaN) || n1 <= 0 || n2 <= 0 || x1 < 0 || x1 > n1 || x2 < 0 || x2 > n2) throw new Error('Invalid counts');
-        res = twoPropTest(x1, n1, x2, n2);
+        const inference=twoProportions({x1,n1,x2,n2});res={...inference,z:inference.statistic,p:inference.pValue,diff:inference.difference,ci:inference.confidenceInterval};
+      } else if (test.id === '1variance') {
+        const inference=oneVariance({values:d1,sigma0:Number(inputs.sigma0)});res={...inference,p:inference.pValue??1};
+      } else if (test.id === '2variance') {
+        const inference=twoVariances({a:d1,b:d2});res={...inference,p:inference.pValue};
       } else if (test.id === 'kw') {
         const groups = inputs.groups.map((g, i) => hasData && g ? getColumnData(g) : parseManual(inputs[`manualG${i}`] || ''));
         const valid = groups.filter(g => g.length >= 2);
         if (valid.length < 3) throw new Error('Need at least 3 groups');
-        const anova = oneWayAnova(valid);
+        const inference=kruskalWallis({groups:valid});const anova={...inference,k:valid.length,N:valid.flat().length,F:inference.H,dfBetween:inference.df,dfWithin:'—',p:inference.pValue};
         res = { ...anova, note: 'Kruskal-Wallis H ≈ F for large samples' };
       } else if (test.id === 'friedman') {
         const groups = inputs.groups.map((g, i) => hasData && g ? getColumnData(g) : parseManual(inputs[`manualG${i}`] || ''));
         const valid = groups.filter(g => g.length >= 2);
         if (valid.length < 3) throw new Error('Need at least 3 paired conditions with 2+ data points each');
         const minLen = Math.min(...valid.map(g => g.length));
-        res = friedmanTest(valid.map(g => g.slice(0, minLen)));
+        const inference=repeatedRanks({conditions:valid.map(g=>g.slice(0,minLen))});res={...inference,p:inference.pValue??inference.p};
       } else if (test.id === 'chi2indep') {
         const table = inputs.table.map(row => row.map(v => parseFloat(v)));
         if (table.some(row => row.some(v => isNaN(v) || v < 0))) throw new Error('All table cells must be filled with non-negative numbers');
         if (table.length < 2 || table[0].length < 2) throw new Error('Need at least a 2×2 table');
-        res = chiSquareIndependence(table);
+        const inference=categoricalAssociation({table});res={...inference,p:inference.pValue??inference.p};
       } else if (test.id === 'fisher') {
         const table = inputs.table.map(row => row.map(v => parseFloat(v)));
         if (table.some(row => row.some(v => isNaN(v) || v < 0))) throw new Error('All table cells must be filled with non-negative numbers');
@@ -474,7 +522,7 @@ export default function HypothesisTesting() {
   };
 
   const printResult = () => window.print();
-  const filtered = TESTS.filter(t => typeFilter === 'All' || t.type === typeFilter);
+  const filtered = useMemo(()=>TESTS.filter(t => (typeFilter === 'All' || t.type === typeFilter)&&`${t.name} ${t.desc}`.toLowerCase().includes(methodSearch.trim().toLowerCase())),[typeFilter,methodSearch]);
 
   return (
     <div className="ht-page">
@@ -512,6 +560,8 @@ export default function HypothesisTesting() {
       <div className="ht-layout">
         {/* Test selector */}
         <div className="ht-test-panel">
+          <div className="form-group" style={{marginBottom:'.75rem'}}><label>Find a known method</label><input type="search" value={methodSearch} onChange={event=>setMethodSearch(event.target.value)} placeholder="Mann-Whitney, Fisher exact, variance…" /></div>
+          {!methodSearch&&<div style={{marginBottom:'1rem'}}><strong style={{fontSize:'.8rem'}}>What are you trying to determine?</strong><div style={{display:'grid',gap:'.35rem',marginTop:'.5rem'}}>{GUIDED_HYPOTHESIS_CHOICES.map(choice=><button type="button" className="btn-ghost" style={{textAlign:'left'}} key={choice.method} onClick={()=>selectMethod(choice.method)}>{choice.label}</button>)}</div></div>}
           <div className="ht-type-filter">
             {['All', 'Continuous', 'Nonparametric', 'Discrete'].map(t => (
               <button key={t} className={`tab-btn ${typeFilter === t ? 'active' : ''}`} onClick={() => setTypeFilter(t)}>{t}</button>
@@ -522,10 +572,7 @@ export default function HypothesisTesting() {
               <button
                 key={test.id}
                 className={`ht-test-btn ${selectedTest === test.id ? 'active' : ''}`}
-                onClick={() => {
-                  setSelectedTest(test.id); setResult(null); setError('');
-                  if (test.id === 'fisher') setInputs(p => ({ ...p, tableRows: 2, tableCols: 2, table: [['', ''], ['', '']] }));
-                }}
+                onClick={() => selectMethod(test.id)}
               >
                 <div className="ht-test-header">
                   <span className="ht-test-name">{test.name}</span>
@@ -608,8 +655,11 @@ export default function HypothesisTesting() {
                         </div>
                       </div>
                     )}
+                    {selectedTest==='2t'&&<div className="form-group" style={{marginTop:'.75rem'}}><label>Variance model</label><select value={inputs.pooled?'pooled':'welch'} onChange={event=>setInputs(previous=>({...previous,pooled:event.target.value==='pooled'}))}><option value="welch">Welch — recommended default</option><option value="pooled">Pooled — only with defensible equal variances</option></select><small style={{color:'var(--text-muted)'}}>Aureqin will not switch methods silently. Welch is more robust when group variances or sample sizes differ.</small></div>}
                   </div>
                 )}
+
+                {TESTS.find(t=>t.id===selectedTest)?.inputs==='variance1'&&<div><div className="form-group"><label>Measurement</label>{hasData&&numCols.length?<select value={inputs.col1} onChange={event=>setInputs(previous=>({...previous,col1:event.target.value}))}><option value="">— select —</option>{numCols.map(column=><option key={column.name}>{column.name}</option>)}</select>:<textarea className="ws-textarea" rows={5} value={inputs.manualD1||''} onChange={event=>setInputs(previous=>({...previous,manualD1:event.target.value}))} placeholder="Enter numeric observations"/>}</div><div className="form-group"><label>Hypothesized standard deviation</label><input type="number" min="0" step="any" value={inputs.sigma0} onChange={event=>setInputs(previous=>({...previous,sigma0:event.target.value}))}/><small style={{color:'var(--text-muted)'}}>Variance inference is highly sensitive to nonnormality. Review the assumption panel before relying on the result.</small></div></div>}
 
                 {/* Multi-group inputs */}
                 {TESTS.find(t => t.id === selectedTest)?.inputs === 'multi' && (

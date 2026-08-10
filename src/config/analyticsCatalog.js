@@ -27,6 +27,9 @@ export const ANALYTICS_CATALOG=Object.freeze([
  method('distribution-analysis','Distribution Analysis','Distributions','/tool/distribution-analysis',{aliases:['probability plot','qq plot','weibull','lognormal','gamma','exponential','box cox'],responseTypes:['positive continuous','continuous']}),
  method('full-factorial-doe','Full Factorial DOE','DOE','/doe',{aliases:['2 level factorial','design of experiments','main effects'],responseTypes:['continuous'],predictorTypes:['experimental factors']}),
  method('fractional-factorial-doe','Fractional Factorial DOE','DOE','/doe',{aliases:['fractional factorial','resolution','alias structure','confounding'],responseTypes:['continuous'],predictorTypes:['experimental factors']}),
+ method('response-surface','Response Surface Methodology','DOE','/doe',{aliases:['response surface','rsm','quadratic doe','contour plot'],responseTypes:['continuous'],predictorTypes:['continuous experimental factors']}),
+ method('central-composite','Central Composite Design','DOE','/doe',{aliases:['central composite','ccd','star points','axial points','rotatable design','face centered'],responseTypes:['continuous'],predictorTypes:['continuous experimental factors']}),
+ method('box-behnken','Box-Behnken Design','DOE','/doe',{aliases:['box behnken','bbd','response surface design'],responseTypes:['continuous'],predictorTypes:['continuous experimental factors']}),
  method('doe-optimization','DOE Response Optimization','DOE','/doe',{aliases:['desirability','confirmation run','recommended settings'],responseTypes:['continuous'],predictorTypes:['experimental factors']}),
 ]);
 

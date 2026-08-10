@@ -5,6 +5,7 @@ import {useAnalysis} from './AnalysisContext';
 import {useReport} from './ReportContext';
 import {NAVIGATION} from '../config/navigation';
 import {toolIndex} from '../utils/navigationTools';
+import {analyticsSearchEntries} from '../config/analyticsExposure';
 
 const IntelligenceContext=createContext();
 const FAVORITES_KEY='sixsigmapro_favorites_v1';
@@ -25,6 +26,7 @@ export function IntelligenceProvider({children}){
   ...analysisResults.map(analysis=>({type:'Analysis',id:analysis.id,title:analysis.title||analysis.name||analysis.id,subtitle:analysis.phase||'Completed analysis',path:analysis.toolId?`/tool/${analysis.toolId}`:'/projects'})),
   ...reports.map(report=>({type:'Report',id:report.id,title:report.title||'Report item',subtitle:'Report Builder',path:'/report'})),
   ...toolLinks.map(item=>({type:'Tool',id:item.id,title:item.name,subtitle:item.context||'Statistical tool',path:item.path})),
+  ...analyticsSearchEntries(),
  ],[analysisResults,datasets,projects,reports]);
  const search=useCallback(query=>{const value=query.trim().toLowerCase();if(!value)return[];return index.filter(item=>`${item.title} ${item.subtitle} ${item.type}`.toLowerCase().includes(value)).slice(0,40)},[index]);
  return <IntelligenceContext.Provider value={{favorites,toggleFavorite,isFavorite,index,search}}>{children}</IntelligenceContext.Provider>;

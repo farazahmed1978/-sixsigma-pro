@@ -1,5 +1,17 @@
 const KEY='axentra_analysis_handoff';
+export const DOE_REGRESSION_DESTINATION='multiregression';
+export const DOE_REGRESSION_PATH='/tool/multiregression';
 export const createAnalysisHandoff=payload=>{const handoff={schemaVersion:1,id:`handoff-${Date.now()}`,createdAt:new Date().toISOString(),status:'ready',datasetId:'',datasetVersion:1,selectedColumns:[],response:'',factors:[],groups:[],metadata:{},...payload};sessionStorage.setItem(KEY,JSON.stringify(handoff));return handoff};
 export const getAnalysisHandoff=()=>{try{return JSON.parse(sessionStorage.getItem(KEY)||'null')}catch{return null}};
 export const clearAnalysisHandoff=()=>sessionStorage.removeItem(KEY);
 export const consumeAnalysisHandoff=destination=>{const handoff=getAnalysisHandoff();if(!handoff||(destination&&handoff.destination!==destination))return null;sessionStorage.setItem(KEY,JSON.stringify({...handoff,status:'consumed',consumedAt:new Date().toISOString()}));return handoff};
+
+const supportedTerm=term=>Array.isArray(term)&&term.length===2&&term.every(name=>typeof name==='string'&&name.trim());
+export function normalizeDoeRegressionHandoff(value){
+ if(!value||typeof value!=='object'||value.sourceTool!=='doe'||value.destination!=='multiregression')return{context:null,warning:null};
+ const response=typeof value.response==='string'?value.response.trim():'',factorDefinitions=Array.isArray(value.factorDefinitions)?value.factorDefinitions.filter(factor=>factor&&typeof factor.name==='string'&&factor.name.trim()).map(factor=>({name:factor.name.trim(),type:factor.type||'continuous',low:Number(factor.low),high:Number(factor.high),coding:factor.coding||value.coding||'coded'})):[],factorNames=factorDefinitions.map(factor=>factor.name),rows=Array.isArray(value.regressionRows)?value.regressionRows.filter(row=>row&&typeof row==='object'):[],interactions=Array.isArray(value.interactions)?value.interactions.filter(supportedTerm).filter(term=>term.every(name=>factorNames.includes(name))):[],polynomialTerms=Array.isArray(value.polynomialTerms)?value.polynomialTerms.filter(term=>term&&factorNames.includes(term.name)&&Number(term.degree)===2).map(term=>({name:term.name,degree:2})):[];
+ const unsupportedCount=(value.interactions?.length||0)-interactions.length+(value.polynomialTerms?.length||0)-polynomialTerms.length;
+ if(!response||!factorNames.length)return{context:null,warning:'DOE results were opened in Regression, but the response or factor mapping was incomplete. Review the model specification before running.'};
+ const completeRows=rows.filter(row=>Number.isFinite(Number(row[response]))&&factorNames.every(name=>Number.isFinite(Number(row[name]))));
+ return{context:{schemaVersion:1,id:value.id||'',sourceAnalysisId:value.sourceAnalysisId||'',sourceTool:'doe',sourceLabel:value.sourceLabel||'DOE analysis',projectId:value.projectId||'',datasetId:value.datasetId||'',datasetVersion:value.datasetVersion||1,datasetVersionId:value.datasetVersionId||'',response,factorDefinitions,factorNames,interactions,polynomialTerms,regressionRows:completeRows,naturalRows:Array.isArray(value.naturalRows)?value.naturalRows:[],coding:value.coding||'coded',modelTerms:Array.isArray(value.modelTerms)?value.modelTerms:[],createdAt:value.createdAt||'',metadata:value.metadata||{}},warning:unsupportedCount||completeRows.length!==rows.length?'DOE results were opened in Regression, but some rows or model terms could not be transferred automatically. Review the model specification before running.':null};
+}

@@ -6,7 +6,7 @@ import './ToolPage.css';
 
 const toolMeta = {
   'control-chart': {
-    name: 'Control Chart (X-bar & R)', icon: '📈', category: 'Control', phase: 'Control',
+    name: 'Control Chart', icon: '📈', category: 'Control', phase: 'Control',
     phaseColor: 'var(--cyan)',
     desc: 'Monitor process stability over time using statistical control limits. Detect special cause variation from common cause variation.',
     formulas: ['UCL = X̄ + 3σ', 'LCL = X̄ − 3σ', 'CL = X̄ (Process Mean)'],
