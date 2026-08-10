@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {syncService} from '../services/syncService';
 import { Link,useNavigate } from 'react-router-dom';
 import {NAVIGATION} from '../config/navigation';
+import {navigationItems} from '../utils/navigationTools';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { useReport } from '../context/ReportContext';
@@ -113,7 +114,7 @@ export default function DocumentWorkspace({ template, project, updateProject }) 
   useEffect(()=>{const host=document.querySelector('.document-workspace .workspace-shell-content');if(!host)return;let bar=host.querySelector('.dw-autosave-control');if(!bar){bar=document.createElement('div');bar.className='dw-autosave-control';host.prepend(bar)}bar.innerHTML=`<button type="button" aria-pressed="${autosave}"><i></i> Autosave ${autosave?'On':'Off'}</button><span class="${saveState}">${saveState==='saving'?'Saving…':saveState==='saved'?'Saved':saveState==='unsaved'?'Unsaved changes':'Offline / retry needed'}</span>`;const button=bar.querySelector('button');button.addEventListener('click',toggleAutosave);return()=>button.removeEventListener('click',toggleAutosave);});
   const missingFor=section=>section.fields.filter(field=>field.required!==false).filter(field=>Array.isArray(record.values[field.id])?!record.values[field.id].length:!textValue(record.values[field.id])).map(field=>field.label);
   useEffect(()=>{if(template.id!=='data-collection-plan')return;const bar=document.querySelector('.document-workspace .dw-autosave-control');if(!bar)return;let button=bar.querySelector('[data-collection-sheet]');if(!button){button=document.createElement('button');button.type='button';button.dataset.collectionSheet='true';button.textContent='Generate Collection Sheet';bar.append(button)}button.addEventListener('click',generateCollectionSheet);return()=>button.removeEventListener('click',generateCollectionSheet);});
-  const phaseDocuments=useMemo(()=>NAVIGATION.find(group=>group.section==='Lean Six Sigma')?.groups?.find(group=>group.name===template.phase)?.subgroups?.find(group=>group.label==='Documents')?.items||[],[template.phase]);
+  const phaseDocuments=useMemo(()=>navigationItems(NAVIGATION).filter(item=>item.suiteId==='operational-excellence'&&item.phase===template.phase&&item.id.startsWith('doc-')),[template.phase]);
   const currentDocumentIndex=phaseDocuments.findIndex(item=>item.path?.endsWith(`/${template.id}`));
   const nextDocument=currentDocumentIndex>=0?phaseDocuments[currentDocumentIndex+1]:null;
   const advance=()=>{const missing=missingFor(current);if(missing.length){setNotice(`Complete before continuing: ${missing.join(', ')}`);return;}saveNow();if(activeIndex<template.sections.length-1){setActiveIndex(index=>index+1);setNotice('Section saved · continue to the next section');return;}if(nextDocument){navigate(`/projects/${project.id}${nextDocument.path}`);return;}setNotice(`${template.name} is complete. Review it or return to Project Binder.`);};

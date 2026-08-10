@@ -3,11 +3,11 @@ import jsPDF from 'jspdf';
 import {useReport} from '../context/ReportContext';
 import {useProjects} from '../context/ProjectsContext';
 import {NAVIGATION} from '../config/navigation';
+import {navigationItems} from '../utils/navigationTools';
 import '../pages/Templates.css';
 
 const PHASES=['Define','Measure','Analyze','Improve','Control'];
-const lean=NAVIGATION.find(group=>group.section==='Lean Six Sigma')?.groups||[];
-const documentPhase=new Map(lean.flatMap(group=>(group.subgroups?.find(sub=>sub.label==='Documents')?.items||[]).map(item=>[item.id.replace(/^doc-/,''),group.name])));
+const documentPhase=new Map(navigationItems(NAVIGATION).filter(item=>item.suiteId==='operational-excellence'&&item.id.startsWith('doc-')).map(item=>[item.id.replace(/^doc-/,''),item.phase]));
 const analysisPhase={hypothesis:'Analyze',anova:'Analyze',regression:'Analyze',correlation:'Analyze',pareto:'Analyze',scatter:'Analyze',boxplot:'Analyze',doe:'Improve',fmea:'Analyze',capability:'Measure','control-chart':'Control','attribute-chart':'Control','run-chart':'Control',msa:'Measure',histogram:'Measure',descriptive:'Measure'};
 const phaseFor=item=>PHASES.includes(item.phase)?item.phase:documentPhase.get(item.documentSnapshot?.templateId)||analysisPhase[item.toolId]||(item.documentId?'Define':'Analyze');
 const sourceId=item=>item.documentId||item.analysisId||item.id;

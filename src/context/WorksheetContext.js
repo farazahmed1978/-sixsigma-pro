@@ -30,6 +30,8 @@ function normalizeDataset(dataset) {
     description: dataset.description || '',
     source: dataset.source || 'worksheet',
     sourceNote: dataset.sourceNote || '',
+    sourceRepresentation: dataset.sourceRepresentation || null,
+    intakeReview: dataset.intakeReview || null,
     status: dataset.status || (dataset.archivedAt ? 'archived' : 'active'),
     version: Number(dataset.version) || 1,
     versionId: dataset.versionId || dataset.datasetVersionId || `${dataset.id || 'legacy-dataset'}-version-${Number(dataset.version) || 1}`,
@@ -101,7 +103,7 @@ export function WorksheetProvider({ children }) {
   }, [activeDataset, user]);
 
   const loadData = useCallback((parsedColumns, name, options = {}) => {
-    const dataset = normalizeDataset({ id: makeId(), name: name || 'Worksheet', description: options.description || '', projectId: options.projectId || '', organizationId:options.organizationId||profile?.default_organization_id||'',createdBy:user?.id||'', source: options.source || 'import',sourceNote:options.sourceNote||'', columns: parsedColumns, history: [historyItem('Data imported')] });
+    const dataset = normalizeDataset({ id: makeId(), name: name || 'Worksheet', description: options.description || '', projectId: options.projectId || '', organizationId:options.organizationId||profile?.default_organization_id||'',createdBy:user?.id||'', source: options.source || 'import',sourceNote:options.sourceNote||'', sourceRepresentation:options.sourceRepresentation||null, intakeReview:options.intakeReview||null, lineage:options.lineage?[options.lineage]:[], columns: parsedColumns, history: [historyItem(options.lineage?.operations?.length?`Data imported with review: ${options.lineage.operations.join('; ')}`:'Data imported')] });
     setDatasets(previous => [...previous, dataset]);
     setActiveDatasetId(dataset.id);
     return dataset.id;

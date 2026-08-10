@@ -4,11 +4,12 @@ import {useWorksheet} from './WorksheetContext';
 import {useAnalysis} from './AnalysisContext';
 import {useReport} from './ReportContext';
 import {NAVIGATION} from '../config/navigation';
+import {toolIndex} from '../utils/navigationTools';
 
 const IntelligenceContext=createContext();
 const FAVORITES_KEY='sixsigmapro_favorites_v1';
 const loadFavorites=()=>{try{return JSON.parse(localStorage.getItem(FAVORITES_KEY)||'[]')}catch{return[]}};
-const toolLinks=NAVIGATION.flatMap(section=>section.groups||[]).flatMap(group=>group.subgroups||[]).filter(group=>group.label==='Tools').flatMap(group=>group.items);
+const toolLinks=toolIndex(NAVIGATION);
 
 export function IntelligenceProvider({children}){
  const {projects}=useProjects();const{datasets}=useWorksheet();const{analysisResults}=useAnalysis();const{items:reports}=useReport();
@@ -22,7 +23,7 @@ export function IntelligenceProvider({children}){
   ...datasets.map(dataset=>({type:'Dataset',id:dataset.id,title:dataset.name,subtitle:dataset.description||'Project dataset',path:'/worksheet'})),
   ...analysisResults.map(analysis=>({type:'Analysis',id:analysis.id,title:analysis.title||analysis.name||analysis.id,subtitle:analysis.phase||'Completed analysis',path:analysis.toolId?`/tool/${analysis.toolId}`:'/projects'})),
   ...reports.map(report=>({type:'Report',id:report.id,title:report.title||'Report item',subtitle:'Report Builder',path:'/report'})),
-  ...toolLinks.map(item=>({type:'Tool',id:item.id,title:item.name,subtitle:'Statistical tool',path:item.path})),
+  ...toolLinks.map(item=>({type:'Tool',id:item.id,title:item.name,subtitle:item.context||'Statistical tool',path:item.path})),
  ],[analysisResults,datasets,projects,reports]);
  const search=useCallback(query=>{const value=query.trim().toLowerCase();if(!value)return[];return index.filter(item=>`${item.title} ${item.subtitle} ${item.type}`.toLowerCase().includes(value)).slice(0,40)},[index]);
  return <IntelligenceContext.Provider value={{favorites,toggleFavorite,isFavorite,index,search}}>{children}</IntelligenceContext.Provider>;

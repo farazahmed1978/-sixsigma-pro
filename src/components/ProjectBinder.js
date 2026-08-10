@@ -2,11 +2,12 @@ import React,{useMemo} from 'react';
 import {Link} from 'react-router-dom';
 import {PHASES} from '../context/ProjectsContext';
 import {NAVIGATION} from '../config/navigation';
+import {navigationItems} from '../utils/navigationTools';
 import './ProjectBinder.css';
 
-const leanGroups=NAVIGATION.find(group=>group.section==='Lean Six Sigma')?.groups||[];
-const documentPhases=new Map(leanGroups.flatMap(group=>(group.subgroups?.find(sub=>sub.label==='Documents')?.items||[]).map(item=>[item.id.replace(/^doc-/,''),group.name])));
-const toolPhases=new Map(leanGroups.flatMap(group=>(group.subgroups?.find(sub=>sub.label==='Tools')?.items||[]).map(item=>[item.id.replace(/^tool-/,''),group.name])));
+const oeItems=navigationItems(NAVIGATION).filter(item=>item.suiteId==='operational-excellence');
+const documentPhases=new Map(oeItems.filter(item=>item.id.startsWith('doc-')).map(item=>[item.id.replace(/^doc-/,''),item.phase]));
+const toolPhases=new Map(oeItems.filter(item=>item.id.startsWith('tool-')).map(item=>[item.id.replace(/^tool-/,''),item.phase]));
 const analysisPhase={hypothesis:'Analyze',anova:'Analyze',regression:'Analyze',multiregression:'Analyze',logistic:'Analyze',correlation:'Analyze',pareto:'Analyze',scatter:'Analyze',boxplot:'Analyze',fishbone:'Analyze',doe:'Improve',fmea:'Analyze',capability:'Measure','control-chart':'Control','attribute-chart':'Control','run-chart':'Control',msa:'Measure',histogram:'Measure',descriptive:'Measure'};
 const phaseRank=value=>Math.max(0,PHASES.indexOf(value));
 const clean=value=>String(value||'').replace(/<[^>]*>/g,' ').replace(/&nbsp;/g,' ').replace(/\s+/g,' ').trim();
