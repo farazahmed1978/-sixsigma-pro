@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { useWorksheet } from './WorksheetContext';
 import { useProjects } from './ProjectsContext';
 import {useAuth} from './AuthContext';
+import { createAnalysisMetadata } from '../foundation/provenance';
 
 const AnalysisContext = createContext();
 export const ANALYSIS_CONTEXT_SCHEMA_VERSION = 1;
@@ -28,7 +29,9 @@ export function AnalysisProvider({ children }) {
   useEffect(() => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(analysisResults)); } catch (error) { console.warn('Analyses could not be saved:', error); } }, [analysisResults]);
 
   const registerAnalysisResult = useCallback(result => {
-    const record = { schemaVersion: ANALYSIS_CONTEXT_SCHEMA_VERSION, id: result.id || `analysis-${Date.now()}`, projectId: result.projectId || activeDataset?.projectId || '',organizationId:result.organizationId||project?.organizationId||profile?.default_organization_id||'',createdBy:result.createdBy||user?.id||'', datasetIds: result.datasetIds || (activeDataset ? [activeDataset.id] : []),datasetVersion:result.datasetVersion||activeDataset?.version||1,toolType:result.toolType||result.toolId||'analysis',phase:result.phase||'Analyze',methodology:result.methodology||'lean-six-sigma',inputConfiguration:result.inputConfiguration||{},result:result.result||result.statsSummary||{},interpretation:result.interpretation||'',evidenceIds:result.evidenceIds||[],linkedReportIds: [], linkedDocumentIds: [],status:result.status||'complete', createdAt: result.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString(), ...result };
+    const id = result.id || `analysis-${Date.now()}`;
+    const base = { schemaVersion: ANALYSIS_CONTEXT_SCHEMA_VERSION, id, projectId: result.projectId || activeDataset?.projectId || '',organizationId:result.organizationId||project?.organizationId||profile?.default_organization_id||'',createdBy:result.createdBy||user?.id||'', datasetIds: result.datasetIds || (activeDataset ? [activeDataset.id] : []),datasetVersionIds:result.datasetVersionIds||(activeDataset?.versionId?[activeDataset.versionId]:[]),datasetVersion:result.datasetVersion||activeDataset?.version||1,toolType:result.toolType||result.toolId||'analysis',phase:result.phase||'Analyze',methodology:result.methodology||'lean-six-sigma',inputConfiguration:result.inputConfiguration||{},result:result.result||result.statsSummary||{},interpretation:result.interpretation||'',evidenceIds:result.evidenceIds||[],linkedReportIds: [], linkedDocumentIds: [],status:result.status||'complete', createdAt: result.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString(), ...result };
+    const record = { ...base, reproducibility: createAnalysisMetadata({ ...base, analysisId: id }) };
     setAnalysisResults(previous => [record, ...previous]);
     if (record.projectId) recordActivity?.(record.projectId, { action: `Ran ${record.title || record.name || 'analysis'}`, assetType: 'analysis', assetId: record.id });
     return record.id;

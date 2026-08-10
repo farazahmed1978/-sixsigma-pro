@@ -7,6 +7,7 @@ const ACTIVE_KEY = 'sixsigmapro_active_dataset';
 const SCHEMA_VERSION = 1;
 
 const makeId = () => `dataset-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+const makeVersionId = () => `dataset-version-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 const now = () => new Date().toISOString();
 const rowCountFor = columns => Math.max(0, ...columns.map(column => column.data?.length || 0));
 const historyItem = action => ({ id: `history-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`, action, at: now() });
@@ -29,6 +30,7 @@ function normalizeDataset(dataset) {
     sourceNote: dataset.sourceNote || '',
     status: dataset.status || (dataset.archivedAt ? 'archived' : 'active'),
     version: Number(dataset.version) || 1,
+    versionId: dataset.versionId || dataset.datasetVersionId || `${dataset.id || 'legacy-dataset'}-version-${Number(dataset.version) || 1}`,
     rowCount: rowCountFor(columns),
     columnCount: columns.length,
     analysisIds: Array.isArray(dataset.analysisIds) ? dataset.analysisIds : [],
@@ -74,7 +76,7 @@ export function WorksheetProvider({ children }) {
     setDatasets(previous => previous.map(dataset => {
       if (dataset.id !== activeDatasetId) return dataset;
       const updated = updater(dataset);
-      return { ...updated, schemaVersion: SCHEMA_VERSION, version:(dataset.version||1)+1, rowCount:rowCountFor(updated.columns||[]), columnCount:(updated.columns||[]).length, updatedAt: now(), history: action ? [historyItem(action), ...(updated.history || dataset.history || [])].slice(0, 50) : updated.history || dataset.history || [] };
+      return { ...updated, schemaVersion: SCHEMA_VERSION, version:(dataset.version||1)+1, versionId:makeVersionId(), rowCount:rowCountFor(updated.columns||[]), columnCount:(updated.columns||[]).length, updatedAt: now(), history: action ? [historyItem(action), ...(updated.history || dataset.history || [])].slice(0, 50) : updated.history || dataset.history || [] };
     }));
   }, [activeDatasetId]);
 
