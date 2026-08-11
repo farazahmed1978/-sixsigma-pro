@@ -68,6 +68,7 @@ import LogisticRegressionTool from './tools/LogisticRegressionTool';
 import AnovaTool from './tools/AnovaTool';
 import DistributionAnalysis from './tools/DistributionAnalysis';
 import ReliabilityWorkspace from './tools/ReliabilityWorkspace';
+import ProductDevelopmentWorkspace from './tools/ProductDevelopmentWorkspace';
 
 // Bucket 3 — calculators
 import SigmaCalculator from './tools/SigmaCalculator';
@@ -99,6 +100,7 @@ const toolMeta = {
   'anova': { title: 'ANOVA', phase: 'Analyze', component: <AnovaTool /> },
   'distribution-analysis': { title: 'Distribution Analysis', phase: 'Analyze', component: <DistributionAnalysis /> },
   'reliability': { title: 'Reliability Analysis', phase: 'Analyze', component: <ReliabilityWorkspace /> },
+  'product-development': { title: 'Product & Design Development', phase: 'Improve', component: <ProductDevelopmentWorkspace /> },
   'sigma-calculator': { title: 'Sigma Level / DPMO Calculator', phase: 'Measure', component: <SigmaCalculator /> },
   'sample-size-calculator': { title: 'Sample Size Calculator', phase: 'Measure', component: <SampleSizeCalculator /> },
   'power-calculator': { title: 'Power / Sample Size Calculator', phase: 'Measure', component: <PowerCalculator /> },

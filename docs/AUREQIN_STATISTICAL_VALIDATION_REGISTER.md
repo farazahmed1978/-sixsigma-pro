@@ -16,8 +16,8 @@ The executable source of truth is `src/foundation/validationCatalog.js`; promoti
 |---|---:|---|
 | VALIDATED | 0 | No method has yet completed the required independent second review and fixture depth. |
 | PARTIALLY VALIDATED | 6 | One-sample t, Welch t, one-way ANOVA, simple linear regression, I-MR, and the one-sided normal tolerance factor have passing NIST-backed fixtures with documented gaps. |
-| UNVALIDATED | 39 | No independently evidenced executable manifest exists yet. |
-| **Total** | **45** | 44 analytics-catalog methods plus the governed I-MR engine. |
+| UNVALIDATED | 46 | No independently evidenced executable manifest exists yet. |
+| **Total** | **52** | 51 analytics-catalog methods plus the governed I-MR engine. |
 
 ## Evidence matrix
 
@@ -70,6 +70,13 @@ The executable source of truth is `src/foundation/validationCatalog.js`; promoti
 | Laney u′ Chart / 1.0.0 | UNVALIDATED | none independently registered | standardized moving-range dispersion adjustment | internal tests only | invalid opportunity and zero-dispersion guards | authoritative fixture and independent review required |
 | G Rare-Event Chart / 1.0.0 | UNVALIDATED | none independently registered | geometric opportunities-between-events limits | internal tests only | positive interval guard | limit convention equivalence and independent fixture required |
 | T Rare-Event Chart / 1.0.0 | UNVALIDATED | none independently registered | elapsed-time-between-events limits | internal tests only | positive interval guard | distribution/limit convention and independent fixture required |
+| Plackett-Burman Screening / 1.0.0 | UNVALIDATED | none independently registered | 4/8/12-run orthogonal screening; main effects | internal tests only | size/factor guards, seeded randomization, orthogonality | published design/effect fixtures and review required |
+| Taguchi Robust Design / 1.0.0 | UNVALIDATED | none independently registered | L4/L8/L9 arrays; standard smaller/larger/nominal S/N | internal tests only | factor-level compatibility and S/N edge guards | authoritative array/S/N fixtures required |
+| Mixture DOE / 1.0.0 | UNVALIDATED | none independently registered | simplex centroid/lattice; linear/quadratic Scheffé | internal tests only | sum constraint and singularity guards | independent coefficient/ANOVA fixtures required |
+| Engineering Monte Carlo / 1.0.0 | UNVALIDATED | none independently registered | seeded distribution propagation and input-response correlation | internal tests only | unsafe expression, distribution, count and correlation guards | independent distribution/quantile fixtures required |
+| Tolerance Stack-Up / 1.0.0 | UNVALIDATED | none independently registered | worst case, RSS and Monte Carlo dimensional stack | internal tests only | direction, units and tolerance validation | authoritative engineering fixture required |
+| TOST Equivalence / 1.0.0 | UNVALIDATED | none independently registered | Welch/paired TOST workflow | internal tests only | margin, sample and pairing guards | exact small-sample t critical values and independent fixtures required |
+| Engineering Sample Size / 1.0.0 | UNVALIDATED | none independently registered | direct-unit normal planning approximations | internal tests only | invalid effect, SD, probability and power guards | noncentral exact engines and independent fixtures required |
 
 ## Discrepancy register
 

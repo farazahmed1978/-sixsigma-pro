@@ -47,6 +47,13 @@ export const ANALYTICS_CATALOG=Object.freeze([
  method('laney-u-prime','Laney u′ Chart','SPC','/tool/attribute-chart',{aliases:['overdispersion defects per unit','underdispersion u chart'],responseTypes:['defect counts']}),
  method('g-rare-event-chart','G Rare-Event Chart','SPC','/tool/attribute-chart',{aliases:['opportunities between rare events'],responseTypes:['positive counts']}),
  method('t-rare-event-chart','T Rare-Event Chart','SPC','/tool/attribute-chart',{aliases:['time between rare events'],responseTypes:['positive continuous']}),
+ method('plackett-burman-screening','Plackett-Burman Screening','Product development','/tool/product-development',{aliases:['screening design','main effects screening'],responseTypes:['continuous'],predictorTypes:['two-level experimental factors']}),
+ method('taguchi-robust-design','Taguchi Robust Design','Product development','/tool/product-development',{aliases:['orthogonal array','signal to noise','s/n','robust parameter design'],responseTypes:['continuous'],predictorTypes:['control and noise factors']}),
+ method('scheffe-mixture-doe','Mixture DOE','Product development','/tool/product-development',{aliases:['simplex','mixture experiment','scheffe'],responseTypes:['continuous'],predictorTypes:['mixture proportions']}),
+ method('engineering-monte-carlo','Engineering Monte Carlo','Product development','/tool/product-development',{aliases:['simulation','uncertainty propagation','sensitivity'],responseTypes:['continuous'],predictorTypes:['engineering inputs']}),
+ method('tolerance-stack','Tolerance Stack-Up','Product development','/tool/product-development',{aliases:['stack-up','rss','worst case','dimensional variation'],responseTypes:['continuous']}),
+ method('tost-equivalence','TOST Equivalence','Product development','/tool/product-development',{aliases:['equivalence test','supplier equivalence','paired equivalence'],responseTypes:['continuous'],predictorTypes:['binary categorical']}),
+ method('engineering-sample-size','Engineering Sample Size','Product development','/tool/product-development',{aliases:['power planning','verification sample size'],responseTypes:['continuous','binary']}),
 ]);
 
 export const analyticsById=id=>ANALYTICS_CATALOG.find(methodItem=>methodItem.id===id)||null;

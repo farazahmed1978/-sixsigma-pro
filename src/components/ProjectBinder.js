@@ -1,5 +1,5 @@
-import React,{useMemo,useState} from 'react';
-import {Link} from 'react-router-dom';
+import React,{useEffect,useMemo,useState} from 'react';
+import {Link,useSearchParams} from 'react-router-dom';
 import {PHASES} from '../context/ProjectsContext';
 import {NAVIGATION} from '../config/navigation';
 import {navigationItems} from '../utils/navigationTools';
@@ -47,7 +47,8 @@ export function buildProjectReviewModel(project,{documents=[],analyses=[],eviden
 }
 
 export default function ProjectBinder({project,documents,analyses,evidence,artifacts,datasets,updateProject}){
- const placement=useProjectPlacement(),[openResult,setOpenResult]=useState(null);
+ const placement=useProjectPlacement(),[searchParams]=useSearchParams(),[openResult,setOpenResult]=useState(null);
+ useEffect(()=>{const requested=searchParams.get('openResult');if(requested){const saved=analyses.find(record=>sourceId(record)===requested);if(saved)setOpenResult(saved)}},[analyses,searchParams]);
  const model=useMemo(()=>buildProjectReviewModel(project,{documents,analyses,evidence,artifacts,datasets}),[project,documents,analyses,evidence,artifacts,datasets]);
  const config=project.binderConfig||{order:[],hiddenIds:[],links:{}};
  const ordered=useMemo(()=>[...model.items].sort((a,b)=>{if(a.phase!==b.phase)return phaseRank(a.phase)-phaseRank(b.phase);const ai=config.order.indexOf(a.sourceId),bi=config.order.indexOf(b.sourceId);return(ai<0?9999:ai)-(bi<0?9999:bi)}),[model.items,config.order]);
