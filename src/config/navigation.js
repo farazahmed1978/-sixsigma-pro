@@ -10,6 +10,7 @@ const ATTRIBUTE_CHART=tool('attribute-chart','Attribute Charts',undefined,'analy
 const RUN_CHART=tool('run-chart','Run Chart');
 const FMEA=tool('fmea','FMEA',undefined,'workspace',{aliases:['failure mode effects analysis','risk priority number','rpn']});
 const PRODUCT_DEVELOPMENT=tool('product-development','Product & Design Development',undefined,'workspace',{aliases:['requirements','ctq','product ctq','verification','design verification','dv','dvp','dvp&r','test plan','traceability','missing evidence','reliability verification','pilot readiness','taguchi','robust design','orthogonal array','signal to noise','s/n','plackett-burman','screening design','mixture doe','simplex','monte carlo','tolerance stack','stack-up','rss','worst case','equivalence','tost']});
+const LEAN_ENTERPRISE=tool('lean-enterprise','Lean Enterprise Workspace',undefined,'workspace',{aliases:['vsm','value stream','current state','future state','takt','cycle time','capacity','bottleneck','constraint','yamazumi','line balance','standard work','standardized work','standard work combination sheet','kanban','pull','supermarket','fifo','heijunka','production leveling','epei','oee','tpm','six big losses','smed','changeover','jidoka','andon','a3','kaizen','gemba','layered audit','daily management','sqdcp','hoshin','x-matrix','catchball']});
 
 const OE_GROUPS=[
  {id:'define',name:'Define',color:'var(--yellow)',clusters:[
@@ -32,7 +33,7 @@ const OE_GROUPS=[
   cluster('verification-synthesis','Verification & Synthesis',[doc('root-cause-verification','Root Cause Verification Plan','workspace'),tool('distribution-analysis','Distribution Analysis',undefined,'analysis',{aliases:['probability plot','distribution fit','box cox']}),tool('reliability','Reliability Analysis Workspace',undefined,'workspace',{aliases:['weibull','life data','reliability','survival','kaplan meier','censored','suspensions','alt','accelerated life','arrhenius','warranty','mtbf','crow amsaa','reliability growth','tolerance interval']}),PRODUCT_DEVELOPMENT,doc('statistical-analysis-summary','Statistical Analysis Summary','workspace')]),
  ]},
  {id:'improve',name:'Improve',color:'var(--purple)',clusters:[
-  cluster('solution-design','Solution Design',[doc('solution-selection-matrix','Solution Selection Matrix / Pugh Matrix','workspace'),doc('impact-effort-matrix','Impact-Effort Matrix','workspace'),doc('future-state-process-map','Future-State Process Map','diagram'),tool('vsm','Value Stream Map Analysis')]),
+  cluster('solution-design','Solution Design',[doc('solution-selection-matrix','Solution Selection Matrix / Pugh Matrix','workspace'),doc('impact-effort-matrix','Impact-Effort Matrix','workspace'),doc('future-state-process-map','Future-State Process Map','diagram'),tool('vsm','Value Stream Map Analysis'),LEAN_ENTERPRISE]),
   cluster('experimentation','Experimentation',[doc('factorial-plan','DOE Experiment Plan','workspace'),tool('doe','Design of Experiments','/doe','analysis',{aliases:['doe','factorial experiment']}),PRODUCT_DEVELOPMENT]),
   cluster('risk-proofing','Risk Proofing',[FMEA]),
   cluster('pilot-delivery','Pilot & Delivery',[doc('pilot-plan','Pilot Plan','workspace'),doc('implementation-plan','Implementation Plan','workspace'),doc('action-plan','Action Plan','workspace'),doc('kaizen-event-summary','Kaizen Event Summary','workspace')]),
