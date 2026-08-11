@@ -28,7 +28,7 @@ const OE_GROUPS=[
   cluster('prioritization-risk','Prioritization & Risk',[tool('pareto','Pareto Chart'),FMEA]),
   cluster('hypothesis-comparison','Hypothesis & Comparison',[doc('hypothesis-plan','Hypothesis Test Plan','workspace'),tool('hypothesis','Hypothesis Testing','/hypothesis','analysis',{aliases:['test','p value','significance']}),tool('boxplot','Box Plot'),tool('anova','ANOVA',undefined,'analysis',{aliases:['analysis of variance']}),tool('effect-size','Effect Size Calculators',undefined,'calculator')]),
   cluster('relationships-prediction','Relationships & Prediction',[tool('scatter','Scatter Plot'),tool('multivari','Multi-Vari Chart'),tool('correlation','Correlation Matrix'),tool('regression','Regression',undefined,'analysis',{aliases:['linear model','prediction']}),tool('multiregression','Multiple Regression'),tool('logistic','Logistic Regression')]),
-  cluster('verification-synthesis','Verification & Synthesis',[doc('root-cause-verification','Root Cause Verification Plan','workspace'),tool('distribution-analysis','Distribution Analysis',undefined,'analysis',{aliases:['probability plot','distribution fit','weibull','lognormal','gamma','box cox']}),doc('statistical-analysis-summary','Statistical Analysis Summary','workspace')]),
+  cluster('verification-synthesis','Verification & Synthesis',[doc('root-cause-verification','Root Cause Verification Plan','workspace'),tool('distribution-analysis','Distribution Analysis',undefined,'analysis',{aliases:['probability plot','distribution fit','box cox']}),tool('reliability','Reliability Analysis Workspace',undefined,'workspace',{aliases:['weibull','life data','reliability','survival','kaplan meier','censored','suspensions','alt','accelerated life','arrhenius','warranty','mtbf','crow amsaa','reliability growth','tolerance interval']}),doc('statistical-analysis-summary','Statistical Analysis Summary','workspace')]),
  ]},
  {id:'improve',name:'Improve',color:'var(--purple)',clusters:[
   cluster('solution-design','Solution Design',[doc('solution-selection-matrix','Solution Selection Matrix / Pugh Matrix','workspace'),doc('impact-effort-matrix','Impact-Effort Matrix','workspace'),doc('future-state-process-map','Future-State Process Map','diagram'),tool('vsm','Value Stream Map Analysis')]),
@@ -39,7 +39,7 @@ const OE_GROUPS=[
  ]},
  {id:'control',name:'Control',color:'var(--cyan)',clusters:[
   cluster('process-control','Process Control',[doc('control-plan','Control Plan','workspace'),doc('reaction-plan','Reaction Plan','workspace'),CONTROL_CHART]),
-  cluster('monitoring-audit','Monitoring & Audit',[doc('monitoring-plan','Monitoring Plan','workspace'),doc('audit-checklist','Audit Checklist','workspace'),ATTRIBUTE_CHART,RUN_CHART]),
+  cluster('monitoring-audit','Monitoring & Audit',[doc('monitoring-plan','Monitoring Plan','workspace'),doc('audit-checklist','Audit Checklist','workspace'),tool('reliability-acceptance','Acceptance Sampling','/tool/reliability','workspace',{aliases:['acceptance sampling','aql','ltpd','rql','oc curve']}),ATTRIBUTE_CHART,RUN_CHART]),
   cluster('closeout-learning','Closeout & Learning',[doc('lessons-learned','Lessons Learned','workspace'),doc('project-closure','Project Closure','workspace')]),
  ]},
 ];

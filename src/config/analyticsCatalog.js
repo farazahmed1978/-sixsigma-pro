@@ -31,6 +31,20 @@ export const ANALYTICS_CATALOG=Object.freeze([
  method('central-composite','Central Composite Design','DOE','/doe',{aliases:['central composite','ccd','star points','axial points','rotatable design','face centered'],responseTypes:['continuous'],predictorTypes:['continuous experimental factors']}),
  method('box-behnken','Box-Behnken Design','DOE','/doe',{aliases:['box behnken','bbd','response surface design'],responseTypes:['continuous'],predictorTypes:['continuous experimental factors']}),
  method('doe-optimization','DOE Response Optimization','DOE','/doe',{aliases:['desirability','confirmation run','recommended settings'],responseTypes:['continuous'],predictorTypes:['experimental factors']}),
+ method('parametric-life-data','Parametric Life Data','Reliability','/tool/reliability',{aliases:['weibull','lognormal life','exponential life','censored mle','suspensions'],responseTypes:['positive continuous']}),
+ method('kaplan-meier','Kaplan-Meier Survival','Reliability','/tool/reliability',{aliases:['survival','censored','suspensions','median survival'],responseTypes:['positive continuous']}),
+ method('log-rank','Log-Rank Group Comparison','Reliability','/tool/reliability',{aliases:['compare survival','supplier reliability','design reliability'],responseTypes:['positive continuous'],predictorTypes:['categorical']}),
+ method('arrhenius-alt','Arrhenius Accelerated Life','Reliability','/tool/reliability',{aliases:['alt','accelerated life','temperature acceleration'],responseTypes:['positive continuous'],predictorTypes:['continuous stress']}),
+ method('inverse-power-alt','Inverse Power Accelerated Life','Reliability','/tool/reliability',{aliases:['inverse power law','voltage acceleration','mechanical stress life'],responseTypes:['positive continuous'],predictorTypes:['continuous stress']}),
+ method('warranty-analysis','Warranty Cohort Analysis','Reliability','/tool/reliability',{aliases:['warranty claims','shipment cohort','claim rate','failure age'],responseTypes:['event age'],predictorTypes:['cohort']}),
+ method('repairable-systems','Repairable Systems','Reliability','/tool/reliability',{aliases:['mtbf','crow amsaa','power law process','reliability growth'],responseTypes:['event time']}),
+ method('reliability-demonstration','Reliability Demonstration','Reliability','/tool/reliability',{aliases:['zero failure test','reliability test units'],responseTypes:['binary']}),
+ method('acceptance-sampling','Attribute Acceptance Sampling','Acceptance','/tool/reliability',{aliases:['aql','ltpd','rql','oc curve','aoql','ati'],responseTypes:['binary']}),
+ method('normal-tolerance-interval','Normal Tolerance Interval','Tolerance intervals','/tool/reliability',{aliases:['population coverage','content confidence','tolerance limits'],responseTypes:['continuous']}),
+ method('laney-p-prime','Laney p′ Chart','SPC','/tool/attribute-chart',{aliases:['overdispersion proportion chart','underdispersion p chart'],responseTypes:['binary counts']}),
+ method('laney-u-prime','Laney u′ Chart','SPC','/tool/attribute-chart',{aliases:['overdispersion defects per unit','underdispersion u chart'],responseTypes:['defect counts']}),
+ method('g-rare-event-chart','G Rare-Event Chart','SPC','/tool/attribute-chart',{aliases:['opportunities between rare events'],responseTypes:['positive counts']}),
+ method('t-rare-event-chart','T Rare-Event Chart','SPC','/tool/attribute-chart',{aliases:['time between rare events'],responseTypes:['positive continuous']}),
 ]);
 
 export const analyticsById=id=>ANALYTICS_CATALOG.find(methodItem=>methodItem.id===id)||null;

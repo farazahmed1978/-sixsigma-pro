@@ -3,7 +3,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, R
 import html2canvas from 'html2canvas';
 import { useWorksheet } from '../context/WorksheetContext';
 import { useProjectReportPlacement as useReport } from '../context/ProjectPlacementContext';
-import { attributeChart } from '../utils/spcEngine';
+import { attributeChart, laneyAttributeChart, rareEventChart } from '../utils/spcEngine';
 import './Tool.css';
 
 // ---------- Attribute (count/proportion) control charts ----------
@@ -66,6 +66,10 @@ const CHART_META = {
   np: { name: 'np Chart', desc: 'Number defective per sample — requires a constant sample size across all points.' },
   c: { name: 'c Chart', desc: 'Count of defects per constant inspection unit (area, length, batch, etc).' },
   u: { name: 'u Chart', desc: 'Defects per unit — sample size (units inspected) can vary from point to point.' },
+  'p-prime': { name: 'Laney p′ Chart', desc: 'Proportion defective with a Laney adjustment for overdispersion or underdispersion.' },
+  'u-prime': { name: 'Laney u′ Chart', desc: 'Defects per unit with a Laney adjustment for overdispersion or underdispersion.' },
+  g: { name: 'G Chart', desc: 'Opportunities or units between rare events.' },
+  t: { name: 'T Chart', desc: 'Continuous elapsed time between rare events.' },
 };
 
 export default function AttributeChart() {
@@ -83,7 +87,7 @@ export default function AttributeChart() {
 
   const numericWsCols = getNumericColumns();
 
-  const needsSampleCol = chartType === 'p' || chartType === 'u';
+  const needsSampleCol = ['p','u','p-prime','u-prime'].includes(chartType);
   const needsConstantN = chartType === 'np';
 
   const reset = () => { setResult(null); setError(''); setAddedToReport(false); };
@@ -96,7 +100,13 @@ export default function AttributeChart() {
       const counts = getColumnData(countCol).map(Number);
       if (counts.length < 2) throw new Error('Need at least 2 data points.');
 
-      if (chartType === 'c') {
+      if (chartType === 'g' || chartType === 't') {
+        setResult(rareEventChart({ type: chartType, intervals: counts }));
+      } else if (chartType === 'p-prime' || chartType === 'u-prime') {
+        if (!sampleCol) throw new Error('Select a sample size or opportunity column.');
+        const samples = getColumnData(sampleCol).map(Number), minLen = Math.min(counts.length, samples.length);
+        setResult(laneyAttributeChart({ type: chartType, counts: counts.slice(0,minLen), sampleSizes: samples.slice(0,minLen) }));
+      } else if (chartType === 'c') {
         setResult(attributeChart({ type: 'c', counts }));
       } else if (chartType === 'np') {
         const n = parseFloat(constantN);
@@ -160,7 +170,7 @@ export default function AttributeChart() {
 
         <div className="form-grid" style={{ marginBottom: '0.75rem' }}>
           <div className="form-group">
-            <label>{chartType === 'c' ? 'Defect Count Column' : 'Defectives / Defects Column'}</label>
+            <label>{chartType === 'c' ? 'Defect Count Column' : chartType==='g'?'Opportunities Between Events':chartType==='t'?'Time Between Events':'Defectives / Defects Column'}</label>
             <select value={countCol} onChange={e => setCountCol(e.target.value)}>
               <option value="">— select —</option>
               {numericWsCols.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}

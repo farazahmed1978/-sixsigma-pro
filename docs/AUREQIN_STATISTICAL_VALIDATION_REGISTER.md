@@ -16,8 +16,8 @@ The executable source of truth is `src/foundation/validationCatalog.js`; promoti
 |---|---:|---|
 | VALIDATED | 0 | No method has yet completed the required independent second review and fixture depth. |
 | PARTIALLY VALIDATED | 5 | One-sample t, Welch t, one-way ANOVA, simple linear regression, and I-MR have passing NIST-backed fixtures with documented gaps. |
-| UNVALIDATED | 24 | No independently evidenced executable manifest exists yet. |
-| **Total** | **29** | 28 analytics-catalog methods plus the governed I-MR engine. |
+| UNVALIDATED | 38 | No independently evidenced executable manifest exists yet. |
+| **Total** | **43** | 42 analytics-catalog methods plus the governed I-MR engine. |
 
 ## Evidence matrix
 
@@ -54,6 +54,20 @@ The executable source of truth is `src/foundation/validationCatalog.js`; promoti
 | Central Composite Design | UNVALIDATED | none registered | CCD generator | none | none | alpha convention, center runs, randomization and rotatability required |
 | Box-Behnken Design | UNVALIDATED | none registered | BBD generator | none | none | run construction, blocking and randomization required |
 | DOE Response Optimization | UNVALIDATED | none registered | desirability optimization | none | none | desirability definitions, weighting, optimizer and confirmation policy required |
+| Parametric Life Data / 1.0.0 | UNVALIDATED | none independently registered | right-censored Weibull, Lognormal, Exponential MLE | internal tests only | exact failures/right censoring; all-censored and invalid lifetime guards | independent fixtures, covariance intervals, and reviewer required |
+| Kaplan-Meier Survival / 1.0.0 | UNVALIDATED | none independently registered | product-limit estimate with log-log Greenwood interval | internal tests only | ties, right censoring, unreached median | authoritative fixture and independent review required |
+| Log-Rank Group Comparison / 1.0.0 | UNVALIDATED | none independently registered | two-group Mantel log-rank | internal tests only | exactly-two-group guard | authoritative fixture, tie-method equivalence, review required |
+| Arrhenius Accelerated Life / 1.0.0 | UNVALIDATED | none independently registered | acceleration factor with absolute temperature | internal tests only | Celsius/Kelvin conversion, absolute-zero and extrapolation guards | full censored stress-life MLE and independent evidence required |
+| Inverse Power Accelerated Life / 1.0.0 | UNVALIDATED | none independently registered | log-life vs log nonthermal stress | internal tests only | positive stress, multiple-level, censoring refusal, extrapolation | censored stress-life MLE and independent evidence required |
+| Warranty Cohort Analysis / 1.0.0 | UNVALIDATED | none independently registered | shipment exposure, cohort claims, age and cost summaries | internal tests only | missing-exposure limitation | field-return lag/exposure model and independent evidence required |
+| Repairable Systems / 1.0.0 | UNVALIDATED | none independently registered | event/exposure summary and preliminary Crow-AMSAA trend | internal tests only | duplicate events, terminology warning | multi-system observation-end model and reference fixtures required |
+| Reliability Demonstration / 1.0.0 | UNVALIDATED | none independently registered | zero-failure binomial demonstration | internal tests only | impossible probability and nonzero-failure guards | authoritative fixture and allowed-failure extension required |
+| Attribute Acceptance Sampling / 1.0.0 | UNVALIDATED | none independently registered | binomial single plan, OC/AOQ/AOQL/ATI | internal tests only | invalid c and AQL/LTPD inversion | finite-lot hypergeometric option, plan design, independent evidence required |
+| Normal Tolerance Interval / 1.0.0 | UNVALIDATED | none independently registered | approximate normal k-factor | internal tests only | sample size, zero variance, extreme inputs | exact k-factor method and independent evidence required |
+| Laney p′ Chart / 1.0.0 | UNVALIDATED | none independently registered | standardized moving-range dispersion adjustment | internal tests only | invalid counts and zero-dispersion guards | authoritative fixture and independent review required |
+| Laney u′ Chart / 1.0.0 | UNVALIDATED | none independently registered | standardized moving-range dispersion adjustment | internal tests only | invalid opportunity and zero-dispersion guards | authoritative fixture and independent review required |
+| G Rare-Event Chart / 1.0.0 | UNVALIDATED | none independently registered | geometric opportunities-between-events limits | internal tests only | positive interval guard | limit convention equivalence and independent fixture required |
+| T Rare-Event Chart / 1.0.0 | UNVALIDATED | none independently registered | elapsed-time-between-events limits | internal tests only | positive interval guard | distribution/limit convention and independent fixture required |
 
 ## Discrepancy register
 
