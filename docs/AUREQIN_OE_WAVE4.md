@@ -1,37 +1,33 @@
-# AUREQIN OE Wave 4 Completion Matrix
+# AUREQIN OE Wave 4 Closure Matrix
 
-Status is based on practitioner usability, not engine existence. `COMPLETE` is intentionally unused where independent validation, required UI depth, or enterprise workflow coverage remains open.
+Status describes functional practitioner coverage separately from independent validation status.
 
-| Capability | Status | UI exposure | Report support | Project support | Validation | Known limitation |
-|---|---|---|---|---|---|---|
-| Guided Reliability workspace | PARTIAL | Reliability Analysis Workspace | Structured semantic payload | Independent Add to Project | N/A shell | Dataset column mapping remains CSV-oriented |
-| Life-data identity and censoring | PARTIAL | Failure vs censored CSV status | Censoring definition retained | Yes | UNVALIDATED | Exact failures/right censoring only; left/interval architected but deferred |
-| Weibull 2-parameter censored MLE | COMPLETE | Life Data study with probability diagnostic, reliability and hazard plots | Parameters and observed-information intervals, B-life intervals, requested-time metrics, comparison, plot data | Yes | UNVALIDATED | Intervals are asymptotic; 3-parameter deferred |
-| Lognormal censored MLE | PARTIAL | Life Data study | Semantic estimates/diagnostics | Yes | UNVALIDATED | No parameter intervals |
-| Exponential censored MLE | PARTIAL | Life Data study | Semantic estimates/diagnostics | Yes | UNVALIDATED | No parameter intervals |
-| Distribution comparison | PARTIAL | Life Data results | log likelihood, AIC, BIC | Yes | UNVALIDATED | No naive GOF p-values; graphical diagnostics incomplete |
-| Kaplan-Meier | PARTIAL | Grouped step curves, confidence lines, censor counts and at-risk tables | Risk/event/survival tables and intervals | Yes | UNVALIDATED | Distinct censor glyphs on the curve remain incomplete |
-| Grouped KM / log-rank | PARTIAL | Separate rendered group results and two-group log-rank | Group curves/tables/comparison retained | Yes | UNVALIDATED | Log-rank currently supports exactly two groups |
-| Arrhenius ALT | PARTIAL | Stress-life CSV workflow with fitted relationship | coefficients, prediction, AF, range, diagnostics, warnings | Yes | UNVALIDATED | Censored ALT is explicitly refused; prediction intervals unavailable |
-| Inverse-power ALT | PARTIAL | Same guarded ALT workspace | coefficients, prediction, AF and diagnostics | Yes | UNVALIDATED | Exact failures only; independent validation required |
-| Warranty analysis | PARTIAL | Cohort table, age/cumulative trend and failure-mode evidence | Exposure-aware rates, costs, cohorts, age and modes | Yes | UNVALIDATED | Pareto rendering and mature-cohort/claim-lag adjustment remain deferred |
-| Repairable systems | PARTIAL | Observation-end aware multi-system workflow | cumulative failures/exposure, PLP beta/scale, CI and diagnostics | Yes | UNVALIDATED | Approximate beta interval; independent PLP fixture required |
-| Reliability demonstration | COMPLETE | Allowed-failure input including zero failures | required units, achieved confidence and assumptions | Yes | UNVALIDATED | Binomial unit plans only; time/exposure plans deferred |
-| Attribute acceptance sampling | COMPLETE | Evaluate or design statistical single plans | designed n/c, OC/AOQ/AOQL/ATI and entered risks | Yes | UNVALIDATED | Binomial design; finite-lot hypergeometric and standards tables deferred |
-| Variables acceptance sampling | MISSING | None | No | No | UNVALIDATED | Deferred rather than approximated |
-| Normal tolerance intervals | PARTIAL | Tolerance Interval study | Limits, content, confidence, terminology | Yes | UNVALIDATED | Approximate k-factor only; exact/nonparametric methods deferred |
-| Advanced capability intervals/nonnormal | MISSING | Existing capability unchanged | Existing only | Existing only | Existing status | Audit completed; unsafe additions deferred |
-| Advanced MSA depth | PARTIAL | Existing crossed/nested UI now exposes ANOVA, variance components, contribution, study variation, tolerance, ndc and hierarchy | Structured tables retained | Existing support | Existing status | Dedicated operator comparison visualization remains limited |
-| SPC enterprise additions | COMPLETE | Laney p′/u′ and G/T integrated into Attribute Charts | Existing semantic/chart support | Existing support | UNVALIDATED | Independent fixtures and authenticated UI QA required |
-| Reliability findings | COMPLETE | Deterministic Create Finding action in Wave 4 workspace | Numerical evidence retained | Additive contract compatible | N/A | Threshold customization remains basic |
-| Saved result contract | PARTIAL | Canonical analysis created through shared actions | Read-only saved payload compatible | Binder Open Result compatible | N/A | Safe Open in Tool/re-run mapping not added |
-| Print regression | PARTIAL | Uses semantic tables and existing report renderer | Entire/selected architecture reused | N/A | N/A | Manual authenticated multi-page browser-print QA required |
-| Navigation/search | COMPLETE | One grouped workspace in Analyze plus acceptance entry in Control | N/A | N/A | N/A | Deep link opens workspace; study query preselection is not yet implemented |
+| Capability | Before 4C | After 4C | Validation | Remaining limitation |
+|---|---|---|---|---|
+| Guided reliability workspace | PARTIAL | COMPLETE | N/A shell | Authenticated UI QA remains |
+| Censored parametric life data | COMPLETE | COMPLETE | UNVALIDATED | Exact/right censoring; left/interval are specialist-tail |
+| Kaplan-Meier | PARTIAL | COMPLETE | UNVALIDATED | Group curves now include confidence, medians, at-risk tables and group censor markers |
+| Global log-rank | PARTIAL | COMPLETE | UNVALIDATED | Global k-group test implemented; adjusted pairwise follow-up deferred |
+| Arrhenius ALT | PARTIAL | COMPLETE | UNVALIDATED | Right-censored Weibull AFT, absolute temperature, fit diagnostics and future-unit interval; fitted-mean CI withheld |
+| Inverse-power ALT | PARTIAL | COMPLETE | UNVALIDATED | Right-censored Weibull AFT; independent reference evidence remains |
+| Warranty maturity | PARTIAL | PARTIAL | UNVALIDATED | Follow-up-aware comparisons and immature warnings complete; full dedicated Pareto/cost/cohort chart suite remains UX work |
+| Repairable systems | PARTIAL | PARTIAL | UNVALIDATED | Approximate beta interval and independent PLP fixture remain |
+| Reliability demonstration | COMPLETE | COMPLETE | UNVALIDATED | Binomial unit plans; exposure-time plans deferred |
+| Finite-lot attribute sampling | PARTIAL | COMPLETE | UNVALIDATED | Hypergeometric selection/design implemented; no standards-table equivalence claim |
+| Variables acceptance sampling | MISSING | COMPLETE | UNVALIDATED | Rigorous one-sided USL/LSL known-sigma plans; unknown-sigma and standards tables explicitly unsupported |
+| Normal tolerance intervals | PARTIAL | COMPLETE | PARTIALLY VALIDATED | Numerical exact one-sided factor; two-sided is explicitly conservative Bonferroni, not mislabeled exact |
+| Nonparametric tolerance intervals | MISSING | COMPLETE | UNVALIDATED | First-order Wilks bounds/interval with feasibility refusal and required n |
+| Advanced MSA presentation | PARTIAL | COMPLETE | Existing status | Operator means, part-by-appraiser interaction and variation components now charted |
+| Laney p′/u′ and G/T charts | COMPLETE | COMPLETE | UNVALIDATED | Independent fixtures and authenticated QA remain |
+| Condition-gated findings | PARTIAL | COMPLETE | N/A | No finding is created merely because an analysis exists |
+| Project/report/saved result | PARTIAL | PARTIAL | N/A | Automated regressions pass; authenticated four-state/manual reopen QA remains |
+| Report print/export | PARTIAL | PARTIAL | N/A | Automated assembly/print tests pass; real authenticated browser print remains manual QA |
 
-## Explicitly deferred
+## Wave 4 stopping-rule classification
 
-- Three-parameter Weibull, Gamma censored MLE, left/interval censoring.
-- Full ALT censored stress-life fitting, inverse-power and generalized Eyring models.
-- Variables sampling, standards-table claims, exact normal and nonparametric tolerance intervals.
-- Laney p′/u′ and rare-event charts.
-- ARIMA, forecasting, mixture DOE, Plackett–Burman, broad screening expansion, and general power/sample-size work remain Wave 5.
+- **A — Enterprise practitioner blocker:** none identified in the implemented core Wave 4 workflows.
+- **B — Specialist-tail backlog:** three-parameter Weibull, uncommon lifetime distributions, left/interval censoring, generalized Eyring, unknown-sigma and standards-table variables plans, standards-specific attribute tables, adjusted pairwise survival follow-up, and niche repairable-system models.
+- **C — Validation / evidence work:** independent fixtures and second review remain open for nearly all Wave 4 methods. The normal one-sided tolerance factor has one passing NIST fixture and remains PARTIALLY VALIDATED.
+- **D — UX / manual-QA issue:** authenticated review of charts, the four project/report states, saved-result reopening, real multi-page browser print/export, and warranty’s full dedicated visualization suite.
+
+Wave 5 capabilities are outside this closure and were not implemented.

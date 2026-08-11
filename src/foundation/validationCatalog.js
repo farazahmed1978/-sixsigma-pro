@@ -1,4 +1,5 @@
 import { individualsMovingRange, oneSampleTTest, oneWayAnova, simpleLinearRegression, welchTwoSampleTTest } from '../utils/statisticalEngines';
+import { normalToleranceInterval } from '../utils/qualityReliabilityEngine';
 
 const nist = (url, note) => ({ authority: 'NIST/SEMATECH Engineering Statistics Handbook or NIST StRD', version: 'accessed 2026-08-09', url, note, independentlyReviewed: true });
 const tolerance = { default: { absolute: 1e-10, relative: 1e-8 } };
@@ -42,6 +43,13 @@ export const STATISTICAL_VALIDATION_CATALOG = Object.freeze([
     independentSecondReview: { complete: false, reviewer: null, reviewedAt: null },
     requiredOutputs: ['movingRanges','centerLine','mrCenterLine','ucl','lcl','mrUcl','mrLcl','specialCauses'],
     cases: [{ id: 'nist-flowrate-imr', input: { values: [49.6,47.6,49.9,51.3,47.8,51.2,52.6,52.4,53.6,52.1] }, expected: { referenceVerified: true, outputs: { movingRanges: [2,2.3,1.4,3.5,3.4,1.4,.2,1.2,1.5], centerLine: 50.81, mrCenterLine: 1.8778, ucl: 55.8041, lcl: 45.8159, specialCauses: [] } }, tolerances: { default: { absolute: .0001, relative: .00001 } }, reference: nist('https://www.itl.nist.gov/div898/handbook/pmc/section3/pmc322.htm', 'NIST publishes observations, moving ranges, centers, I-chart limits, and states no points are outside. MR limits are not printed on the cited page.') }],
+  },
+  {
+    methodId: 'normal-tolerance-interval', methodVersion: '1.0.0', implementation: 'src/utils/qualityReliabilityEngine.js:normalToleranceInterval', runner: input => normalToleranceInterval(input.values, input.options),
+    methodEquivalence: { established: true, note: 'The one-sided normal factor is solved through the noncentral-t-equivalent probability integral; this matches the NIST exact one-sided definition and published factor.' },
+    independentSecondReview: { complete: false, reviewer: null, reviewedAt: null },
+    requiredOutputs: ['n','coverage','confidence','side','k','lower','upper'],
+    cases: [{ id: 'nist-one-sided-normal-k-n43', input: { values: Array.from({ length: 43 }, (_, index) => index + 1), options: { coverage: .9, confidence: .99, side: 'lower' } }, expected: { referenceVerified: true, outputs: { n: 43, coverage: .9, confidence: .99, side: 'lower', k: 1.874 } }, tolerances: { default: { absolute: .001, relative: .0005 } }, reference: nist('https://www.itl.nist.gov/div898/handbook/prc/section2/prc263.htm', 'NIST publishes the exact one-sided normal tolerance factor k=1.8740 for n=43, population content 0.90, and confidence 0.99. The arbitrary finite values isolate the sample-size-only factor; bounds are not claimed as NIST-certified.') }],
   },
 ]);
 
