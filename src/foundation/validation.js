@@ -2,6 +2,8 @@ import { VALIDATION_STATUS } from './provenance';
 
 export const VALIDATION_MANIFEST_VERSION = 1;
 
+const CLOSED_DISCREPANCY_STATUSES = new Set(['RESOLVED', 'ACCEPTED']);
+
 function numericComparison(actual, expected, tolerance = {}) {
   if (!Number.isFinite(actual) || !Number.isFinite(expected)) return { pass: Object.is(actual, expected), delta: null };
   const absolute = tolerance.absolute ?? 1e-8;
@@ -57,6 +59,29 @@ export function validateMethod(manifest, calculator) {
   let status = validationStatus(manifest.cases, results);
   const covered = new Set((manifest.cases || []).flatMap(item => Object.keys(item.expected?.outputs || {})));
   const missingRequiredOutputs = (manifest.requiredOutputs || []).filter(path => !covered.has(path));
-  if (status === VALIDATION_STATUS.VALIDATED && missingRequiredOutputs.length) status = VALIDATION_STATUS.PARTIALLY_VALIDATED;
-  return { methodId: manifest.methodId, manifestVersion: manifest.manifestVersion || VALIDATION_MANIFEST_VERSION, status, results, coveredOutputs: [...covered], missingRequiredOutputs };
+  const verifiedFixtureCount = (manifest.cases || []).filter(item => item.expected?.referenceVerified === true).length;
+  const minimumVerifiedFixtures = manifest.minimumVerifiedFixtures ?? 2;
+  const unresolvedDiscrepancies = (manifest.discrepancies || []).filter(item => !CLOSED_DISCREPANCY_STATUSES.has(item.status));
+  const promotionChecks = {
+    outputCoverageComplete: missingRequiredOutputs.length === 0,
+    fixtureCoverageComplete: verifiedFixtureCount >= minimumVerifiedFixtures,
+    methodEquivalenceEstablished: manifest.methodEquivalence?.established === true,
+    independentSecondReviewComplete: manifest.independentSecondReview?.complete === true,
+    discrepanciesClosed: unresolvedDiscrepancies.length === 0,
+  };
+  const promotionBlockers = Object.entries(promotionChecks).filter(([, pass]) => !pass).map(([check]) => check);
+  if (status === VALIDATION_STATUS.VALIDATED && promotionBlockers.length) status = VALIDATION_STATUS.PARTIALLY_VALIDATED;
+  return {
+    methodId: manifest.methodId,
+    manifestVersion: manifest.manifestVersion || VALIDATION_MANIFEST_VERSION,
+    status,
+    results,
+    coveredOutputs: [...covered],
+    missingRequiredOutputs,
+    verifiedFixtureCount,
+    minimumVerifiedFixtures,
+    unresolvedDiscrepancies,
+    promotionChecks,
+    promotionBlockers,
+  };
 }

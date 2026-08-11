@@ -20,6 +20,7 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
+    "validate:statistics": "react-scripts test --watchAll=false --runTestsByPath src/foundation/statisticalValidationReport.test.js",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {

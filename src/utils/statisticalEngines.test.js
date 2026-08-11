@@ -4,11 +4,11 @@ import { VALIDATION_STATUS } from '../foundation/provenance';
 import { individualsMovingRange, oneSampleTTest, oneWayAnova, simpleLinearRegression, welchTwoSampleTTest } from './statisticalEngines';
 
 describe('independent reference validation', () => {
-  test.each(STATISTICAL_VALIDATION_CATALOG.map(manifest => [manifest.methodId, manifest]))('%s passes every independently evidenced fixture and remains honest about uncovered outputs', (_id, manifest) => {
+  test.each(STATISTICAL_VALIDATION_CATALOG.map(manifest => [manifest.methodId, manifest]))('%s passes every independently evidenced fixture and remains honest about promotion gaps', (_id, manifest) => {
     const result = validateMethod(manifest, manifest.runner);
     expect(result.results.every(item => item.pass)).toBe(true);
     expect(result.status).toBe(VALIDATION_STATUS.PARTIALLY_VALIDATED);
-    expect(result.missingRequiredOutputs.length).toBeGreaterThan(0);
+    expect(result.promotionBlockers.length).toBeGreaterThan(0);
   });
 });
 

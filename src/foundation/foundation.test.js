@@ -69,6 +69,20 @@ describe('statistical validation harness', () => {
     expect(STATISTICAL_VALIDATION_CATALOG).toHaveLength(5);
     STATISTICAL_VALIDATION_CATALOG.forEach(manifest => expect(validateMethod(manifest, manifest.runner).status).toBe(VALIDATION_STATUS.PARTIALLY_VALIDATED));
   });
+
+  test('blocks VALIDATED promotion without fixture depth, equivalence, discrepancy closure, and independent review', () => {
+    const manifest = {
+      methodId: 'governed-example',
+      requiredOutputs: ['estimate'],
+      cases: [verifiedCase],
+      methodEquivalence: { established: true },
+      independentSecondReview: { complete: false },
+      discrepancies: [{ id: 'D-1', status: 'OPEN' }],
+    };
+    const result = validateMethod(manifest, values => ({ estimate: values.reduce((sum, value) => sum + value, 0) }));
+    expect(result.status).toBe(VALIDATION_STATUS.PARTIALLY_VALIDATED);
+    expect(result.promotionBlockers).toEqual(expect.arrayContaining(['fixtureCoverageComplete', 'independentSecondReviewComplete', 'discrepanciesClosed']));
+  });
 });
 
 describe('deterministic guidance and export boundaries', () => {
