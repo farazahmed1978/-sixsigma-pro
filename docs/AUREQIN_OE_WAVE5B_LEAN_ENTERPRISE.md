@@ -59,6 +59,40 @@ The final pass removes hard-coded calculation-only demo tabs from the routed Lea
 | X-Matrix / Catchball | Structured text; no relationship visualization | COMPLETE | Four editable strategy dimensions, owners, 1/3/9 relationship lifecycle and visual lines, alignment-gap guidance; Catchball proposal/feedback/revision/agreement history with explicit agreed-target application | `LeanManagementVisuals.test.js`: entity/relationship create-edit-delete, gaps, Catchball history/agreement and serialized state |
 | Sustainment | No practitioner assessment | COMPLETE | Configurable labeled defaults, saved-evidence selection/opening, deterministic Sustaining/At Risk/Not Sustained/Not Assessable result and visible rationale; explicitly not a maturity certification | `LeanManagementVisuals.test.js`: linked evidence, deterministic status/rationale, evidence opening and serialized reopen |
 
+## Final-3 authoritative Lean completion matrix
+
+This table supersedes earlier interim classifications.
+
+| Mainstream capability | Final status | Practitioner evidence |
+|---|---|---|
+| Authenticated artifact home, save/reopen/revision/archive | COMPLETE | Canonical project-scoped list, deep opening, New/Open identity separation and immutable revision snapshots |
+| VSM current/future visual authoring and timeline | COMPLETE | Visual symbol/data/link authoring, independent future-state clone and saved map reopening |
+| Takt, capacity and constraint evidence | COMPLETE | Editable map/process evidence and deterministic calculations |
+| Yamazumi / line balancing | COMPLETE | Stacked station chart, takt, VA/NVA, reassignment/reordering and live balance metrics |
+| Standard Work Combination Sheet and movement chart | COMPLETE | Shared revision with elapsed-time categories, draggable locations, path, WIP and markers |
+| Kanban / FIFO / supermarket | COMPLETE | Durable practitioner configuration and deterministic Kanban sizing; explicit FIFO and supermarket fields |
+| Heijunka / EPEI / SMED guidance | COMPLETE | Editable pitch box, capacity/mix visibility, infeasibility and conditional SMED Opportunity |
+| OEE / TPM and SMED | COMPLETE | Practitioner inputs and saved analytical artifacts; no machine-control claim |
+| A3 / Kaizen / Gemba / process audit | COMPLETE | Structured durable workspaces with section/subobject canonical evidence context |
+| Daily Management and Jidoka | COMPLETE | KPI lanes, abnormality workflow, guarded closure and canonical KPI→abnormality link |
+| Hoshin X-Matrix / Catchball | COMPLETE | Interactive relationship visualization, alignment gaps, durable Catchball and explicit accepted-target application |
+| Sustainment assessment | COMPLETE | Configurable evidence rules, rationale and canonical evidence opening |
+| Findings / canonical evidence / relationship graph | COMPLETE | Explicit evidence-supported Finding review, provenance, controlled relationships, picker, panel, graph, opening and safe removal |
+| Project and Report integration | COMPLETE | Existing independent placement and inclusion controls retained for every meaningful Lean artifact |
+
+### Final gap classification
+
+- **A — Mainstream blocker:** NONE.
+- **B — Specialist tail:** MES, real Andon hardware, CMMS, ERP production orders, advanced finite-capacity sequencing, proprietary audit standards and advanced plant simulation.
+- **C — Validation/evidence:** staged migration execution, adversarial RLS validation, independent method review and formal acceptance evidence.
+- **D — UX/manual QA:** authenticated multi-user scenario, tablet/touch review, real Project/Binder navigation, and production print/export review.
+
+## Executable Aurelia end-to-end scenario
+
+Using fictional Aurelia mixed-model assembly data, an authenticated practitioner can now create and save a Current-State VSM, identify a map condition, review and create a Finding, create an A3 and link the VSM/Finding to the relevant A3 section, link Root Cause evidence without copying it, create and link a Kaizen, clone the VSM to Future State, revise shared Standard Work, add the work to a Daily KPI, create a linked abnormality from a KPI miss, and link those canonical records into Sustainment. A saved SPC, Capability, OEE, reliability, product evidence, or project artifact can be selected through the evidence picker; saved analyses open in `SavedAnalysisResult`. Removing any relationship leaves both endpoint objects intact.
+
+Automated evidence: `leanConnectivity.test.js`, `LeanConnectivityPanel.test.js`, and `LeanPractitionerWorkspace.integration.test.js` cover identity-only graph data, malformed/restricted links, Finding provenance, relationship lifecycle, real-shell deep opening, linked Lean navigation, New/Open separation, and non-destructive removal. Authenticated staging remains the required manual acceptance environment for RLS and external workspace routes.
+
 Closure reassessment: durable organization/project-scoped records, append-only revision snapshots, and canonical evidence links are now implemented. Migration `202608100002_lean_enterprise_records.sql` must be applied after `202608100001_product_development_records.sql`; it has not been executed. Server triggers reject project/organization mismatches, RLS uses the existing organization role model, authenticated writes bind the actor, and revision mutation/deletion is denied. No service-role browser access is introduced.
 
 The remaining **A** gaps are visual practitioner execution: authenticated save/reopen is not yet wired into the Lean workspace; VSM drag/data-box controls, interactive Yamazumi, Standard Work Combination/Chart, Heijunka box, structured A3/Kaizen/Gemba/audit, operational Daily Management/Jidoka, and interactive X-Matrix surfaces remain incomplete. Engine contracts now support immutable VSM movement/edit/delete/reconnection and Yamazumi reassignment/edit/reorder, but engine-only capability is not counted as COMPLETE. **C** additionally includes staged migration/RLS adversarial testing; **D** includes authenticated reopening, tablet/touch review, and real print/export QA.
