@@ -6,7 +6,7 @@ create table if not exists public.lean_records(
  owner_id uuid references auth.users(id), created_by uuid not null references auth.users(id), updated_by uuid not null references auth.users(id),
  created_at timestamptz not null default now(), updated_at timestamptz not null default now(), effective_at timestamptz,
  change_summary text not null default 'Initial version', payload jsonb not null default '{}', metadata jsonb not null default '{}',
- check(revision>0), check(record_type in ('value-stream-map','standard-work','yamazumi','kanban-loop','heijunka','smed','a3','kaizen','kaizen-event','gemba-observation','process-audit','daily-management','abnormality','x-matrix','catchball'))
+ check(revision>0), check(record_type in ('value-stream-map','standard-work','yamazumi','kanban-loop','heijunka','smed','a3','kaizen','kaizen-event','gemba-observation','process-audit','daily-management','abnormality','x-matrix','catchball','sustainment'))
 );
 create table if not exists public.lean_record_revisions(
  id uuid primary key, organization_id uuid not null references public.organizations(id) on delete cascade,

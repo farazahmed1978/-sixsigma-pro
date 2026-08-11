@@ -1,5 +1,5 @@
 export const LEAN_RECORD_VERSION=1;
-export const LEAN_RECORD_TYPES=Object.freeze(['value-stream-map','standard-work','yamazumi','kanban-loop','heijunka','smed','a3','kaizen','kaizen-event','gemba-observation','process-audit','daily-management','abnormality','x-matrix','catchball']);
+export const LEAN_RECORD_TYPES=Object.freeze(['value-stream-map','standard-work','yamazumi','kanban-loop','heijunka','smed','a3','kaizen','kaizen-event','gemba-observation','process-audit','daily-management','abnormality','x-matrix','catchball','sustainment']);
 const now=()=>new Date().toISOString();
 const uid=prefix=>window.crypto?.randomUUID?.()||`${prefix}-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
 export function assertLeanScope(record,context){if(!context?.userId)throw new Error('Authenticated user is required.');if(!context.organizationId||!context.projectId)throw new Error('Organization and project scope are required.');if(record?.organizationId&&record.organizationId!==context.organizationId)throw new Error('Organization scope mismatch.');if(record?.projectId&&record.projectId!==context.projectId)throw new Error('Project scope mismatch.');}
