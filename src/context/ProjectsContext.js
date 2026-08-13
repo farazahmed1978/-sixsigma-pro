@@ -45,6 +45,7 @@ export function ProjectsProvider({ children }) {
   const [deletingProjectId,setDeletingProjectId]=useState('');
   const hydrated = useRef(!configured);
   const generation=useRef(0);
+  const projectsRef=useRef(projects);projectsRef.current=projects;
 
   useEffect(() => {
     let active = true;
@@ -96,14 +97,14 @@ export function ProjectsProvider({ children }) {
   }, [profile,user]);
 
   const updateProject = useCallback((id, updates) => {
-    const current=projects.find(project=>project.id===id);if(!current)return Promise.reject(new Error('The target project is no longer available.'));
+    const current=projectsRef.current.find(project=>project.id===id);if(!current)return Promise.reject(new Error('The target project is no longer available.'));
       const shared = { ...(current.sharedFields || {}) };
       const mappings = { name:'projectName', champion:'sponsor', owner:'owner', processOwner:'processOwner', startDate:'startDate', targetDate:'targetDate', status:'status', budget:'budget', goal:'goalSummary', scopeSummary:'scopeSummary', businessCaseSummary:'businessCaseSummary' };
       Object.entries(mappings).forEach(([source,target]) => { if (Object.prototype.hasOwnProperty.call(updates,source)) shared[target]=updates[source]; });
       const next={ ...current, ...updates, sharedFields:{...shared,...(updates.sharedFields||{})}, updatedAt:new Date().toISOString() };
     setProjects(prev => prev.map(project => project.id===id?next:project));
     return configured&&user?projectRepository.save(projectToRow(next)):Promise.resolve(next);
-  }, [configured,projects,user]);
+  }, [configured,user]);
 
   const deleteProject = useCallback(async (id) => {
     if(deletingProjectId)return false;setDeletingProjectId(id);setPersistenceError('');generation.current=nextGeneration(generation.current);

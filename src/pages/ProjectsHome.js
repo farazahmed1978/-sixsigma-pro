@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useProjects, PHASES } from '../context/ProjectsContext';
 import { useInteractions } from '../context/InteractionContext';
 import './ProjectWorkspace.css';
+import {projectResumeCta} from '../utils/projectResume';
 
 function projectProgress(project) {
   const done = PHASES.filter(ph => project.phases[ph].itemIds.length > 0).length;
@@ -96,6 +97,7 @@ export default function ProjectsHome() {
           {projects.map(project => {
             const progress = projectProgress(project);
             const phase = currentPhase(project);
+            const resume = projectResumeCta(project);
             return (
               <div key={project.id} className="card pw-project-card">
                 <div className="pw-project-card-top">
@@ -122,8 +124,8 @@ export default function ProjectsHome() {
                   <span className="pw-progress-label">{progress}% populated</span>
                 </div>
                 <div className="pw-project-actions">
-                  <Link to={`/projects/${project.id}/charter`} className="btn-primary pw-open-btn">Project Charter</Link>
-                  <Link to={`/projects/${project.id}`} className="btn-secondary pw-open-btn">Open →</Link>
+                  <Link to={resume.target.route} className="btn-primary pw-open-btn">{resume.label}</Link>
+                  <Link to={`/projects/${project.id}`} className="btn-secondary pw-open-btn">Open Project →</Link>
                 </div>
               </div>
             );

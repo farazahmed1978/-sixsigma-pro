@@ -552,7 +552,7 @@ export default function Templates() {
     const template = TEMPLATES.find(item => item.id === templateId);
     if (!project || !template) return <div className="templates-not-found"><h1>Document workspace not found</h1><p>Select a valid project and template from the document library.</p><button className="btn-primary" onClick={() => navigate('/templates')}>Return to templates</button></div>;
     if (template.id === 'charter') return <Navigate to={`/projects/${project.id}/charter`} replace />;
-    return <DocumentWorkspace template={template} project={project} updateProject={updateProject} />;
+    return <DocumentWorkspace key={`${project.id}:${template.id}`} template={template} project={project} updateProject={updateProject} />;
   }
 
   const openTemplate = template => {
