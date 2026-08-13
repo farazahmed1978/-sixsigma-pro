@@ -11,6 +11,8 @@ import {analyticsById} from '../config/analyticsCatalog';
 import { BOOK_EXCERPTS } from '../utils/bookExcerpts';
 import { buildAssumptionReport } from '../utils/assumptionDiagnostics';
 import AssumptionReportCard from '../components/AssumptionReportCard';
+import AnalysisContextSelector from '../components/AnalysisContextSelector';
+import {useAnalysis} from '../context/AnalysisContext';
 import '../tools/Tool.css';
 import './HypothesisTesting.css';
 
@@ -385,6 +387,7 @@ function ResultBox({ result, testId }) {
 export default function HypothesisTesting() {
   const [searchParams,setSearchParams]=useSearchParams();
   const { activeDataset, columns, getColumnData, hasData } = useWorksheet();
+  const {registerAnalysisResult}=useAnalysis();
   const { addReportItem, addReportOnly } = useReport();
   const resultRef = useRef(null);
   const requestedMethod=HYPOTHESIS_METHOD_CONTEXT[searchParams.get('method')]||null;
@@ -398,6 +401,7 @@ export default function HypothesisTesting() {
   const [addedToReport, setAddedToReport] = useState(false);
   const bookExcerpt = BOOK_EXCERPTS.hypothesis;
   useEffect(()=>{const context=HYPOTHESIS_METHOD_CONTEXT[searchParams.get('method')];if(context){setSelectedTest(context);setInputs(previous=>({...previous,pooled:searchParams.get('method')==='pooled-two-sample-t'}));setResult(null);setError('')}},[searchParams]);
+  useEffect(()=>{const names=new Set(columns.map(column=>column.name));setInputs(previous=>({...previous,col1:names.has(previous.col1)?previous.col1:'',col2:names.has(previous.col2)?previous.col2:'',groups:previous.groups.map(name=>names.has(name)?name:'')}));setResult(null);setError('')},[activeDataset?.id,columns]);
   const selectMethod=id=>{setSelectedTest(id);setResult(null);setError('');const catalogId=Object.keys(HYPOTHESIS_METHOD_CONTEXT).find(key=>HYPOTHESIS_METHOD_CONTEXT[key]===id);if(catalogId)setSearchParams({method:catalogId},{replace:true});else setSearchParams({}, {replace:true});if(id==='fisher')setInputs(previous=>({...previous,tableRows:2,tableCols:2,table:[['',''],['','']]}))};
 
   const handleAddToReport = useCallback(async (reportOnly=false) => {
@@ -407,19 +411,23 @@ export default function HypothesisTesting() {
     const chartImage = canvas.toDataURL('image/png');
     const { summary, interpretation } = buildReportContent(test, result);
     const catalogId=Object.keys(HYPOTHESIS_METHOD_CONTEXT).find(id=>HYPOTHESIS_METHOD_CONTEXT[id]===selectedTest),validationStatus=analyticsById(catalogId)?.validationStatus||'UNVALIDATED';
+    const variableMapping={first:inputs.col1||null,second:inputs.col2||null,groups:inputs.groups.filter(Boolean)};
+    const analysisId=reportOnly?null:registerAnalysisResult({title:test.name,toolId:'hypothesis',phase:'Analyze',projectId:activeDataset?.projectId||'',datasetIds:[activeDataset?.id].filter(Boolean),datasetVersionIds:[activeDataset?.versionId].filter(Boolean),datasetVersion:activeDataset?.version||1,method:result.method||catalogId||selectedTest,methodVersion:result.methodVersion||'1',validationStatus,inputConfiguration:{testId:selectedTest,variables:variableMapping,mu0:inputs.mu0,p0:inputs.p0,sigma0:inputs.sigma0,pooled:inputs.pooled},variableMapping,result,interpretation});
     (reportOnly?addReportOnly:addReportItem)({
       title: test.name,
       toolId: 'hypothesis',
+      projectId:activeDataset?.projectId||'',
+      analysisId,
       timestamp: new Date().toISOString(),
       chartImage,
       statsSummary: summary,
       interpretation,
       assumptionReport: result.assumptionReport || null,
-      provenance: result.method ? { method: result.method, methodVersion: result.methodVersion, datasetId:activeDataset?.id||null,datasetVersionId:activeDataset?.versionId||null,variableMapping:{first:inputs.col1||null,second:inputs.col2||null,groups:inputs.groups.filter(Boolean)},parameters:{mu0:inputs.mu0,p0:inputs.p0,sigma0:inputs.sigma0,pooled:inputs.pooled},nAnalyzed:[result.n,result.nA+result.nB,result.n1+result.n2].find(Number.isFinite)||null,missingHandling: result.missingHandling||{policy:'finite worksheet values or explicit manual input'},validationStatus} : null,
+      provenance: result.method ? { analysisId,projectId:activeDataset?.projectId||null,method:result.method, methodVersion:result.methodVersion, datasetId:activeDataset?.id||null,datasetVersionId:activeDataset?.versionId||null,variableMapping,parameters:{mu0:inputs.mu0,p0:inputs.p0,sigma0:inputs.sigma0,pooled:inputs.pooled},nAnalyzed:[result.n,result.nA+result.nB,result.n1+result.n2].find(Number.isFinite)||null,missingHandling: result.missingHandling||{policy:'finite worksheet values or explicit manual input'},validationStatus} : null,
       rawData: [],
     });
     if(reportOnly)setAddedToReport(previous=>!previous);
-  }, [result, selectedTest, addReportItem,addReportOnly,activeDataset,inputs]);
+  }, [result, selectedTest, addReportItem,addReportOnly,activeDataset,inputs,registerAnalysisResult]);
 
   const numCols = columns.filter(c => c.data.some(v => !isNaN(parseFloat(v))));
 
@@ -526,6 +534,7 @@ export default function HypothesisTesting() {
 
   return (
     <div className="ht-page">
+      <AnalysisContextSelector />
       <div className="ht-header">
         <div>
           <h1>Hypothesis Testing</h1>

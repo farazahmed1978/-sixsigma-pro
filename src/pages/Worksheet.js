@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link,useLocation } from 'react-router-dom';
 import Papa from 'papaparse';
 import { useWorksheet } from '../context/WorksheetContext';
 import { useProjects } from '../context/ProjectsContext';
@@ -8,6 +8,7 @@ import { useInteractions } from '../context/InteractionContext';
 import { isMissing, profileColumn, typedColumn } from '../utils/dataWorkspace';
 import { applyIntakeCleanup, createIntakeReview, defaultCleanupOptions } from '../utils/intakeReview';
 import { addRecentTool as addSharedRecentTool, persistTools, readStoredTools, RECENT_TOOLS_KEY } from '../utils/navigationTools';
+import {datasetHydrationSnapshot,reportDatasetHydration} from '../utils/datasetHydrationDiagnostics';
 import './Worksheet.css';
 
 const TOOLS = [
@@ -63,11 +64,12 @@ function IntakeReviewPanel({review,options,setOptions,onImport,onBack}){
 }
 
 export default function Worksheet() {
+  const location=useLocation();
   const worksheet = useWorksheet();
   const { projects } = useProjects();
   const {confirm,requestForm,toast}=useInteractions();
   const { columns, fileName, rowCount, loadData, clearData, addColumn, startBlankSheet, hasData, datasets, activeDataset, activeDatasetId, switchDataset, renameDataset, updateDatasetMetadata, duplicateDataset, deleteDataset, assignDatasetProject, deriveCalculatedColumn, deriveTransformedColumn, deriveRecodedColumn, deriveJoinedDataset,deriveStackedDataset,deriveUnpivotedDataset,derivePivotedDataset } = worksheet;
-  const [activeProjectId, setActiveProjectId] = useState(() => activeDataset?.projectId || projects[0]?.id || '');
+  const [activeProjectId, setActiveProjectId] = useState(() => location.state?.projectId||activeDataset?.projectId || projects[0]?.id || '');
   const [dialog, setDialog] = useState(null);
   const [pasteText, setPasteText] = useState('');
   const [newColName, setNewColName] = useState('');
@@ -85,8 +87,10 @@ export default function Worksheet() {
   const [cleanupOptions,setCleanupOptions]=useState(null);
   const fileRef = useRef(null);
   const previousWorkspaceMode = useRef('normal');
-  const projectDatasets = datasets.filter(dataset => dataset.projectId === activeProjectId);
+  const projectDatasets = useMemo(()=>datasets.filter(dataset => dataset.projectId === activeProjectId),[activeProjectId,datasets]);
   const activeProject = projects.find(project => project.id === activeProjectId);
+  useEffect(()=>{if(process.env.NODE_ENV==='production')return;const previous=window.__AUREQIN_DATASET_HYDRATION__||{};reportDatasetHydration(datasetHydrationSnapshot({userId:previous.user||'',organizationId:previous.org||'',projectId:activeProjectId,rows:(previous.datasets||[]).map(item=>({id:item.id,title:item.title,project_id:item.project_id,organization_id:item.organization_id,created_by:item.created_by,status:item.status,content:{archivedAt:item.archivedAt}})),contextDatasets:datasets,renderedDatasets:projectDatasets}))},[activeProjectId,datasets,projectDatasets]);
+  useEffect(()=>{const projectId=location.state?.projectId,datasetId=location.state?.datasetId;if(projectId)setActiveProjectId(projectId);if(location.state?.newDataset){switchDataset('');setActiveTab('Worksheet');setDialog(null);return}if(datasetId&&datasets.some(dataset=>dataset.id===datasetId&&(!projectId||dataset.projectId===projectId)))switchDataset(datasetId)},[datasets,location.state,switchDataset]);
   const requestDatasetMetadata=useCallback(async(suggestedName,source)=>{const values=await requestForm({title:'Dataset details',submitLabel:'Continue',fields:[{name:'name',label:'Dataset name',value:suggestedName,required:true},{name:'description',label:'Description',type:'textarea'},{name:'projectId',label:'Project',type:'select',value:activeProjectId||projects[0]?.id||'',options:[{value:'',label:'Unassigned workspace'},...projects.map(project=>({value:project.id,label:project.name}))]},{name:'sourceNote',label:'Source note',value:source}]});return values?{name:values.name.trim(),description:values.description.trim(),projectId:values.projectId,source,sourceNote:values.sourceNote.trim()}:null},[activeProjectId,projects,requestForm]);
 
   const completeIntake=useCallback(async(review,options,suggestedName)=>{const prepared=applyIntakeCleanup(review,options);if(!prepared.columns.length){toast('No importable columns remain after the selected cleanup.','warning');return}const details=await requestDatasetMetadata(suggestedName,review.source);if(!details)return;loadData(prepared.columns,details.name,{...details,sourceRepresentation:prepared.sourceRepresentation,intakeReview:{schemaVersion:review.schemaVersion,issues:review.issues,columns:review.columns,missingTokens:review.missingTokens},lineage:prepared.lineage});setActiveProjectId(details.projectId);setPasteText('');setIntakeReview(null);setCleanupOptions(null);setDialog(null);setActiveTab('Worksheet');toast('Dataset imported.');},[loadData,requestDatasetMetadata,toast]);
@@ -116,7 +120,7 @@ export default function Worksheet() {
   const openProfile = (index, mode) => { setSelectedColumn(index); setProfileMode(mode); setActiveTab('Column Profile'); };
   const openDetails = () => { setDetails({ name: activeDataset?.name || '', description: activeDataset?.description || '' }); setDialog('details'); };
   const saveDetails = () => { if (!activeDataset) return; updateDatasetMetadata(activeDataset.id, { name: details.name.trim() || activeDataset.name, description: details.description.trim() }); setDialog(null); };
-  const saveDatasetWorkflow=useCallback(async()=>{if(!activeDataset||!activeProjectId)return;const values=await requestForm({title:'Save dataset to project',submitLabel:'Save Dataset',fields:[{name:'name',label:'Dataset name',value:activeDataset.name,required:true},{name:'description',label:'Description',type:'textarea',value:activeDataset.description||''},{name:'sourceNote',label:'Source note',value:activeDataset.sourceNote||activeDataset.source||''}]});if(!values)return;const duplicate=projectDatasets.some(item=>item.id!==activeDataset.id&&item.name.trim().toLowerCase()===values.name.trim().toLowerCase());if(duplicate&&!await confirm({title:'Use duplicate dataset name?',message:`A dataset named “${values.name.trim()}” already exists in this project. Both datasets will remain available.`,confirmLabel:'Save Anyway'}))return;updateDatasetMetadata(activeDataset.id,{name:values.name.trim(),description:values.description.trim(),sourceNote:values.sourceNote.trim(),savedToProjectAt:new Date().toISOString()});assignDatasetProject(activeDataset.id,activeProjectId);toast('Dataset saved to project.');},[activeDataset,activeProjectId,projectDatasets,updateDatasetMetadata,assignDatasetProject,requestForm,confirm,toast]);
+  const saveDatasetWorkflow=useCallback(async()=>{if(!activeDataset||!activeProjectId)return;const values=await requestForm({title:'Save dataset to project',submitLabel:'Save Dataset',fields:[{name:'name',label:'Dataset name',value:activeDataset.name,required:true},{name:'description',label:'Description',type:'textarea',value:activeDataset.description||''},{name:'sourceNote',label:'Source note',value:activeDataset.sourceNote||activeDataset.source||''}]});if(!values)return;const duplicate=projectDatasets.some(item=>item.id!==activeDataset.id&&item.name.trim().toLowerCase()===values.name.trim().toLowerCase());if(duplicate&&!await confirm({title:'Use duplicate dataset name?',message:`A dataset named “${values.name.trim()}” already exists in this project. Both datasets will remain available.`,confirmLabel:'Save Anyway'}))return;try{await assignDatasetProject(activeDataset.id,activeProjectId,{name:values.name.trim(),description:values.description.trim(),sourceNote:values.sourceNote.trim(),savedToProjectAt:new Date().toISOString()});toast('Dataset saved to project.');}catch(error){toast(error.message||'Dataset could not be saved to Aureqin.','error');}},[activeDataset,activeProjectId,projectDatasets,assignDatasetProject,requestForm,confirm,toast]);
   const renameActiveDataset=async()=>{const values=await requestForm({title:'Rename dataset',submitLabel:'Rename',fields:[{name:'name',label:'Dataset name',value:fileName,required:true}]});if(values){renameDataset(activeDatasetId,values.name.trim());toast('Dataset renamed.')}};
   const clearActiveDataset=async()=>{if(await confirm({title:'Clear dataset?',message:`All rows and columns in “${fileName}” will be removed. This cannot be undone.`,confirmLabel:'Clear Dataset',destructive:true})){clearData();toast('Dataset cleared.')}};
   const deleteActiveDataset=async()=>{if(await confirm({title:'Delete dataset?',message:`“${fileName}” will be permanently removed from this workspace. This cannot be undone.`,confirmLabel:'Delete Dataset',destructive:true})){deleteDataset(activeDatasetId);toast('Dataset deleted.')}};

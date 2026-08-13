@@ -3,6 +3,7 @@ import {useAuth} from './AuthContext';
 import {datasetRepository} from '../repositories/datasetRepository';
 import {HYDRATION,nextGeneration,isCurrentGeneration} from '../services/persistenceSafety';
 import { calculatedColumn, createLineage, joinDatasets, pivot, recodeColumn, sortedRowIndices, stackColumns, transformColumn, typedColumn, unpivot } from '../utils/dataWorkspace';
+import {datasetHydrationSnapshot,reportDatasetHydration} from '../utils/datasetHydrationDiagnostics';
 
 const WorksheetContext = createContext();
 const STORAGE_KEY = 'sixsigmapro_datasets_v1';
@@ -49,6 +50,36 @@ function normalizeDataset(dataset) {
   };
 }
 
+export function datasetPersistenceRecord(dataset,{organizationId,userId}) {
+  return {
+    id:dataset.id,
+    project_id:dataset.projectId,
+    organization_id:dataset.organizationId||organizationId,
+    created_by:dataset.createdBy||userId,
+    status:dataset.status||'active',
+    methodology:'lean-six-sigma',
+    lifecycle_phase:'Measure',
+    dmaic_phase:'Measure',
+    title:dataset.name,
+    description:dataset.description||'',
+    source:dataset.source||'',
+    version:dataset.version||1,
+    row_count:dataset.rowCount||0,
+    column_count:dataset.columnCount||0,
+    content:dataset,
+    updated_at:dataset.updatedAt||now(),
+  };
+}
+
+export async function persistDatasetAssignment({dataset,projectId,updates={},configured,organizationId,userId,saveAndVerify=datasetRepository.saveAndVerify}) {
+  const assigned={...dataset,...updates,id:dataset.id,columns:dataset.columns,projectId,organizationId:dataset.organizationId||organizationId||'',createdBy:dataset.createdBy||userId||'',updatedAt:now(),history:[historyItem('Dataset saved to project'),...dataset.history].slice(0,50)};
+  if(!configured)return assigned;
+  if(!userId||!organizationId)throw new Error('Authenticated organization context is required to save this dataset.');
+  const persisted=await saveAndVerify(datasetPersistenceRecord(assigned,{organizationId,userId}),{userId});
+  if(!persisted?.id||persisted.id!==assigned.id||persisted.project_id!==projectId)throw new Error('Aureqin did not confirm the saved dataset ownership.');
+  return assigned;
+}
+
 function loadRegistry() {
   try {
     const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
@@ -76,15 +107,15 @@ export function WorksheetProvider({ children }) {
     let active=true;
     if(!configured||!user||!profile?.default_organization_id)return()=>{active=false};
     const request=nextGeneration(generation.current);generation.current=request;setDatasets([]);setActiveDatasetId('');setHydrationStatus(HYDRATION.HYDRATING);setPersistenceError('');
-    datasetRepository.listOrganization(profile.default_organization_id).then(rows=>{if(active&&isCurrentGeneration(request,generation.current)){setDatasets(rows.map(row=>normalizeDataset({...row.content,id:row.id,projectId:row.project_id,organizationId:row.organization_id,createdBy:row.created_by,name:row.title,description:row.description,source:row.source,version:row.version,createdAt:row.created_at,updatedAt:row.updated_at})));setHydrationStatus(HYDRATION.READY)} }).catch(error=>{if(active&&isCurrentGeneration(request,generation.current)){setHydrationStatus(HYDRATION.ERROR);setPersistenceError(error.message||'Datasets could not be loaded from Aureqin.')}});
+    datasetRepository.listOrganization(profile.default_organization_id).then(rows=>{if(active&&isCurrentGeneration(request,generation.current)){const normalized=rows.map(row=>normalizeDataset({...row.content,id:row.id,projectId:row.project_id,organizationId:row.organization_id,createdBy:row.created_by,name:row.title,description:row.description,source:row.source,version:row.version,createdAt:row.created_at,updatedAt:row.updated_at}));reportDatasetHydration(datasetHydrationSnapshot({userId:user.id,organizationId:profile.default_organization_id,rows,contextDatasets:normalized}));setDatasets(normalized);setHydrationStatus(HYDRATION.READY)} }).catch(error=>{if(active&&isCurrentGeneration(request,generation.current)){reportDatasetHydration(datasetHydrationSnapshot({userId:user.id,organizationId:profile.default_organization_id,error:error.message||String(error)}));setHydrationStatus(HYDRATION.ERROR);setPersistenceError(error.message||'Datasets could not be loaded from Aureqin.')}});
     return()=>{active=false};
   },[configured,profile?.default_organization_id,user]);
   useEffect(() => {
-    if(!configured||!user||!profile?.default_organization_id)return undefined;
+    if(!configured||!user||!profile?.default_organization_id||hydrationStatus!==HYDRATION.READY)return undefined;
     const persisted=datasets.filter(dataset=>dataset.projectId);
-    const timer=window.setTimeout(()=>Promise.all(persisted.map(dataset=>datasetRepository.saveMetadata({id:dataset.id,project_id:dataset.projectId,organization_id:dataset.organizationId||profile.default_organization_id,created_by:dataset.createdBy||user.id,status:dataset.status||'active',methodology:'lean-six-sigma',lifecycle_phase:'Measure',dmaic_phase:'Measure',title:dataset.name,description:dataset.description||'',source:dataset.source||'',version:dataset.version||1,row_count:dataset.rowCount||0,column_count:dataset.columnCount||0,content:dataset,updated_at:new Date().toISOString()}))).catch(error=>console.error('Datasets could not be saved to Aureqin:',error)),250);
+    const timer=window.setTimeout(()=>Promise.all(persisted.map(dataset=>datasetRepository.saveMetadata(datasetPersistenceRecord(dataset,{organizationId:profile.default_organization_id,userId:user.id})))).then(()=>setPersistenceError('')).catch(error=>setPersistenceError(error.message||'Dataset changes could not be saved to Aureqin.')),250);
     return()=>window.clearTimeout(timer);
-  },[configured,datasets,profile?.default_organization_id,user]);
+  },[configured,datasets,hydrationStatus,profile?.default_organization_id,user]);
   useEffect(()=>{const cleanup=event=>{generation.current=nextGeneration(generation.current);const projectId=event.detail?.projectId;setDatasets(previous=>previous.filter(dataset=>dataset.projectId!==projectId));setActiveDatasetId(current=>datasets.some(dataset=>dataset.id===current&&dataset.projectId===projectId)?'':current)};window.addEventListener('aureqin:project-deleted',cleanup);return()=>window.removeEventListener('aureqin:project-deleted',cleanup)},[datasets]);
   useEffect(() => {
     if(configured)return;
@@ -154,7 +185,16 @@ export function WorksheetProvider({ children }) {
   }, [datasets]);
   const deleteDataset = useCallback(async id => { if(configured&&datasets.find(item=>item.id===id)?.projectId)await datasetRepository.remove(id);setDatasets(previous => previous.filter(dataset => dataset.id !== id)); setActiveDatasetId(current => current === id ? '' : current); }, [configured,datasets]);
   const archiveDataset = useCallback(id => setDatasets(previous => previous.map(dataset => dataset.id === id ? { ...dataset, archivedAt: dataset.archivedAt ? '' : now(),status:dataset.archivedAt?'active':'archived', updatedAt: now(), history: [historyItem(dataset.archivedAt ? 'Dataset restored' : 'Dataset archived'), ...dataset.history].slice(0, 50) } : dataset)), []);
-  const assignDatasetProject = useCallback((id, projectId) => setDatasets(previous => previous.map(dataset => dataset.id === id ? { ...dataset, projectId, updatedAt: now(), history: [historyItem('Project assignment changed'), ...dataset.history].slice(0, 50) } : dataset)), []);
+  const assignDatasetProject = useCallback(async(id,projectId,updates={})=>{
+    const current=datasets.find(dataset=>dataset.id===id);
+    if(!current)throw new Error('The dataset is no longer available.');
+    setPersistenceError('');
+    let assigned;
+    try{assigned=await persistDatasetAssignment({dataset:current,projectId,updates,configured,organizationId:profile?.default_organization_id,userId:user?.id});}
+    catch(error){setPersistenceError(error.message||'Dataset could not be saved to Aureqin.');throw error;}
+    setDatasets(previous=>previous.map(dataset=>dataset.id===id?assigned:dataset));
+    return assigned;
+  },[configured,datasets,profile?.default_organization_id,user]);
   const changeColumnType = useCallback((colIndex, type) => updateActive(dataset => ({ ...dataset, columns: dataset.columns.map((column, index) => index === colIndex ? typedColumn({ ...column, type }) : column) }), `Column type changed to ${type}`), [updateActive]);
   const sortColumn = useCallback((colIndex, direction) => { const column = columns[colIndex]; if (column) setViewSort([{ column: column.name, direction }]); }, [columns]);
   const clearViewSort = useCallback(() => setViewSort([]), []);

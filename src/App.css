@@ -38,8 +38,8 @@
   --border: rgba(255,255,255,0.07);
   --border-active: rgba(0,102,255,0.4);
   --text-primary: #edf2ff;
-  --text-secondary: #7b93b8;
-  --text-muted: #3d5578;
+  --text-secondary: #a8b9d3;
+  --text-muted: #8195b5;
   --shadow: 0 4px 24px rgba(0,0,0,0.5);
   --input-bg: rgba(255,255,255,0.04);
   --navy: #060d1b;
@@ -56,8 +56,8 @@
   --border: rgba(0,0,0,0.09);
   --border-active: rgba(0,102,255,0.4);
   --text-primary: #0f1c35;
-  --text-secondary: #4a5f82;
-  --text-muted: #8fa3c4;
+  --text-secondary: #405575;
+  --text-muted: #607493;
   --shadow: 0 4px 20px rgba(0,0,0,0.08);
   --input-bg: rgba(0,0,0,0.03);
   --accent: #0055dd;
@@ -209,8 +209,10 @@ label {
 @keyframes spin { to { transform: rotate(360deg); } }
 
 @media print {
-  .sidebar, .topbar, .no-print { display: none !important; }
+  .sidebar, .topbar, .no-print, .placement-toast, .toast, .dw-autosave, .dw-autosave-control, button, [role="status"] { display: none !important; }
   .main-content { margin: 0 !important; padding: 1rem !important; }
+  .main-content, .card, article, section { min-height: 0 !important; }
+  .card, article { break-inside: avoid-page; page-break-inside: avoid; }
   body { background: white !important; color: black !important; }
 }
 

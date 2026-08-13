@@ -40,6 +40,7 @@ import Onboarding from './pages/Onboarding';
 import AuthAction from './pages/AuthAction';
 import Suites,{SuiteRoute} from './pages/Suites';
 import Billing from './pages/Billing';
+import AnalysisLauncher from './pages/AnalysisLauncher';
 
 // Tool wrapper
 import ToolPage from './pages/ToolPage';
@@ -150,6 +151,7 @@ export default function App() {
                   <Route path="/privacy" element={<PrivacyPolicy />} />
                   <Route path="/terms" element={<TermsOfService />} />
                   <Route path="/hypothesis" element={<ProtectedRoute><SuiteGate suiteIds="operational-excellence"><HypothesisTesting /></SuiteGate></ProtectedRoute>} />
+                  <Route path="/analysis" element={<ProtectedRoute><SuiteGate suiteIds="operational-excellence"><AnalysisLauncher /></SuiteGate></ProtectedRoute>} />
                   <Route path="/doe" element={<ProtectedRoute><SuiteGate suiteIds="operational-excellence"><DOEPage /></SuiteGate></ProtectedRoute>} />
                   <Route path="/templates" element={<ProtectedRoute><Templates /></ProtectedRoute>} />
                   <Route path="/documents/:templateId" element={<ProtectedRoute><DocumentSuiteGate><Templates /></DocumentSuiteGate></ProtectedRoute>} />
