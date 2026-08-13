@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import {useAuth} from './AuthContext';
+import {projectRepository} from '../repositories/projectRepository';
 
 const ProjectsContext = createContext();
 const STORAGE_KEY = 'sixsigmapro_projects';
@@ -23,20 +24,45 @@ function loadProjects() {
   }
 }
 
+export function normalizeProject(project) {
+  return { status: 'Active', currentPhase: 'Define', targetDate: '', methodology: 'hybrid', ...project,
+    phases: { ...emptyPhases(), ...(project.phases || {}) }, documents: project.documents || {},
+    evidenceLibrary: Array.isArray(project.evidenceLibrary) ? project.evidenceLibrary : [], artifacts: Array.isArray(project.artifacts) ? project.artifacts : [],
+    binderConfig: { order: [], hiddenIds: [], links: {}, ...(project.binderConfig || {}) },
+    sharedFields: { projectName: project.name || '', sponsor: project.champion || '', owner: project.owner || '', targetDate: project.targetDate || '', status: project.status || 'Active', ...(project.sharedFields || {}) },
+    activityLog: Array.isArray(project.activityLog) ? project.activityLog : [], team: Array.isArray(project.team) ? project.team : [], timeline: Array.isArray(project.timeline) ? project.timeline : [],
+    tasks: Array.isArray(project.tasks) ? project.tasks : [], risks: Array.isArray(project.risks) ? project.risks : [], issues: Array.isArray(project.issues) ? project.issues : [], decisions: Array.isArray(project.decisions) ? project.decisions : [], approvals: Array.isArray(project.approvals) ? project.approvals : [] };
+}
+export const projectFromRow = row => normalizeProject({ ...(row.content || {}), id: row.id, name: row.name, organizationId: row.organization_id, createdBy: row.created_by, status: row.status, methodology: row.methodology, currentPhase: row.current_phase, targetDate: row.target_date || '', createdAt: row.created_at, updatedAt: row.updated_at });
+export const projectToRow = project => ({ id: project.id, organization_id: project.organizationId, created_by: project.createdBy, name: project.name, status: String(project.status || 'active').toLowerCase(), methodology: project.methodology || 'hybrid', current_phase: project.currentPhase || 'Define', target_date: project.targetDate || null, content: project, updated_at: new Date().toISOString() });
+
 export function ProjectsProvider({ children }) {
-  const {user,profile}=useAuth();
-  const [projects, setProjects] = useState(loadProjects);
+  const {user,profile,configured}=useAuth();
+  const [projects, setProjects] = useState(() => configured ? [] : loadProjects());
+  const hydrated = useRef(!configured);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
-    } catch (e) {
-      console.warn('Projects could not be saved to localStorage:', e);
-    }
-  }, [projects]);
+    let active = true;
+    if (!configured) { hydrated.current = true; return undefined; }
+    hydrated.current = false;
+    if (!user || !profile?.default_organization_id) { setProjects([]); return () => { active = false; }; }
+    projectRepository.listCloud(profile.default_organization_id).then(rows => { if (active) { setProjects(rows.map(projectFromRow)); hydrated.current = true; } }).catch(error => console.error('Projects could not be loaded from Aureqin:', error));
+    return () => { active = false; };
+  }, [configured, profile?.default_organization_id, user]);
+
+  useEffect(() => {
+    if (configured || !hydrated.current) return;
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(projects)); } catch (e) { console.warn('Projects could not be saved to localStorage:', e); }
+  }, [configured, projects]);
+
+  useEffect(() => {
+    if (!configured || !hydrated.current || !user || !profile?.default_organization_id) return undefined;
+    const timer = window.setTimeout(() => Promise.all(projects.map(project => projectRepository.save(projectToRow(project)))).catch(error => console.error('Projects could not be saved to Aureqin:', error)), 250);
+    return () => window.clearTimeout(timer);
+  }, [configured, profile?.default_organization_id, projects, user]);
 
   const createProject = useCallback((data) => {
-    const id = `proj-${Date.now()}`;
+    const id = crypto.randomUUID();
     const project = {
       id,
       name: (data.name || '').trim() || 'Untitled Project',
@@ -73,9 +99,11 @@ export function ProjectsProvider({ children }) {
     }));
   }, []);
 
-  const deleteProject = useCallback((id) => {
+  const deleteProject = useCallback(async (id) => {
+    if (configured && user) await projectRepository.remove(id);
     setProjects(prev => prev.filter(p => p.id !== id));
-  }, []);
+    window.dispatchEvent(new CustomEvent('aureqin:project-deleted', { detail: { projectId: id } }));
+  }, [configured, user]);
 
   // An item lives in at most one phase per project — assigning it to a new
   // phase removes it from any other phase in that same project first.

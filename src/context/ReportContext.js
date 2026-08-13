@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import {useAuth} from './AuthContext';
+import {cloudRepository} from '../repositories/cloudRepository';
 
 const ReportContext = createContext();
 const STORAGE_KEY = 'sixsigmapro_report_items';
@@ -75,19 +76,22 @@ function saveWithFallback(items, setWarning) {
 }
 
 export function ReportProvider({ children }) {
-  const {user,profile}=useAuth();
+  const {user,profile,configured}=useAuth();
   // [{ id, title, toolId, timestamp, statsSummary, interpretation, chartImage, includeRawData, rawData }]
-  const [items, setItems] = useState(loadItems);
+  const [items, setItems] = useState(() => configured ? [] : loadItems());
   const [storageWarning, setStorageWarning] = useState(null);
 
+  useEffect(()=>{let active=true;if(!configured||!user||!profile?.default_organization_id)return()=>{active=false};cloudRepository.list('reports',{organization_id:profile.default_organization_id}).then(rows=>{if(active)setItems(sortReportItemsByPhase(rows.map(row=>({...row.content,id:row.id,projectId:row.project_id,organizationId:row.organization_id,createdBy:row.created_by,title:row.title,status:row.status,phase:row.dmaic_phase,createdAt:row.created_at,updatedAt:row.updated_at}))))}).catch(error=>console.error('Report assets could not be loaded from Aureqin:',error));return()=>{active=false}},[configured,profile?.default_organization_id,user]);
   useEffect(() => {
+    if(configured){if(!user||!profile?.default_organization_id)return;const timer=window.setTimeout(()=>Promise.all(items.filter(item=>item.projectId).map(item=>cloudRepository.upsert('reports',{id:item.id,project_id:item.projectId,organization_id:item.organizationId||profile.default_organization_id,created_by:item.createdBy||user.id,status:item.status||'active',methodology:item.methodology||'lean-six-sigma',lifecycle_phase:item.phase||'Analyze',dmaic_phase:item.phase||'Analyze',title:item.title,content:item,updated_at:new Date().toISOString()}))).catch(error=>console.error('Report assets could not be saved to Aureqin:',error)),250);return()=>window.clearTimeout(timer)}
     saveWithFallback(items, setStorageWarning);
-  }, [items]);
+  }, [configured,items,profile?.default_organization_id,user]);
+  useEffect(()=>{const cleanup=event=>setItems(previous=>previous.filter(item=>item.projectId!==event.detail?.projectId));window.addEventListener('aureqin:project-deleted',cleanup);return()=>window.removeEventListener('aureqin:project-deleted',cleanup)},[]);
 
   const addReportItem = useCallback(async (item) => {
     const identity=reportIdentity(item),existing=identity?items.find(entry=>reportIdentity(entry)===identity):null;
     if(existing)return existing.id;
-    const id = `${item.toolId}-${Date.now()}`;
+    const id = crypto.randomUUID();
     const compressedImage = await compressImage(item.chartImage);
     setItems(prev => {
       const next={ id, includeRawData: false,organizationId:item.organizationId||profile?.default_organization_id||'',createdBy:item.createdBy||user?.id||'',status:item.status||'active',methodology:item.methodology||'lean-six-sigma',createdAt:item.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString(), assetType:item.documentId?'document':item.assetType||'analysis', ...item, chartImage: compressedImage };
@@ -98,9 +102,13 @@ export function ReportProvider({ children }) {
     return id;
   }, [items,profile,user]);
 
-  const removeReportItem = useCallback((id) => {
+  const removeReportItem = useCallback(async (id) => {
+    const item=items.find(entry=>entry.id===id);if(!item)return false;
+    if(!window.confirm(`Remove “${item.title || 'this asset'}” from the persisted project report? The source document or analysis will remain.`))return false;
+    if(configured&&item.projectId)await cloudRepository.remove('reports',id);
     setItems(prev => prev.filter(i => i.id !== id));
-  }, []);
+    return true;
+  }, [configured,items]);
 
   const toggleIncludeRawData = useCallback((id) => {
     setItems(prev => prev.map(i => i.id === id ? { ...i, includeRawData: !i.includeRawData } : i));
@@ -115,7 +123,7 @@ export function ReportProvider({ children }) {
     });
   }, []);
 
-  const clearReport = useCallback(() => setItems([]), []);
+  const clearReport = useCallback(async () => {if(!items.length||!window.confirm(`Clear all ${items.length} persisted report assets? Source documents and analyses will remain.`))return false;if(configured)await Promise.all(items.filter(item=>item.projectId).map(item=>cloudRepository.remove('reports',item.id)));setItems([]);return true}, [configured,items]);
 
   return (
     <ReportContext.Provider value={{

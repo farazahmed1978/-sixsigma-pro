@@ -4,6 +4,7 @@ export const projectRepository={
  listLocal(){try{return JSON.parse(localStorage.getItem(LOCAL_KEY)||'[]')}catch{return[]}},
  async listCloud(organizationId){return cloudRepository.list('projects',{organization_id:organizationId})},
  async save(project){return cloudRepository.upsert('projects',project,{onConflict:'id'})},
+ async remove(id){return cloudRepository.remove('projects',id)},
  async importLocal({organizationId,userId,projects}){
   if(!organizationId||!userId)throw new Error('missing-project-ownership');
   const imported=[];

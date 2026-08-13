@@ -104,8 +104,8 @@ export default function ProjectsHome() {
                     className="pw-delete-btn"
                     title="Delete project"
                     onClick={async () => {
-                      if (await confirm({title:'Delete project?',message:`“${project.name}” will be permanently removed. Existing report items are retained. This cannot be undone.`,confirmLabel:'Delete Project',destructive:true})) {
-                        deleteProject(project.id);toast('Project deleted.');
+                      if (await confirm({title:'Delete project and its contents?',message:`“${project.name}” and its project-owned datasets, documents, analyses, report assets, artifacts, and placements will be permanently removed. Shared organization assets are not affected. This cannot be undone.`,confirmLabel:'Delete Project and Contents',destructive:true})) {
+                        await deleteProject(project.id);toast('Project and its contents deleted.');
                       }
                     }}
                   >

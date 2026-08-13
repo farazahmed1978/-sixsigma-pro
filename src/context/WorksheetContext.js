@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 import {useAuth} from './AuthContext';
+import {datasetRepository} from '../repositories/datasetRepository';
 import { calculatedColumn, createLineage, joinDatasets, pivot, recodeColumn, sortedRowIndices, stackColumns, transformColumn, typedColumn, unpivot } from '../utils/dataWorkspace';
 
 const WorksheetContext = createContext();
@@ -7,8 +8,8 @@ const STORAGE_KEY = 'sixsigmapro_datasets_v1';
 const ACTIVE_KEY = 'sixsigmapro_active_dataset';
 const SCHEMA_VERSION = 1;
 
-const makeId = () => `dataset-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-const makeVersionId = () => `dataset-version-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+const makeId = () => crypto.randomUUID();
+const makeVersionId = () => crypto.randomUUID();
 const now = () => new Date().toISOString();
 const rowCountFor = columns => Math.max(0, ...columns.map(column => column.data?.length || 0));
 const historyItem = action => ({ id: `history-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`, action, at: now() });
@@ -57,9 +58,9 @@ function loadRegistry() {
 }
 
 export function WorksheetProvider({ children }) {
-  const {user,profile}=useAuth();
-  const [datasets, setDatasets] = useState(loadRegistry);
-  const [activeDatasetId, setActiveDatasetId] = useState(() => localStorage.getItem(ACTIVE_KEY) || '');
+  const {user,profile,configured}=useAuth();
+  const [datasets, setDatasets] = useState(() => configured ? [] : loadRegistry());
+  const [activeDatasetId, setActiveDatasetId] = useState(() => configured ? '' : localStorage.getItem(ACTIVE_KEY) || '');
   const [viewSort, setViewSort] = useState([]);
 
   const activeDataset = useMemo(() => datasets.find(dataset => dataset.id === activeDatasetId) || null, [datasets, activeDatasetId]);
@@ -69,12 +70,26 @@ export function WorksheetProvider({ children }) {
   const viewRowIndices = useMemo(() => sortedRowIndices(columns, viewSort), [columns, viewSort]);
 
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(datasets)); } catch (error) { console.warn('Datasets could not be saved:', error); }
-  }, [datasets]);
+    let active=true;
+    if(!configured||!user||!profile?.default_organization_id)return()=>{active=false};
+    datasetRepository.listOrganization(profile.default_organization_id).then(rows=>{if(active)setDatasets(rows.map(row=>normalizeDataset({...row.content,id:row.id,projectId:row.project_id,organizationId:row.organization_id,createdBy:row.created_by,name:row.title,description:row.description,source:row.source,version:row.version,createdAt:row.created_at,updatedAt:row.updated_at}))) }).catch(error=>console.error('Datasets could not be loaded from Aureqin:',error));
+    return()=>{active=false};
+  },[configured,profile?.default_organization_id,user]);
   useEffect(() => {
-    if (activeDatasetId) localStorage.setItem(ACTIVE_KEY, activeDatasetId);
-    else localStorage.removeItem(ACTIVE_KEY);
-  }, [activeDatasetId]);
+    if(!configured||!user||!profile?.default_organization_id)return undefined;
+    const persisted=datasets.filter(dataset=>dataset.projectId);
+    const timer=window.setTimeout(()=>Promise.all(persisted.map(dataset=>datasetRepository.saveMetadata({id:dataset.id,project_id:dataset.projectId,organization_id:dataset.organizationId||profile.default_organization_id,created_by:dataset.createdBy||user.id,status:dataset.status||'active',methodology:'lean-six-sigma',lifecycle_phase:'Measure',dmaic_phase:'Measure',title:dataset.name,description:dataset.description||'',source:dataset.source||'',version:dataset.version||1,row_count:dataset.rowCount||0,column_count:dataset.columnCount||0,content:dataset,updated_at:new Date().toISOString()}))).catch(error=>console.error('Datasets could not be saved to Aureqin:',error)),250);
+    return()=>window.clearTimeout(timer);
+  },[configured,datasets,profile?.default_organization_id,user]);
+  useEffect(()=>{const cleanup=event=>{const projectId=event.detail?.projectId;setDatasets(previous=>previous.filter(dataset=>dataset.projectId!==projectId));setActiveDatasetId(current=>datasets.some(dataset=>dataset.id===current&&dataset.projectId===projectId)?'':current)};window.addEventListener('aureqin:project-deleted',cleanup);return()=>window.removeEventListener('aureqin:project-deleted',cleanup)},[datasets]);
+  useEffect(() => {
+    if(configured)return;
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(datasets)); } catch (error) { console.warn('Datasets could not be saved:', error); }
+  }, [configured,datasets]);
+  useEffect(() => {
+    if(configured)return;
+    if (activeDatasetId) localStorage.setItem(ACTIVE_KEY, activeDatasetId); else localStorage.removeItem(ACTIVE_KEY);
+  }, [activeDatasetId,configured]);
   useEffect(() => {
     if (activeDatasetId && !datasets.some(dataset => dataset.id === activeDatasetId)) setActiveDatasetId(datasets[0]?.id || '');
   }, [activeDatasetId, datasets]);
@@ -133,7 +148,7 @@ export function WorksheetProvider({ children }) {
     const copy = normalizeDataset({ ...source, id: makeId(), version: 1, versionId: makeVersionId(), name: `${source.name} Copy`, columns: source.columns.map(column => ({ ...column, data: [...column.data] })), createdAt: now(), updatedAt: now(), history: [historyItem('Dataset duplicated')] });
     setDatasets(previous => [...previous, copy]); setActiveDatasetId(copy.id); return copy.id;
   }, [datasets]);
-  const deleteDataset = useCallback(id => { setDatasets(previous => previous.filter(dataset => dataset.id !== id)); setActiveDatasetId(current => current === id ? '' : current); }, []);
+  const deleteDataset = useCallback(async id => { if(configured&&datasets.find(item=>item.id===id)?.projectId)await datasetRepository.remove(id);setDatasets(previous => previous.filter(dataset => dataset.id !== id)); setActiveDatasetId(current => current === id ? '' : current); }, [configured,datasets]);
   const archiveDataset = useCallback(id => setDatasets(previous => previous.map(dataset => dataset.id === id ? { ...dataset, archivedAt: dataset.archivedAt ? '' : now(),status:dataset.archivedAt?'active':'archived', updatedAt: now(), history: [historyItem(dataset.archivedAt ? 'Dataset restored' : 'Dataset archived'), ...dataset.history].slice(0, 50) } : dataset)), []);
   const assignDatasetProject = useCallback((id, projectId) => setDatasets(previous => previous.map(dataset => dataset.id === id ? { ...dataset, projectId, updatedAt: now(), history: [historyItem('Project assignment changed'), ...dataset.history].slice(0, 50) } : dataset)), []);
   const changeColumnType = useCallback((colIndex, type) => updateActive(dataset => ({ ...dataset, columns: dataset.columns.map((column, index) => index === colIndex ? typedColumn({ ...column, type }) : column) }), `Column type changed to ${type}`), [updateActive]);
