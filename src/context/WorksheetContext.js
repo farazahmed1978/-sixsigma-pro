@@ -12,6 +12,7 @@ const SCHEMA_VERSION = 1;
 
 const makeId = () => crypto.randomUUID();
 const makeVersionId = () => crypto.randomUUID();
+const canonicalVersionId = value => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value||'') ? value : makeVersionId();
 const now = () => new Date().toISOString();
 const rowCountFor = columns => Math.max(0, ...columns.map(column => column.data?.length || 0));
 const historyItem = action => ({ id: `history-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`, action, at: now() });
@@ -37,7 +38,7 @@ function normalizeDataset(dataset) {
     intakeReview: dataset.intakeReview || null,
     status: dataset.status || (dataset.archivedAt ? 'archived' : 'active'),
     version: Number(dataset.version) || 1,
-    versionId: dataset.versionId || dataset.datasetVersionId || `${dataset.id || 'legacy-dataset'}-version-${Number(dataset.version) || 1}`,
+    versionId: canonicalVersionId(dataset.versionId || dataset.datasetVersionId),
     rowCount: rowCountFor(columns),
     columnCount: columns.length,
     analysisIds: Array.isArray(dataset.analysisIds) ? dataset.analysisIds : [],
@@ -113,7 +114,7 @@ export function WorksheetProvider({ children }) {
   useEffect(() => {
     if(!configured||!user||!profile?.default_organization_id||hydrationStatus!==HYDRATION.READY)return undefined;
     const persisted=datasets.filter(dataset=>dataset.projectId);
-    const timer=window.setTimeout(()=>Promise.all(persisted.map(dataset=>datasetRepository.saveMetadata(datasetPersistenceRecord(dataset,{organizationId:profile.default_organization_id,userId:user.id})))).then(()=>setPersistenceError('')).catch(error=>setPersistenceError(error.message||'Dataset changes could not be saved to Aureqin.')),250);
+    const timer=window.setTimeout(()=>Promise.all(persisted.map(dataset=>datasetRepository.saveAndVerify(datasetPersistenceRecord(dataset,{organizationId:profile.default_organization_id,userId:user.id}),{userId:user.id}))).then(()=>setPersistenceError('')).catch(error=>setPersistenceError(error.message||'Dataset changes could not be saved to Aureqin.')),250);
     return()=>window.clearTimeout(timer);
   },[configured,datasets,hydrationStatus,profile?.default_organization_id,user]);
   useEffect(()=>{const cleanup=event=>{generation.current=nextGeneration(generation.current);const projectId=event.detail?.projectId;setDatasets(previous=>previous.filter(dataset=>dataset.projectId!==projectId));setActiveDatasetId(current=>datasets.some(dataset=>dataset.id===current&&dataset.projectId===projectId)?'':current)};window.addEventListener('aureqin:project-deleted',cleanup);return()=>window.removeEventListener('aureqin:project-deleted',cleanup)},[datasets]);

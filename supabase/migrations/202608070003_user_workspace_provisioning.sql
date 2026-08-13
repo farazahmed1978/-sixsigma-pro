@@ -40,31 +40,31 @@ security definer
 set search_path = public, auth
 as $$
 declare
-  organization_id uuid;
+  workspace_organization_id uuid;
   display_name text;
 begin
-  select default_organization_id into organization_id
+  select default_organization_id into workspace_organization_id
   from public.profiles
   where id=target_user_id;
 
-  if organization_id is not null then
-    return organization_id;
+  if workspace_organization_id is not null then
+    return workspace_organization_id;
   end if;
 
   display_name:=coalesce(nullif(trim(target_full_name),''),nullif(split_part(coalesce(target_email,''),'@',1),''),'Aureqin');
 
   insert into public.organizations(name,created_by)
   values(display_name||'''s Workspace',target_user_id)
-  returning id into organization_id;
+  returning id into workspace_organization_id;
 
   insert into public.profiles(id,full_name,default_organization_id)
-  values(target_user_id,display_name,organization_id)
+  values(target_user_id,display_name,workspace_organization_id)
   on conflict(id) do update
   set full_name=coalesce(public.profiles.full_name,excluded.full_name),
       default_organization_id=coalesce(public.profiles.default_organization_id,excluded.default_organization_id),
       updated_at=now();
 
-  return organization_id;
+  return workspace_organization_id;
 end;
 $$;
 

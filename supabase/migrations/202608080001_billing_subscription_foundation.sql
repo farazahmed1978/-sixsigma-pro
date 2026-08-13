@@ -158,22 +158,22 @@ $$;
 -- New accounts receive one selected 14-day suite trial. The selection is captured before auth signup.
 create or replace function public.aureqin_handle_new_auth_user()
 returns trigger language plpgsql security definer set search_path=public,auth as $$
-declare organization_id uuid;selected_suite text;trial_record_id uuid;entitlement_record_id uuid;
+declare workspace_organization_id uuid;selected_suite text;trial_record_id uuid;entitlement_record_id uuid;
 begin
- organization_id:=public.aureqin_ensure_user_workspace(new.id,new.email,coalesce(new.raw_user_meta_data->>'full_name',new.raw_user_meta_data->>'name'));
+ workspace_organization_id:=public.aureqin_ensure_user_workspace(new.id,new.email,coalesce(new.raw_user_meta_data->>'full_name',new.raw_user_meta_data->>'name'));
  selected_suite:=case new.raw_user_meta_data->>'planId'
   when 'founding-project-management' then 'project-management'
   else 'operational-excellence' end;
  insert into public.suite_trials(organization_id,user_id,suite_id,status,source,started_at,ends_at,metadata)
- values(organization_id,new.id,selected_suite,'active','onboarding',now(),now()+interval '14 days',jsonb_build_object('plan_selection',new.raw_user_meta_data->>'planId'))
+ values(workspace_organization_id,new.id,selected_suite,'active','onboarding',now(),now()+interval '14 days',jsonb_build_object('plan_selection',new.raw_user_meta_data->>'planId'))
  on conflict(organization_id,suite_id) where allow_repeat=false do nothing returning id into trial_record_id;
  if trial_record_id is not null then
   insert into public.suite_entitlements(organization_id,suite_id,status,source,starts_at,ends_at,granted_by,metadata)
-  values(organization_id,selected_suite,'trial','onboarding-trial',now(),now()+interval '14 days',new.id,jsonb_build_object('trial_id',trial_record_id))
+  values(workspace_organization_id,selected_suite,'trial','onboarding-trial',now(),now()+interval '14 days',new.id,jsonb_build_object('trial_id',trial_record_id))
   on conflict(organization_id,suite_id) do update set status='trial',source='onboarding-trial',starts_at=excluded.starts_at,ends_at=excluded.ends_at,granted_by=excluded.granted_by,metadata=excluded.metadata,updated_at=now()
   returning id into entitlement_record_id;
   insert into public.entitlement_history(organization_id,suite_id,entitlement_id,previous_state,next_state,reason,actor_type,actor_user_id,metadata)
-  values(organization_id,selected_suite,entitlement_record_id,'locked','trial','onboarding-trial-started','auth-provisioning',new.id,jsonb_build_object('trial_id',trial_record_id));
+  values(workspace_organization_id,selected_suite,entitlement_record_id,'locked','trial','onboarding-trial-started','auth-provisioning',new.id,jsonb_build_object('trial_id',trial_record_id));
  end if;
  return new;
 end;

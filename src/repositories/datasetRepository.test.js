@@ -5,7 +5,7 @@ import {cloudRepository} from './cloudRepository';
 import {reportDatasetPersistence} from '../utils/datasetHydrationDiagnostics';
 import {saveAndVerifyDataset} from './datasetRepository';
 
-const row={id:'9e7c22a1-1cfb-4acf-a7ad-acde05402717',project_id:'a38bd060-d13a-4c5d-ae3c-8b19c98edc09',organization_id:'33aa322d-0c84-41c4-a786-2b93c01ed806',created_by:'fbc898fc-2d2d-4ffd-9984-a106b622f754',title:'Dataset A',content:{columns:[{name:'CycleTime',data:[10]}]}};
+const row={id:'9e7c22a1-1cfb-4acf-a7ad-acde05402717',project_id:'a38bd060-d13a-4c5d-ae3c-8b19c98edc09',organization_id:'33aa322d-0c84-41c4-a786-2b93c01ed806',created_by:'fbc898fc-2d2d-4ffd-9984-a106b622f754',title:'Dataset A',version:1,content:{versionId:'15a24d88-c751-4c71-90d6-b792ab2f2501',columns:[{name:'CycleTime',data:[10]}]}};
 
 beforeEach(()=>jest.clearAllMocks());
 

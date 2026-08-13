@@ -116,6 +116,11 @@ function ToolRoute({ toolId }) {
   return <ToolPage tool={toolId}>{meta.component}</ToolPage>;
 }
 
+function DevelopmentEnvironmentBadge() {
+  if (process.env.NODE_ENV !== 'development' || process.env.REACT_APP_ENVIRONMENT !== 'staging') return null;
+  return <div className="development-environment-badge" data-environment="staging" data-project-ref={process.env.REACT_APP_SUPABASE_PROJECT_REF} title={process.env.REACT_APP_SUPABASE_URL}>STAGING · {process.env.REACT_APP_SUPABASE_PROJECT_REF}</div>;
+}
+
 export default function App() {
   return (
     <ThemeProvider>
@@ -131,6 +136,7 @@ export default function App() {
               <ProjectPlacementProvider>
               <IntelligenceProvider>
               <PersistenceHydrationGate><Router>
+                <DevelopmentEnvironmentBadge />
                 <Layout>
                   <Routes>
                   <Route path="/" element={<Dashboard />} />

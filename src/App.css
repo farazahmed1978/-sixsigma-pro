@@ -208,8 +208,25 @@ label {
 .spinner { width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+.development-environment-badge {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  z-index: 10000;
+  transform: translateX(-50%);
+  padding: 0.4rem 0.75rem;
+  border: 1px solid #fbbf24;
+  border-radius: 999px;
+  background: #451a03;
+  color: #fef3c7;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.28);
+  font: 700 0.7rem/1.2 var(--font-body);
+  letter-spacing: 0.08em;
+  pointer-events: none;
+}
+
 @media print {
-  .sidebar, .topbar, .no-print, .placement-toast, .toast, .dw-autosave, .dw-autosave-control, button, [role="status"] { display: none !important; }
+  .sidebar, .topbar, .no-print, .placement-toast, .toast, .dw-autosave, .dw-autosave-control, .development-environment-badge, button, [role="status"] { display: none !important; }
   .main-content { margin: 0 !important; padding: 1rem !important; }
   .main-content, .card, article, section { min-height: 0 !important; }
   .card, article { break-inside: avoid-page; page-break-inside: avoid; }
