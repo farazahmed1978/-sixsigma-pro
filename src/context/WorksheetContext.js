@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 import {useAuth} from './AuthContext';
 import {datasetRepository} from '../repositories/datasetRepository';
+import {HYDRATION,nextGeneration,isCurrentGeneration} from '../services/persistenceSafety';
 import { calculatedColumn, createLineage, joinDatasets, pivot, recodeColumn, sortedRowIndices, stackColumns, transformColumn, typedColumn, unpivot } from '../utils/dataWorkspace';
 
 const WorksheetContext = createContext();
@@ -60,6 +61,8 @@ function loadRegistry() {
 export function WorksheetProvider({ children }) {
   const {user,profile,configured}=useAuth();
   const [datasets, setDatasets] = useState(() => configured ? [] : loadRegistry());
+  const [hydrationStatus,setHydrationStatus]=useState(configured?HYDRATION.HYDRATING:HYDRATION.READY),[persistenceError,setPersistenceError]=useState('');
+  const generation=React.useRef(0);
   const [activeDatasetId, setActiveDatasetId] = useState(() => configured ? '' : localStorage.getItem(ACTIVE_KEY) || '');
   const [viewSort, setViewSort] = useState([]);
 
@@ -72,7 +75,8 @@ export function WorksheetProvider({ children }) {
   useEffect(() => {
     let active=true;
     if(!configured||!user||!profile?.default_organization_id)return()=>{active=false};
-    datasetRepository.listOrganization(profile.default_organization_id).then(rows=>{if(active)setDatasets(rows.map(row=>normalizeDataset({...row.content,id:row.id,projectId:row.project_id,organizationId:row.organization_id,createdBy:row.created_by,name:row.title,description:row.description,source:row.source,version:row.version,createdAt:row.created_at,updatedAt:row.updated_at}))) }).catch(error=>console.error('Datasets could not be loaded from Aureqin:',error));
+    const request=nextGeneration(generation.current);generation.current=request;setDatasets([]);setActiveDatasetId('');setHydrationStatus(HYDRATION.HYDRATING);setPersistenceError('');
+    datasetRepository.listOrganization(profile.default_organization_id).then(rows=>{if(active&&isCurrentGeneration(request,generation.current)){setDatasets(rows.map(row=>normalizeDataset({...row.content,id:row.id,projectId:row.project_id,organizationId:row.organization_id,createdBy:row.created_by,name:row.title,description:row.description,source:row.source,version:row.version,createdAt:row.created_at,updatedAt:row.updated_at})));setHydrationStatus(HYDRATION.READY)} }).catch(error=>{if(active&&isCurrentGeneration(request,generation.current)){setHydrationStatus(HYDRATION.ERROR);setPersistenceError(error.message||'Datasets could not be loaded from Aureqin.')}});
     return()=>{active=false};
   },[configured,profile?.default_organization_id,user]);
   useEffect(() => {
@@ -81,7 +85,7 @@ export function WorksheetProvider({ children }) {
     const timer=window.setTimeout(()=>Promise.all(persisted.map(dataset=>datasetRepository.saveMetadata({id:dataset.id,project_id:dataset.projectId,organization_id:dataset.organizationId||profile.default_organization_id,created_by:dataset.createdBy||user.id,status:dataset.status||'active',methodology:'lean-six-sigma',lifecycle_phase:'Measure',dmaic_phase:'Measure',title:dataset.name,description:dataset.description||'',source:dataset.source||'',version:dataset.version||1,row_count:dataset.rowCount||0,column_count:dataset.columnCount||0,content:dataset,updated_at:new Date().toISOString()}))).catch(error=>console.error('Datasets could not be saved to Aureqin:',error)),250);
     return()=>window.clearTimeout(timer);
   },[configured,datasets,profile?.default_organization_id,user]);
-  useEffect(()=>{const cleanup=event=>{const projectId=event.detail?.projectId;setDatasets(previous=>previous.filter(dataset=>dataset.projectId!==projectId));setActiveDatasetId(current=>datasets.some(dataset=>dataset.id===current&&dataset.projectId===projectId)?'':current)};window.addEventListener('aureqin:project-deleted',cleanup);return()=>window.removeEventListener('aureqin:project-deleted',cleanup)},[datasets]);
+  useEffect(()=>{const cleanup=event=>{generation.current=nextGeneration(generation.current);const projectId=event.detail?.projectId;setDatasets(previous=>previous.filter(dataset=>dataset.projectId!==projectId));setActiveDatasetId(current=>datasets.some(dataset=>dataset.id===current&&dataset.projectId===projectId)?'':current)};window.addEventListener('aureqin:project-deleted',cleanup);return()=>window.removeEventListener('aureqin:project-deleted',cleanup)},[datasets]);
   useEffect(() => {
     if(configured)return;
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(datasets)); } catch (error) { console.warn('Datasets could not be saved:', error); }
@@ -174,6 +178,7 @@ export function WorksheetProvider({ children }) {
     createDataset, createDerivedDataset, switchDataset, renameDataset, updateDatasetMetadata, duplicateDataset, archiveDataset, deleteDataset, assignDatasetProject, changeColumnType, sortColumn, clearViewSort,
     deriveCalculatedColumn, deriveTransformedColumn, deriveRecodedColumn, deriveJoinedDataset, deriveStackedDataset, deriveUnpivotedDataset, derivePivotedDataset,
     getNumericColumns, getCategoricalColumns, getColumnData, getRawColumnData,
+    hydrationStatus,persistenceError,
   }}>{children}</WorksheetContext.Provider>;
 }
 

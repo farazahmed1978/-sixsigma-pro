@@ -16,7 +16,7 @@ function currentPhase(project) {
 }
 
 export default function ProjectsHome() {
-  const { projects, createProject, deleteProject } = useProjects();
+  const { projects, createProject, deleteProject, deletingProjectId } = useProjects();
   const {confirm,toast}=useInteractions();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: '', goal: '', owner: '', champion: '' });
@@ -102,10 +102,11 @@ export default function ProjectsHome() {
                   <h3>{project.name}</h3>
                   <button
                     className="pw-delete-btn"
+                    disabled={Boolean(deletingProjectId)}
                     title="Delete project"
                     onClick={async () => {
                       if (await confirm({title:'Delete project and its contents?',message:`“${project.name}” and its project-owned datasets, documents, analyses, report assets, artifacts, and placements will be permanently removed. Shared organization assets are not affected. This cannot be undone.`,confirmLabel:'Delete Project and Contents',destructive:true})) {
-                        await deleteProject(project.id);toast('Project and its contents deleted.');
+                        try{await deleteProject(project.id);toast('Project and its contents deleted and verified.');}catch(error){toast(error.message||'Project deletion could not be verified. Retry the deletion.');}
                       }
                     }}
                   >

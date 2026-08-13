@@ -12,6 +12,7 @@ import {AuthProvider} from './context/AuthContext';
 import {EntitlementProvider} from './context/EntitlementContext';
 import {BillingProvider} from './context/BillingContext';
 import {InteractionProvider} from './context/InteractionContext';
+import PersistenceHydrationGate from './components/PersistenceHydrationGate';
 import ProtectedRoute from './components/ProtectedRoute';
 import SupabaseSetupGate from './components/SupabaseSetupGate';
 import GlobalErrorBoundary from './components/GlobalErrorBoundary';
@@ -128,7 +129,7 @@ export default function App() {
             <AnalysisProvider>
               <ProjectPlacementProvider>
               <IntelligenceProvider>
-              <Router>
+              <PersistenceHydrationGate><Router>
                 <Layout>
                   <Routes>
                   <Route path="/" element={<Dashboard />} />
@@ -162,7 +163,7 @@ export default function App() {
                   ))}
                   </Routes>
                 </Layout>
-              </Router>
+              </Router></PersistenceHydrationGate>
               </IntelligenceProvider>
               </ProjectPlacementProvider>
             </AnalysisProvider>

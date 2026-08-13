@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import {useAuth} from './AuthContext';
 import {projectRepository} from '../repositories/projectRepository';
+import {HYDRATION,nextGeneration,isCurrentGeneration} from '../services/persistenceSafety';
 
 const ProjectsContext = createContext();
 const STORAGE_KEY = 'sixsigmapro_projects';
@@ -39,14 +40,19 @@ export const projectToRow = project => ({ id: project.id, organization_id: proje
 export function ProjectsProvider({ children }) {
   const {user,profile,configured}=useAuth();
   const [projects, setProjects] = useState(() => configured ? [] : loadProjects());
+  const [hydrationStatus,setHydrationStatus]=useState(configured?HYDRATION.HYDRATING:HYDRATION.READY);
+  const [persistenceError,setPersistenceError]=useState('');
+  const [deletingProjectId,setDeletingProjectId]=useState('');
   const hydrated = useRef(!configured);
+  const generation=useRef(0);
 
   useEffect(() => {
     let active = true;
     if (!configured) { hydrated.current = true; return undefined; }
+    const request=nextGeneration(generation.current);generation.current=request;setProjects([]);setHydrationStatus(HYDRATION.HYDRATING);setPersistenceError('');
     hydrated.current = false;
     if (!user || !profile?.default_organization_id) { setProjects([]); return () => { active = false; }; }
-    projectRepository.listCloud(profile.default_organization_id).then(rows => { if (active) { setProjects(rows.map(projectFromRow)); hydrated.current = true; } }).catch(error => console.error('Projects could not be loaded from Aureqin:', error));
+    projectRepository.listCloud(profile.default_organization_id).then(rows => { if (active&&isCurrentGeneration(request,generation.current)) { setProjects(rows.map(projectFromRow)); hydrated.current = true;setHydrationStatus(HYDRATION.READY); } }).catch(error => {if(active&&isCurrentGeneration(request,generation.current)){setHydrationStatus(HYDRATION.ERROR);setPersistenceError(error.message||'Projects could not be loaded from Aureqin.');}});
     return () => { active = false; };
   }, [configured, profile?.default_organization_id, user]);
 
@@ -90,20 +96,19 @@ export function ProjectsProvider({ children }) {
   }, [profile,user]);
 
   const updateProject = useCallback((id, updates) => {
-    setProjects(prev => prev.map(p => {
-      if (p.id !== id) return p;
-      const shared = { ...(p.sharedFields || {}) };
+    const current=projects.find(project=>project.id===id);if(!current)return Promise.reject(new Error('The target project is no longer available.'));
+      const shared = { ...(current.sharedFields || {}) };
       const mappings = { name:'projectName', champion:'sponsor', owner:'owner', processOwner:'processOwner', startDate:'startDate', targetDate:'targetDate', status:'status', budget:'budget', goal:'goalSummary', scopeSummary:'scopeSummary', businessCaseSummary:'businessCaseSummary' };
       Object.entries(mappings).forEach(([source,target]) => { if (Object.prototype.hasOwnProperty.call(updates,source)) shared[target]=updates[source]; });
-      return { ...p, ...updates, sharedFields:{...shared,...(updates.sharedFields||{})}, updatedAt:new Date().toISOString() };
-    }));
-  }, []);
+      const next={ ...current, ...updates, sharedFields:{...shared,...(updates.sharedFields||{})}, updatedAt:new Date().toISOString() };
+    setProjects(prev => prev.map(project => project.id===id?next:project));
+    return configured&&user?projectRepository.save(projectToRow(next)):Promise.resolve(next);
+  }, [configured,projects,user]);
 
   const deleteProject = useCallback(async (id) => {
-    if (configured && user) await projectRepository.remove(id);
-    setProjects(prev => prev.filter(p => p.id !== id));
-    window.dispatchEvent(new CustomEvent('aureqin:project-deleted', { detail: { projectId: id } }));
-  }, [configured, user]);
+    if(deletingProjectId)return false;setDeletingProjectId(id);setPersistenceError('');generation.current=nextGeneration(generation.current);
+    try{if (configured && user) await projectRepository.remove(id);setProjects(prev => prev.filter(p => p.id !== id));window.dispatchEvent(new CustomEvent('aureqin:project-deleted', { detail: { projectId: id } }));setDeletingProjectId('');return true}catch(error){setDeletingProjectId('');setPersistenceError(error.message||'Project deletion could not be verified. Retry the deletion.');throw error;}
+  }, [configured, deletingProjectId,user]);
 
   // An item lives in at most one phase per project — assigning it to a new
   // phase removes it from any other phase in that same project first.
@@ -174,6 +179,7 @@ export function ProjectsProvider({ children }) {
       addArtifact,
       updateArtifact,
       removeArtifact,
+      hydrationStatus,persistenceError,deletingProjectId,
     }}>
       {children}
     </ProjectsContext.Provider>

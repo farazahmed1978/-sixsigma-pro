@@ -1,9 +1,10 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState, useRef } from 'react';
 import { useWorksheet } from './WorksheetContext';
 import { useProjects } from './ProjectsContext';
 import {useAuth} from './AuthContext';
 import { createAnalysisMetadata } from '../foundation/provenance';
 import {analysisRepository} from '../repositories/analysisRepository';
+import {HYDRATION,nextGeneration,isCurrentGeneration} from '../services/persistenceSafety';
 
 const AnalysisContext = createContext();
 export const ANALYSIS_CONTEXT_SCHEMA_VERSION = 1;
@@ -25,11 +26,12 @@ export function AnalysisProvider({ children }) {
   const {user,profile,configured}=useAuth();
   const [selectedDatasetIds, setSelectedDatasetIds] = useState([]);
   const [analysisResults, setAnalysisResults] = useState(() => configured ? [] : loadAnalyses());
+  const [hydrationStatus,setHydrationStatus]=useState(configured?HYDRATION.HYDRATING:HYDRATION.READY),[persistenceError,setPersistenceError]=useState('');const generation=useRef(0);
   const project = projects.find(item => item.id === activeDataset?.projectId) || null;
 
-  useEffect(()=>{let active=true;if(!configured||!user||!profile?.default_organization_id)return()=>{active=false};analysisRepository.listOrganization(profile.default_organization_id).then(rows=>{if(active)setAnalysisResults(rows.map(row=>({...row.content,id:row.id,projectId:row.project_id,organizationId:row.organization_id,createdBy:row.created_by,title:row.title,status:row.status,phase:row.dmaic_phase,createdAt:row.created_at,updatedAt:row.updated_at}))) }).catch(error=>console.error('Analyses could not be loaded from Aureqin:',error));return()=>{active=false}},[configured,profile?.default_organization_id,user]);
+  useEffect(()=>{let active=true;if(!configured||!user||!profile?.default_organization_id)return()=>{active=false};const request=nextGeneration(generation.current);generation.current=request;setAnalysisResults([]);setHydrationStatus(HYDRATION.HYDRATING);setPersistenceError('');analysisRepository.listOrganization(profile.default_organization_id).then(rows=>{if(active&&isCurrentGeneration(request,generation.current)){setAnalysisResults(rows.map(row=>({...row.content,id:row.id,projectId:row.project_id,organizationId:row.organization_id,createdBy:row.created_by,title:row.title,status:row.status,phase:row.dmaic_phase,createdAt:row.created_at,updatedAt:row.updated_at})));setHydrationStatus(HYDRATION.READY)} }).catch(error=>{if(active&&isCurrentGeneration(request,generation.current)){setHydrationStatus(HYDRATION.ERROR);setPersistenceError(error.message||'Analyses could not be loaded from Aureqin.')}});return()=>{active=false}},[configured,profile?.default_organization_id,user]);
   useEffect(() => {if(configured){if(!user||!profile?.default_organization_id)return;const timer=window.setTimeout(()=>Promise.all(analysisResults.filter(item=>item.projectId).map(item=>analysisRepository.save({id:item.id,project_id:item.projectId,organization_id:item.organizationId||profile.default_organization_id,created_by:item.createdBy||user.id,status:item.status||'complete',methodology:item.methodology||'lean-six-sigma',lifecycle_phase:item.phase||'Analyze',dmaic_phase:item.phase||'Analyze',title:item.title||item.name||'Analysis',method:item.method||item.toolType||'',method_version:item.methodVersion||'1',parameters:item.inputConfiguration||{},result_schema_version:item.resultSchemaVersion||'1',validation_status:item.validationStatus||'UNVALIDATED',content:item,updated_at:new Date().toISOString()}))).catch(error=>console.error('Analyses could not be saved to Aureqin:',error)),250);return()=>window.clearTimeout(timer)}try { localStorage.setItem(STORAGE_KEY, JSON.stringify(analysisResults)); } catch (error) { console.warn('Analyses could not be saved:', error); } }, [analysisResults,configured,profile?.default_organization_id,user]);
-  useEffect(()=>{const cleanup=event=>setAnalysisResults(previous=>previous.filter(item=>item.projectId!==event.detail?.projectId));window.addEventListener('aureqin:project-deleted',cleanup);return()=>window.removeEventListener('aureqin:project-deleted',cleanup)},[]);
+  useEffect(()=>{const cleanup=event=>{generation.current=nextGeneration(generation.current);setAnalysisResults(previous=>previous.filter(item=>item.projectId!==event.detail?.projectId))};window.addEventListener('aureqin:project-deleted',cleanup);return()=>window.removeEventListener('aureqin:project-deleted',cleanup)},[]);
 
   const registerAnalysisResult = useCallback(result => {
     const id = result.id || crypto.randomUUID();
@@ -61,7 +63,8 @@ export function AnalysisProvider({ children }) {
     duplicateAnalysis,
     deleteAnalysis,
     updateAnalysis,
-  }), [activeDataset, analysisResults, columns, datasets, project, rowCount, selectedDatasetIds, registerAnalysisResult, duplicateAnalysis, deleteAnalysis, updateAnalysis]);
+    hydrationStatus,persistenceError,
+  }), [activeDataset, analysisResults, columns, datasets, project, rowCount, selectedDatasetIds, registerAnalysisResult, duplicateAnalysis, deleteAnalysis, updateAnalysis, hydrationStatus, persistenceError]);
 
   return <AnalysisContext.Provider value={value}>{children}</AnalysisContext.Provider>;
 }
