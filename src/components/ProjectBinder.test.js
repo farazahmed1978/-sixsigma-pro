@@ -1,7 +1,7 @@
 import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import SavedAnalysisResult,{hasSavedResult} from './SavedAnalysisResult';
-import {placementDraftForAnalysis,reportItemForAnalysis,routeFor} from './ProjectBinder';
+import {buildProjectReviewModel,placementDraftForAnalysis,reportItemForAnalysis,routeFor} from './ProjectBinder';
 
 const saved=(toolId='regression')=>({id:`${toolId}-canonical`,projectId:'project-1',toolId,title:`Saved ${toolId}`,phase:toolId==='doe'?'Improve':'Analyze',createdAt:'2026-08-10T00:00:00.000Z',datasetIds:['dataset-1'],datasetVersionIds:['version-7'],variableMapping:{response:'Yield',predictor:'Temperature'},inputConfiguration:{alpha:.05},result:{coefficients:[{term:'Temperature',estimate:2.4}],diagnostics:{rSquared:.91}},interpretation:'Persisted interpretation'});
 
@@ -10,3 +10,4 @@ test('Project Binder routes a placed Lean artifact to its canonical saved editor
 test('Open Result renders persisted payload without a tool route or recalculation',()=>{const analysis=saved(),markup=renderToStaticMarkup(<SavedAnalysisResult analysis={analysis} onClose={()=>{}}/>);expect(markup).toContain('Read-only canonical result');expect(markup).toContain('regression-canonical');expect(markup).toContain('Temperature');expect(markup).not.toContain('/tool/regression')});
 test('legacy incomplete result shows an explicit limitation',()=>{const analysis={id:'legacy-1',toolId:'anova',title:'Legacy ANOVA'},markup=renderToStaticMarkup(<SavedAnalysisResult analysis={analysis} onClose={()=>{}}/>);expect(hasSavedResult(analysis)).toBe(false);expect(markup).toContain('Full saved-result rendering is unavailable');expect(markup).toContain('will not reconstruct it from the current worksheet')});
 test('report payload is additive and leaves canonical result unchanged',()=>{const analysis=saved(),before=JSON.stringify(analysis),item=reportItemForAnalysis(analysis);expect(item.structuredOutput).toBe(analysis.result);expect(item.phase).toBe('Analyze');expect(JSON.stringify(analysis)).toBe(before)});
+test('Binder model uses native PM lifecycle and does not invent DMAIC stages',()=>{const model=buildProjectReviewModel({id:'pm-1',suiteId:'project-management',methodology:'project-management',currentPhase:'Planning'},{documents:[{id:'pm-plan',title:'PM Plan',phase:'Planning',values:{summary:'Approved plan'}}],analyses:[],evidence:[],artifacts:[],datasets:[]});expect(model.narrativeContract.sequence).toEqual(['Initiation','Planning','Execution','Monitoring & Controlling','Closing']);expect(model.items[0].phase).toBe('Planning');expect(model.narrativeContract.sequence).not.toContain('Define')});

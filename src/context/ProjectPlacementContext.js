@@ -1,40 +1,620 @@
-import React,{createContext,useCallback,useContext,useEffect,useMemo,useRef,useState} from 'react';
-import {useAnalysis} from './AnalysisContext';
-import {useReport} from './ReportContext';
-import {useProjects} from './ProjectsContext';
-import {useAuth} from './AuthContext';
-import {useWorksheet} from './WorksheetContext';
-import {createProjectPlacement,normalizePlacement,placementDestinations,placementLabel,suggestProjectPlacement,UNFILED_LOCATION} from '../foundation/projectPlacement';
-import {cloudRepository} from '../repositories/cloudRepository';
-import {HYDRATION,nextGeneration,isCurrentGeneration} from '../services/persistenceSafety';
-import './ProjectPlacementContext.css';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { useAnalysis } from "./AnalysisContext";
+import { useReport } from "./ReportContext";
+import { useProjects } from "./ProjectsContext";
+import { useAuth } from "./AuthContext";
+import { useWorksheet } from "./WorksheetContext";
+import {
+  createProjectPlacement,
+  normalizePlacement,
+  placementDestinations,
+  placementLabel,
+  suggestProjectPlacement,
+  UNFILED_LOCATION,
+} from "../foundation/projectPlacement";
+import { cloudRepository } from "../repositories/cloudRepository";
+import {
+  HYDRATION,
+  nextGeneration,
+  isCurrentGeneration,
+} from "../services/persistenceSafety";
+import { resolveProjectSuiteId } from "../foundation/lifecycle";
+import "./ProjectPlacementContext.css";
 
-const STORAGE_KEY='aureqin_project_placements_v1';
-const Context=createContext(null);
-const load=()=>{try{return(JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]')||[]).map(normalizePlacement).filter(Boolean)}catch{return[]}};
+const STORAGE_KEY = "aureqin_project_placements_v1";
+const Context = createContext(null);
+const load = () => {
+  try {
+    return (JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]") || [])
+      .map(normalizePlacement)
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+};
 
-export function ProjectPlacementProvider({children}){
- const {analysisResults,registerAnalysisResult}=useAnalysis(),{addReportItem,removeReportItem}=useReport(),{projects,recordActivity}=useProjects(),{user,profile,configured}=useAuth();
- const[placements,setPlacements]=useState(()=>configured?[]:load()),[request,setRequest]=useState(null),[notice,setNotice]=useState(''),[hydrationStatus,setHydrationStatus]=useState(configured?HYDRATION.HYDRATING:HYDRATION.READY),[persistenceError,setPersistenceError]=useState('');const resolver=useRef(null),generation=useRef(0),destinations=useMemo(placementDestinations,[]);
- useEffect(()=>{let active=true;if(!configured||!user||!profile?.default_organization_id)return()=>{active=false};const fetchGeneration=nextGeneration(generation.current);generation.current=fetchGeneration;setPlacements([]);setHydrationStatus(HYDRATION.HYDRATING);setPersistenceError('');cloudRepository.list('artifacts',{organization_id:profile.default_organization_id}).then(rows=>{if(active&&isCurrentGeneration(fetchGeneration,generation.current)){setPlacements(rows.filter(row=>row.content?.recordType==='project-placement').map(row=>normalizePlacement({...row.content.placement,placementId:row.id,projectId:row.project_id,organizationId:row.organization_id,createdBy:row.created_by})).filter(Boolean));setHydrationStatus(HYDRATION.READY)}}).catch(error=>{if(active&&isCurrentGeneration(fetchGeneration,generation.current)){setHydrationStatus(HYDRATION.ERROR);setPersistenceError(error.message||'Project placements could not be loaded from Aureqin.')}});return()=>{active=false}},[configured,profile?.default_organization_id,user]);
- useEffect(()=>{if(configured){if(!user||!profile?.default_organization_id)return;const timer=window.setTimeout(()=>Promise.all(placements.map(placement=>cloudRepository.upsert('artifacts',{id:placement.placementId,project_id:placement.projectId,organization_id:placement.organizationId||profile.default_organization_id,created_by:placement.createdBy||user.id,status:'active',methodology:'lean-six-sigma',lifecycle_phase:placement.phase,dmaic_phase:placement.phase,title:placement.metadata?.title||'Project placement',content:{recordType:'project-placement',placement},updated_at:new Date().toISOString()}))).catch(error=>console.error('Project placements could not be saved to Aureqin:',error)),250);return()=>window.clearTimeout(timer)}try{localStorage.setItem(STORAGE_KEY,JSON.stringify(placements))}catch(error){console.warn('Project placements could not be saved:',error)}},[configured,placements,profile?.default_organization_id,user]);
- useEffect(()=>{const cleanup=event=>{generation.current=nextGeneration(generation.current);setPlacements(previous=>previous.filter(item=>item.projectId!==event.detail?.projectId))};window.addEventListener('aureqin:project-deleted',cleanup);return()=>window.removeEventListener('aureqin:project-deleted',cleanup)},[]);
- const close=useCallback(result=>{setRequest(null);resolver.current?.(result);resolver.current=null},[]);
- const requestPlacement=useCallback(draft=>new Promise(resolve=>{const existing=draft?.artifactId?placements.find(item=>item.artifactId===draft.artifactId&&(!draft.projectId||item.projectId===draft.projectId)&&item.isPrimary):null,suggested=existing||suggestProjectPlacement(draft?.toolId||draft?.analysis?.toolId);resolver.current=resolve;setNotice('');setRequest({draft:draft||{},existing,projectId:draft?.projectId||existing?.projectId||'',title:draft?.title||draft?.analysis?.title||'Analysis result',locationKey:`${suggested.suiteId}:${suggested.phaseId}:${suggested.workflowClusterId}`,includeReport:existing?existing.reportIncluded:draft?.includeReport!==false})}),[placements]);
- useEffect(()=>{if(!request)return undefined;const onKeyDown=event=>{if(event.key==='Escape')close(null)};window.addEventListener('keydown',onKeyDown);return()=>window.removeEventListener('keydown',onKeyDown)},[request,close]);
- const confirm=async()=>{const draft=request.draft,project=projects.find(item=>item.id===request.projectId),location=destinations.find(item=>`${item.suiteId}:${item.phaseId}:${item.workflowClusterId}`===request.locationKey)||UNFILED_LOCATION;if(!project){setNotice('Select a project before adding this analysis.');return}try{let artifactId=request.existing?.artifactId||draft.artifactId;if(!artifactId){artifactId=registerAnalysisResult({...draft.analysis,title:request.title,projectId:project.id,organizationId:project.organizationId||profile?.default_organization_id||''})}let reportItemId=request.existing?.reportItemId||'';if(request.includeReport&&!reportItemId&&draft.reportItem)reportItemId=await addReportItem({...draft.reportItem,title:request.title,analysisId:artifactId,projectId:project.id});if(!request.includeReport&&reportItemId){removeReportItem(reportItemId);reportItemId=''}const next=createProjectPlacement({...(request.existing||{}),projectId:project.id,organizationId:project.organizationId||profile?.default_organization_id||'',artifactType:draft.artifactType||'analysis',artifactId,location,isPrimary:true,createdBy:user?.id||'',reportIncluded:request.includeReport,reportItemId,datasetIds:draft.analysis?.datasetIds||[],datasetVersionIds:draft.analysis?.datasetVersionIds||[],method:draft.analysis?.method||draft.reportItem?.provenance?.method||'',sourceWorkflow:draft.toolId||draft.analysis?.toolId||'',metadata:{title:request.title,toolId:draft.toolId||draft.analysis?.toolId||'',validationStatus:draft.analysis?.validationStatus||'',...(request.existing?.metadata||{})},updatedAt:new Date().toISOString()});setPlacements(previous=>[...previous.filter(item=>item.placementId!==next.placementId&&!(item.artifactId===artifactId&&item.projectId===project.id&&item.isPrimary)),next]);recordActivity?.(project.id,{action:`Placed ${request.title} in ${placementLabel(next)}`,assetType:'analysis',assetId:artifactId});setNotice(`Added to Project · ${placementLabel(next)} · ${request.includeReport?'Included in project report':'Not included in project report'}`);close(next)}catch(error){setNotice(error.message)}};
- const updatePlacement=useCallback((placementId,updates)=>setPlacements(previous=>previous.map(item=>item.placementId===placementId?normalizePlacement({...item,...updates,updatedAt:new Date().toISOString()}):item)),[]);
- const removePlacement=useCallback(async placementId=>{if(configured)await cloudRepository.remove('artifacts',placementId);setPlacements(previous=>previous.filter(item=>item.placementId!==placementId))},[configured]);
- const primaryPlacementFor=useCallback((artifactId,projectId)=>placements.find(item=>item.artifactId===artifactId&&(!projectId||item.projectId===projectId)&&item.isPrimary)||null,[placements]);
- const placementForLegacy=useCallback(analysis=>primaryPlacementFor(analysis.id,analysis.projectId)||createProjectPlacement({projectId:analysis.projectId||'legacy-project',artifactId:analysis.id,artifactType:'analysis',location:suggestProjectPlacement(analysis.toolId),isPrimary:true,reportIncluded:Boolean(analysis.linkedReportIds?.length),metadata:{legacyDerived:true,title:analysis.title||analysis.name||'Legacy analysis'}}),[primaryPlacementFor]);
- const value=useMemo(()=>({placements,requestPlacement,updatePlacement,removePlacement,primaryPlacementFor,placementForLegacy,notice,dismissNotice:()=>setNotice(''),analysisResults,hydrationStatus,persistenceError}),[placements,requestPlacement,updatePlacement,removePlacement,primaryPlacementFor,placementForLegacy,notice,analysisResults,hydrationStatus,persistenceError]);
- return <Context.Provider value={value}>{children}{notice&&<div className="placement-toast" role="status"><span>{notice}</span><button onClick={()=>setNotice('')} aria-label="Dismiss">×</button></div>}{request&&<div className="placement-backdrop" role="presentation" onMouseDown={event=>event.target===event.currentTarget&&close(null)}><section className="placement-modal" role="dialog" aria-modal="true" aria-labelledby="placement-title"><header><div><span>{request.existing?'MANAGE PLACEMENT':'ADD TO PROJECT'}</span><h2 id="placement-title">{request.existing?'Manage Project Placement':'Add to Project'}</h2></div><button onClick={()=>close(null)} aria-label="Close">×</button></header><div className="form-group"><label>Project</label><select value={request.projectId} onChange={event=>setRequest(previous=>({...previous,projectId:event.target.value}))}><option value="">Select project</option>{projects.map(project=><option value={project.id} key={project.id}>{project.name}</option>)}</select></div><div className="form-group"><label>Project location</label><select value={request.locationKey} onChange={event=>setRequest(previous=>({...previous,locationKey:event.target.value}))}>{destinations.map(item=><option key={`${item.suiteId}:${item.phaseId}:${item.workflowClusterId}`} value={`${item.suiteId}:${item.phaseId}:${item.workflowClusterId}`}>{item.suite} · {item.phase} → {item.workflowCluster}</option>)}</select></div><div className="form-group"><label>Title</label><input value={request.title} onChange={event=>setRequest(previous=>({...previous,title:event.target.value}))}/></div><label className="placement-report-toggle"><input type="checkbox" checked={request.includeReport} onChange={event=>setRequest(previous=>({...previous,includeReport:event.target.checked}))}/><span><strong>Include in project report</strong><small>Uses the existing DMAIC report phase and sequencing.</small></span></label>{notice&&<div className="alert alert-warning">{notice}</div>}<footer><button className="btn-secondary" onClick={()=>close(null)}>Cancel</button><button className="btn-primary" onClick={confirm}>{request.existing?'Save Placement':'Add to Project'}</button></footer></section></div>}</Context.Provider>;
+export function ProjectPlacementProvider({ children }) {
+  const { analysisResults, registerAnalysisResult } = useAnalysis(),
+    { addReportItem, removeReportItem } = useReport(),
+    { projects, recordActivity } = useProjects(),
+    { user, profile, configured } = useAuth();
+  const [placements, setPlacements] = useState(() =>
+      configured ? [] : load(),
+    ),
+    [request, setRequest] = useState(null),
+    [notice, setNotice] = useState(""),
+    [hydrationStatus, setHydrationStatus] = useState(
+      configured ? HYDRATION.HYDRATING : HYDRATION.READY,
+    ),
+    [persistenceError, setPersistenceError] = useState("");
+  const resolver = useRef(null),
+    generation = useRef(0),
+    destinations = useMemo(placementDestinations, []);
+  const selectedProject = projects.find((project) => project.id === request?.projectId);
+  const visibleDestinations = selectedProject
+    ? destinations.filter(
+        (item) =>
+          item === UNFILED_LOCATION || item.suiteId === resolveProjectSuiteId(selectedProject),
+      )
+    : destinations;
+  useEffect(() => {
+    let active = true;
+    if (!configured || !user || !profile?.default_organization_id)
+      return () => {
+        active = false;
+      };
+    const fetchGeneration = nextGeneration(generation.current);
+    generation.current = fetchGeneration;
+    setPlacements([]);
+    setHydrationStatus(HYDRATION.HYDRATING);
+    setPersistenceError("");
+    cloudRepository
+      .list("artifacts", { organization_id: profile.default_organization_id })
+      .then((rows) => {
+        if (
+          active &&
+          isCurrentGeneration(fetchGeneration, generation.current)
+        ) {
+          setPlacements(
+            rows
+              .filter((row) => row.content?.recordType === "project-placement")
+              .map((row) =>
+                normalizePlacement({
+                  ...row.content.placement,
+                  placementId: row.id,
+                  projectId: row.project_id,
+                  organizationId: row.organization_id,
+                  createdBy: row.created_by,
+                }),
+              )
+              .filter(Boolean),
+          );
+          setHydrationStatus(HYDRATION.READY);
+        }
+      })
+      .catch((error) => {
+        if (
+          active &&
+          isCurrentGeneration(fetchGeneration, generation.current)
+        ) {
+          setHydrationStatus(HYDRATION.ERROR);
+          setPersistenceError(
+            error.message ||
+              "Project placements could not be loaded from Aureqin.",
+          );
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [configured, profile?.default_organization_id, user]);
+  useEffect(() => {
+    if (configured) {
+      if (!user || !profile?.default_organization_id) return;
+      const timer = window.setTimeout(
+        () =>
+          Promise.all(
+            placements.map((placement) =>
+              cloudRepository.upsert("artifacts", {
+                id: placement.placementId,
+                project_id: placement.projectId,
+                organization_id:
+                  placement.organizationId || profile.default_organization_id,
+                created_by: placement.createdBy || user.id,
+                status: "active",
+                methodology:
+                  projects.find((project) => project.id === placement.projectId)?.methodology ||
+                  "lean-six-sigma",
+                lifecycle_phase: placement.phase,
+                dmaic_phase: placement.phase,
+                title: placement.metadata?.title || "Project placement",
+                content: { recordType: "project-placement", placement },
+                updated_at: new Date().toISOString(),
+              }),
+            ),
+          ).catch((error) =>
+            console.error(
+              "Project placements could not be saved to Aureqin:",
+              error,
+            ),
+          ),
+        250,
+      );
+      return () => window.clearTimeout(timer);
+    }
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(placements));
+    } catch (error) {
+      console.warn("Project placements could not be saved:", error);
+    }
+  }, [configured, placements, profile?.default_organization_id, projects, user]);
+  useEffect(() => {
+    const cleanup = (event) => {
+      generation.current = nextGeneration(generation.current);
+      setPlacements((previous) =>
+        previous.filter((item) => item.projectId !== event.detail?.projectId),
+      );
+    };
+    window.addEventListener("aureqin:project-deleted", cleanup);
+    return () => window.removeEventListener("aureqin:project-deleted", cleanup);
+  }, []);
+  const close = useCallback((result) => {
+    setRequest(null);
+    resolver.current?.(result);
+    resolver.current = null;
+  }, []);
+  const requestPlacement = useCallback(
+    (draft) =>
+      new Promise((resolve) => {
+        const existing = draft?.artifactId
+            ? placements.find(
+                (item) =>
+                  item.artifactId === draft.artifactId &&
+                  (!draft.projectId || item.projectId === draft.projectId) &&
+                  item.isPrimary,
+              )
+            : null,
+          suggested =
+            existing ||
+            suggestProjectPlacement(draft?.toolId || draft?.analysis?.toolId);
+        resolver.current = resolve;
+        setNotice("");
+        setRequest({
+          draft: draft || {},
+          existing,
+          projectId: draft?.projectId || existing?.projectId || "",
+          title: draft?.title || draft?.analysis?.title || "Analysis result",
+          locationKey: `${suggested.suiteId}:${suggested.phaseId}:${suggested.workflowClusterId}`,
+          includeReport: existing
+            ? existing.reportIncluded
+            : draft?.includeReport !== false,
+        });
+      }),
+    [placements],
+  );
+  useEffect(() => {
+    if (!request) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") close(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [request, close]);
+  const confirm = async () => {
+    const draft = request.draft,
+      project = projects.find((item) => item.id === request.projectId),
+      location =
+        destinations.find(
+          (item) =>
+            `${item.suiteId}:${item.phaseId}:${item.workflowClusterId}` ===
+            request.locationKey,
+        ) || UNFILED_LOCATION;
+    if (!project) {
+      setNotice("Select a project before adding this analysis.");
+      return;
+    }
+    try {
+      let artifactId = request.existing?.artifactId || draft.artifactId;
+      if (!artifactId) {
+        artifactId = registerAnalysisResult({
+          ...draft.analysis,
+          title: request.title,
+          projectId: project.id,
+          organizationId:
+            project.organizationId || profile?.default_organization_id || "",
+        });
+      }
+      let reportItemId = request.existing?.reportItemId || "";
+      if (request.includeReport && !reportItemId && draft.reportItem)
+        reportItemId = await addReportItem({
+          ...draft.reportItem,
+          title: request.title,
+          analysisId: artifactId,
+          projectId: project.id,
+        });
+      if (!request.includeReport && reportItemId) {
+        removeReportItem(reportItemId);
+        reportItemId = "";
+      }
+      const next = createProjectPlacement({
+        ...(request.existing || {}),
+        projectId: project.id,
+        organizationId:
+          project.organizationId || profile?.default_organization_id || "",
+        artifactType: draft.artifactType || "analysis",
+        artifactId,
+        location,
+        isPrimary: true,
+        createdBy: user?.id || "",
+        reportIncluded: request.includeReport,
+        reportItemId,
+        datasetIds: draft.analysis?.datasetIds || [],
+        datasetVersionIds: draft.analysis?.datasetVersionIds || [],
+        method:
+          draft.analysis?.method || draft.reportItem?.provenance?.method || "",
+        sourceWorkflow: draft.toolId || draft.analysis?.toolId || "",
+        metadata: {
+          title: request.title,
+          toolId: draft.toolId || draft.analysis?.toolId || "",
+          validationStatus: draft.analysis?.validationStatus || "",
+          ...(request.existing?.metadata || {}),
+        },
+        updatedAt: new Date().toISOString(),
+      });
+      setPlacements((previous) => [
+        ...previous.filter(
+          (item) =>
+            item.placementId !== next.placementId &&
+            !(
+              item.artifactId === artifactId &&
+              item.projectId === project.id &&
+              item.isPrimary
+            ),
+        ),
+        next,
+      ]);
+      recordActivity?.(project.id, {
+        action: `Placed ${request.title} in ${placementLabel(next)}`,
+        assetType: "analysis",
+        assetId: artifactId,
+      });
+      setNotice(
+        `Added to Project · ${placementLabel(next)} · ${request.includeReport ? "Included in project report" : "Not included in project report"}`,
+      );
+      close(next);
+    } catch (error) {
+      setNotice(error.message);
+    }
+  };
+  const updatePlacement = useCallback(
+    (placementId, updates) =>
+      setPlacements((previous) =>
+        previous.map((item) =>
+          item.placementId === placementId
+            ? normalizePlacement({
+                ...item,
+                ...updates,
+                updatedAt: new Date().toISOString(),
+              })
+            : item,
+        ),
+      ),
+    [],
+  );
+  const removePlacement = useCallback(
+    async (placementId) => {
+      if (configured) await cloudRepository.remove("artifacts", placementId);
+      setPlacements((previous) =>
+        previous.filter((item) => item.placementId !== placementId),
+      );
+    },
+    [configured],
+  );
+  const primaryPlacementFor = useCallback(
+    (artifactId, projectId) =>
+      placements.find(
+        (item) =>
+          item.artifactId === artifactId &&
+          (!projectId || item.projectId === projectId) &&
+          item.isPrimary,
+      ) || null,
+    [placements],
+  );
+  const placementForLegacy = useCallback(
+    (analysis) =>
+      primaryPlacementFor(analysis.id, analysis.projectId) ||
+      createProjectPlacement({
+        projectId: analysis.projectId || "legacy-project",
+        artifactId: analysis.id,
+        artifactType: "analysis",
+        location: suggestProjectPlacement(analysis.toolId),
+        isPrimary: true,
+        reportIncluded: Boolean(analysis.linkedReportIds?.length),
+        metadata: {
+          legacyDerived: true,
+          title: analysis.title || analysis.name || "Legacy analysis",
+        },
+      }),
+    [primaryPlacementFor],
+  );
+  const value = useMemo(
+    () => ({
+      placements,
+      requestPlacement,
+      updatePlacement,
+      removePlacement,
+      primaryPlacementFor,
+      placementForLegacy,
+      notice,
+      dismissNotice: () => setNotice(""),
+      analysisResults,
+      hydrationStatus,
+      persistenceError,
+    }),
+    [
+      placements,
+      requestPlacement,
+      updatePlacement,
+      removePlacement,
+      primaryPlacementFor,
+      placementForLegacy,
+      notice,
+      analysisResults,
+      hydrationStatus,
+      persistenceError,
+    ],
+  );
+  return (
+    <Context.Provider value={value}>
+      {children}
+      {notice && (
+        <div className="placement-toast" role="status">
+          <span>{notice}</span>
+          <button onClick={() => setNotice("")} aria-label="Dismiss">
+            ×
+          </button>
+        </div>
+      )}
+      {request && (
+        <div
+          className="placement-backdrop"
+          role="presentation"
+          onMouseDown={(event) =>
+            event.target === event.currentTarget && close(null)
+          }
+        >
+          <section
+            className="placement-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="placement-title"
+          >
+            <header>
+              <div>
+                <span>
+                  {request.existing ? "MANAGE PLACEMENT" : "ADD TO PROJECT"}
+                </span>
+                <h2 id="placement-title">
+                  {request.existing
+                    ? "Manage Project Placement"
+                    : "Add to Project"}
+                </h2>
+              </div>
+              <button onClick={() => close(null)} aria-label="Close">
+                ×
+              </button>
+            </header>
+            <div className="form-group">
+              <label>Project</label>
+              <select
+                value={request.projectId}
+                onChange={(event) =>
+                  setRequest((previous) => ({
+                    ...previous,
+                    projectId: event.target.value,
+                  }))
+                }
+              >
+                <option value="">Select project</option>
+                {projects.map((project) => (
+                  <option value={project.id} key={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Project location</label>
+              <select
+                value={request.locationKey}
+                onChange={(event) =>
+                  setRequest((previous) => ({
+                    ...previous,
+                    locationKey: event.target.value,
+                  }))
+                }
+              >
+                {visibleDestinations.map((item) => (
+                  <option
+                    key={`${item.suiteId}:${item.phaseId}:${item.workflowClusterId}`}
+                    value={`${item.suiteId}:${item.phaseId}:${item.workflowClusterId}`}
+                  >
+                    {item.suite} · {item.phase} → {item.workflowCluster}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Title</label>
+              <input
+                value={request.title}
+                onChange={(event) =>
+                  setRequest((previous) => ({
+                    ...previous,
+                    title: event.target.value,
+                  }))
+                }
+              />
+            </div>
+            <label className="placement-report-toggle">
+              <input
+                type="checkbox"
+                checked={request.includeReport}
+                onChange={(event) =>
+                  setRequest((previous) => ({
+                    ...previous,
+                    includeReport: event.target.checked,
+                  }))
+                }
+              />
+              <span>
+                <strong>Include in project report</strong>
+                <small>Uses the selected project's configured lifecycle and sequencing.</small>
+              </span>
+            </label>
+            {notice && <div className="alert alert-warning">{notice}</div>}
+            <footer>
+              <button className="btn-secondary" onClick={() => close(null)}>
+                Cancel
+              </button>
+              <button className="btn-primary" onClick={confirm}>
+                {request.existing ? "Save Placement" : "Add to Project"}
+              </button>
+            </footer>
+          </section>
+        </div>
+      )}
+    </Context.Provider>
+  );
 }
-export const useProjectPlacement=()=>useContext(Context);
-export function useProjectReportPlacement(){
- const placement=useProjectPlacement(),{activeDataset}=useWorksheet(),{registerAnalysisResult}=useAnalysis(),report=useReport();
- const addReportItem=useCallback(reportItem=>{const toolId=reportItem.toolId||'analysis',projectId=reportItem.projectId||activeDataset?.projectId||'',title=reportItem.title||'Analysis result',existing=placement.placements.find(item=>item.projectId===projectId&&item.isPrimary&&item.metadata?.toolId===toolId&&item.metadata?.title===title),artifactId=reportItem.analysisId||reportItem.provenance?.analysisId||existing?.artifactId||'';return placement.requestPlacement({artifactId,toolId,projectId,title,includeReport:true,analysis:{title,toolId,phase:reportItem.phase,method:reportItem.provenance?.method||toolId,methodVersion:reportItem.provenance?.methodVersion||'',datasetIds:[reportItem.provenance?.datasetId||activeDataset?.id].filter(Boolean),datasetVersionIds:[reportItem.provenance?.datasetVersionId||activeDataset?.versionId].filter(Boolean),result:reportItem.structuredOutput||{statsSummary:reportItem.statsSummary,rawData:reportItem.rawData,diagnostics:reportItem.diagnostics},interpretation:reportItem.interpretation||''},reportItem});},[activeDataset,placement]);
- const addReportOnly=useCallback(async reportItem=>{const toolId=reportItem.toolId||'analysis',projectId=reportItem.projectId||activeDataset?.projectId||'',title=reportItem.title||'Analysis result',reportKey=reportItem.reportKey||`${projectId}:${toolId}:${title}`,known=report.items.find(item=>item.reportKey===reportKey);if(known){report.removeReportItem(known.id);return null}const analysisId=reportItem.analysisId||reportItem.provenance?.analysisId||registerAnalysisResult({title,toolId,phase:reportItem.phase,projectId,method:reportItem.provenance?.method||toolId,methodVersion:reportItem.provenance?.methodVersion||'',datasetIds:[reportItem.provenance?.datasetId||activeDataset?.id].filter(Boolean),datasetVersionIds:[reportItem.provenance?.datasetVersionId||activeDataset?.versionId].filter(Boolean),result:reportItem.structuredOutput||{statsSummary:reportItem.statsSummary,rawData:reportItem.rawData,diagnostics:reportItem.diagnostics},interpretation:reportItem.interpretation||''});return report.addReportItem({...reportItem,projectId,analysisId,reportKey,phase:reportItem.phase||suggestProjectPlacement(toolId).phase})},[activeDataset,registerAnalysisResult,report]);
- const removeFromReport=useCallback(reportItem=>{const reportKey=reportItem.reportKey||`${reportItem.projectId||activeDataset?.projectId||''}:${reportItem.toolId||'analysis'}:${reportItem.title||'Analysis result'}`,existing=report.items.find(item=>item.reportKey===reportKey||(item.analysisId&&((item.analysisId===reportItem.analysisId)||(item.analysisId===reportItem.provenance?.analysisId))));if(existing)report.removeReportItem(existing.id)},[activeDataset,report]);
- return useMemo(()=>({addReportItem,addReportOnly,removeFromReport,reportItems:report.items}),[addReportItem,addReportOnly,removeFromReport,report.items]);
+export const useProjectPlacement = () => useContext(Context);
+export function useProjectReportPlacement() {
+  const placement = useProjectPlacement(),
+    { activeDataset } = useWorksheet(),
+    { registerAnalysisResult } = useAnalysis(),
+    report = useReport();
+  const addReportItem = useCallback(
+    (reportItem) => {
+      const toolId = reportItem.toolId || "analysis",
+        projectId = reportItem.projectId || activeDataset?.projectId || "",
+        title = reportItem.title || "Analysis result",
+        existing = placement.placements.find(
+          (item) =>
+            item.projectId === projectId &&
+            item.isPrimary &&
+            item.metadata?.toolId === toolId &&
+            item.metadata?.title === title,
+        ),
+        artifactId =
+          reportItem.analysisId ||
+          reportItem.provenance?.analysisId ||
+          existing?.artifactId ||
+          "";
+      return placement.requestPlacement({
+        artifactId,
+        toolId,
+        projectId,
+        title,
+        includeReport: true,
+        analysis: {
+          title,
+          toolId,
+          phase: reportItem.phase,
+          method: reportItem.provenance?.method || toolId,
+          methodVersion: reportItem.provenance?.methodVersion || "",
+          datasetIds: [
+            reportItem.provenance?.datasetId || activeDataset?.id,
+          ].filter(Boolean),
+          datasetVersionIds: [
+            reportItem.provenance?.datasetVersionId || activeDataset?.versionId,
+          ].filter(Boolean),
+          result: reportItem.structuredOutput || {
+            statsSummary: reportItem.statsSummary,
+            rawData: reportItem.rawData,
+            diagnostics: reportItem.diagnostics,
+          },
+          interpretation: reportItem.interpretation || "",
+        },
+        reportItem,
+      });
+    },
+    [activeDataset, placement],
+  );
+  const addReportOnly = useCallback(
+    async (reportItem) => {
+      const toolId = reportItem.toolId || "analysis",
+        projectId = reportItem.projectId || activeDataset?.projectId || "",
+        title = reportItem.title || "Analysis result",
+        reportKey = reportItem.reportKey || `${projectId}:${toolId}:${title}`,
+        known = report.items.find((item) => item.reportKey === reportKey);
+      if (known) {
+        report.removeReportItem(known.id);
+        return null;
+      }
+      const analysisId =
+        reportItem.analysisId ||
+        reportItem.provenance?.analysisId ||
+        registerAnalysisResult({
+          title,
+          toolId,
+          phase: reportItem.phase,
+          projectId,
+          method: reportItem.provenance?.method || toolId,
+          methodVersion: reportItem.provenance?.methodVersion || "",
+          datasetIds: [
+            reportItem.provenance?.datasetId || activeDataset?.id,
+          ].filter(Boolean),
+          datasetVersionIds: [
+            reportItem.provenance?.datasetVersionId || activeDataset?.versionId,
+          ].filter(Boolean),
+          result: reportItem.structuredOutput || {
+            statsSummary: reportItem.statsSummary,
+            rawData: reportItem.rawData,
+            diagnostics: reportItem.diagnostics,
+          },
+          interpretation: reportItem.interpretation || "",
+        });
+      return report.addReportItem({
+        ...reportItem,
+        projectId,
+        analysisId,
+        reportKey,
+        phase: reportItem.phase || suggestProjectPlacement(toolId).phase,
+      });
+    },
+    [activeDataset, registerAnalysisResult, report],
+  );
+  const removeFromReport = useCallback(
+    (reportItem) => {
+      const reportKey =
+          reportItem.reportKey ||
+          `${reportItem.projectId || activeDataset?.projectId || ""}:${reportItem.toolId || "analysis"}:${reportItem.title || "Analysis result"}`,
+        existing = report.items.find(
+          (item) =>
+            item.reportKey === reportKey ||
+            (item.analysisId &&
+              (item.analysisId === reportItem.analysisId ||
+                item.analysisId === reportItem.provenance?.analysisId)),
+        );
+      if (existing) report.removeReportItem(existing.id);
+    },
+    [activeDataset, report],
+  );
+  return useMemo(
+    () => ({
+      addReportItem,
+      addReportOnly,
+      removeFromReport,
+      reportItems: report.items,
+    }),
+    [addReportItem, addReportOnly, removeFromReport, report.items],
+  );
 }

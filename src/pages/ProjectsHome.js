@@ -1,18 +1,20 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useProjects, PHASES } from '../context/ProjectsContext';
+import { useProjects } from '../context/ProjectsContext';
+import {lifecycleForProject,lifecycleStageLabels} from '../foundation/lifecycle';
 import { useInteractions } from '../context/InteractionContext';
 import './ProjectWorkspace.css';
 import {projectResumeCta} from '../utils/projectResume';
 
 function projectProgress(project) {
-  const done = PHASES.filter(ph => project.phases[ph].itemIds.length > 0).length;
-  return Math.round((done / PHASES.length) * 100);
+  const stages=lifecycleStageLabels(lifecycleForProject(project));
+  const done = stages.filter(stage => (project.phases?.[stage]?.itemIds||[]).length > 0).length;
+  return Math.round((done / stages.length) * 100);
 }
 
 function currentPhase(project) {
-  // First phase (in DMAIC order) that has nothing assigned yet is "where they are".
-  const next = PHASES.find(ph => project.phases[ph].itemIds.length === 0);
+  // First configured lifecycle stage with no assigned records is where work resumes.
+  const next = lifecycleStageLabels(lifecycleForProject(project)).find(stage => (project.phases?.[stage]?.itemIds||[]).length === 0);
   return next || 'Complete';
 }
 
@@ -34,7 +36,7 @@ export default function ProjectsHome() {
       <div className="pw-header">
         <div>
           <h1>Project Workspace</h1>
-          <p>Group your analyses into DMAIC projects — Charter, Measure, Analyze, Improve, Control, all in one place.</p>
+          <p>Group project records through each suite's native lifecycle, all in one place.</p>
         </div>
         <button className="btn-primary" onClick={() => setShowForm(s => !s)}>
           {showForm ? 'Cancel' : '+ New Project'}
@@ -90,7 +92,7 @@ export default function ProjectsHome() {
         <div className="empty-state">
           <div className="empty-state-icon">🗂️</div>
           <h3>No Projects Yet</h3>
-          <p>Create a project to start organizing your analyses into a DMAIC story.</p>
+          <p>Create a project to start organizing work through its native lifecycle.</p>
         </div>
       ) : (
         <div className="pw-project-grid">

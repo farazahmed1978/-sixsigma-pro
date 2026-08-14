@@ -2,32 +2,29 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import {useAuth} from './AuthContext';
 import {projectRepository} from '../repositories/projectRepository';
 import {HYDRATION,nextGeneration,isCurrentGeneration} from '../services/persistenceSafety';
+import {OE_LIFECYCLE,initializeLifecycleStages,lifecycleForProject,lifecycleStageLabels,resolveLifecycleStage} from '../foundation/lifecycle';
 
 const ProjectsContext = createContext();
 const STORAGE_KEY = 'sixsigmapro_projects';
 export const EVIDENCE_SCHEMA_VERSION = 1;
 
-export const PHASES = ['Define', 'Measure', 'Analyze', 'Improve', 'Control'];
-
-function emptyPhases() {
-  return PHASES.reduce((acc, p) => ({ ...acc, [p]: { notes: '', itemIds: [] } }), {});
-}
+export const PHASES = lifecycleStageLabels(OE_LIFECYCLE);
 
 function loadProjects() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    // Guard against older/malformed records missing a phase key.
-    return parsed.map(p => ({ status: 'Active', currentPhase: 'Define', targetDate: '',methodology:'hybrid', ...p, phases: { ...emptyPhases(), ...p.phases }, documents: p.documents || {}, evidenceLibrary: Array.isArray(p.evidenceLibrary) ? p.evidenceLibrary : [], artifacts: Array.isArray(p.artifacts) ? p.artifacts : [], binderConfig: { order: [], hiddenIds: [], links: {}, ...(p.binderConfig || {}) }, sharedFields: {projectName:p.name||'',sponsor:p.champion||'',owner:p.owner||'',targetDate:p.targetDate||'',status:p.status||'Active',...(p.sharedFields||{})}, activityLog: Array.isArray(p.activityLog) ? p.activityLog : [], team: Array.isArray(p.team) ? p.team : [], timeline: Array.isArray(p.timeline) ? p.timeline : [],tasks:Array.isArray(p.tasks)?p.tasks:[],risks:Array.isArray(p.risks)?p.risks:[],issues:Array.isArray(p.issues)?p.issues:[],decisions:Array.isArray(p.decisions)?p.decisions:[],approvals:Array.isArray(p.approvals)?p.approvals:[] }));
+    return parsed.map(normalizeProject);
   } catch {
     return [];
   }
 }
 
 export function normalizeProject(project) {
-  return { status: 'Active', currentPhase: 'Define', targetDate: '', methodology: 'hybrid', ...project,
-    phases: { ...emptyPhases(), ...(project.phases || {}) }, documents: project.documents || {},
+  const lifecycle=lifecycleForProject(project),first=lifecycle.stages[0]?.label||'';
+  return { status: 'Active', targetDate: '', methodology: 'hybrid', ...project,currentPhase: resolveLifecycleStage(project,lifecycle)?.label||first,
+    phases: initializeLifecycleStages(lifecycle,project.phases||{}), documents: project.documents || {},
     evidenceLibrary: Array.isArray(project.evidenceLibrary) ? project.evidenceLibrary : [], artifacts: Array.isArray(project.artifacts) ? project.artifacts : [],
     binderConfig: { order: [], hiddenIds: [], links: {}, ...(project.binderConfig || {}) },
     sharedFields: { projectName: project.name || '', sponsor: project.champion || '', owner: project.owner || '', targetDate: project.targetDate || '', status: project.status || 'Active', ...(project.sharedFields || {}) },
@@ -35,7 +32,7 @@ export function normalizeProject(project) {
     tasks: Array.isArray(project.tasks) ? project.tasks : [], risks: Array.isArray(project.risks) ? project.risks : [], issues: Array.isArray(project.issues) ? project.issues : [], decisions: Array.isArray(project.decisions) ? project.decisions : [], approvals: Array.isArray(project.approvals) ? project.approvals : [] };
 }
 export const projectFromRow = row => normalizeProject({ ...(row.content || {}), id: row.id, name: row.name, organizationId: row.organization_id, createdBy: row.created_by, status: row.status, methodology: row.methodology, currentPhase: row.current_phase, targetDate: row.target_date || '', createdAt: row.created_at, updatedAt: row.updated_at });
-export const projectToRow = project => ({ id: project.id, organization_id: project.organizationId, created_by: project.createdBy, name: project.name, status: String(project.status || 'active').toLowerCase(), methodology: project.methodology || 'hybrid', current_phase: project.currentPhase || 'Define', target_date: project.targetDate || null, content: project, updated_at: new Date().toISOString() });
+export const projectToRow = project => ({ id: project.id, organization_id: project.organizationId, created_by: project.createdBy, name: project.name, status: String(project.status || 'active').toLowerCase(), methodology: project.methodology || 'hybrid', current_phase: project.currentPhase || lifecycleForProject(project).stages[0]?.label || '', target_date: project.targetDate || null, content: project, updated_at: new Date().toISOString() });
 
 export function ProjectsProvider({ children }) {
   const {user,profile,configured}=useAuth();
@@ -70,6 +67,7 @@ export function ProjectsProvider({ children }) {
 
   const createProject = useCallback((data) => {
     const id = crypto.randomUUID();
+    const lifecycle=lifecycleForProject(data),firstStage=lifecycle.stages[0]?.label||'';
     const project = {
       id,
       name: (data.name || '').trim() || 'Untitled Project',
@@ -78,14 +76,14 @@ export function ProjectsProvider({ children }) {
       champion: data.champion || '',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),organizationId:profile?.default_organization_id||'',createdBy:user?.id||'',methodology:data.methodology||'hybrid',
-      phases: emptyPhases(),
+      suiteId:data.suiteId||'operational-excellence',phases: initializeLifecycleStages(lifecycle),
       documents: {},
       evidenceLibrary: [],
       artifacts: [],
       binderConfig: { order: [], hiddenIds: [], links: {} },
       sharedFields: {projectName:(data.name||'').trim()||'Untitled Project',sponsor:data.champion||'',owner:data.owner||'',processOwner:data.processOwner||'',startDate:data.startDate||'',targetDate:data.targetDate||'',status:'Active',budget:data.budget||'',businessCaseSummary:data.businessCaseSummary||'',goalSummary:data.goal||'',scopeSummary:data.scopeSummary||''},
       status: 'Active',
-      currentPhase: 'Define',
+      currentPhase: firstStage,
       targetDate: '',
       team: [],
       timeline: [],
@@ -117,7 +115,7 @@ export function ProjectsProvider({ children }) {
     setProjects(prev => prev.map(p => {
       if (p.id !== projectId) return p;
       const phases = {};
-      PHASES.forEach(ph => {
+      lifecycleStageLabels(lifecycleForProject(p)).forEach(ph => {
         phases[ph] = { ...p.phases[ph], itemIds: p.phases[ph].itemIds.filter(i => i !== itemId) };
       });
       phases[phase] = { ...phases[phase], itemIds: [...phases[phase].itemIds, itemId] };
@@ -129,7 +127,7 @@ export function ProjectsProvider({ children }) {
     setProjects(prev => prev.map(p => {
       if (p.id !== projectId) return p;
       const phases = {};
-      PHASES.forEach(ph => {
+      lifecycleStageLabels(lifecycleForProject(p)).forEach(ph => {
         phases[ph] = { ...p.phases[ph], itemIds: p.phases[ph].itemIds.filter(i => i !== itemId) };
       });
       return { ...p, phases };
