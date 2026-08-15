@@ -6,6 +6,7 @@ import { useAnalysis } from "../context/AnalysisContext";
 import { useReport } from "../context/ReportContext";
 import { useProjectPlacement } from "../context/ProjectPlacementContext";
 import ProjectBinder from "../components/ProjectBinder";
+import ProjectRisks from "../components/ProjectRisks";
 import SavedAnalysisResult from "../components/SavedAnalysisResult";
 import { useInteractions } from "../context/InteractionContext";
 import {
@@ -23,6 +24,7 @@ import "./ProjectDetail.css";
 const TABS = [
   "Project Home",
   "Project Settings",
+  "Risks",
   "Documents",
   "Datasets",
   "Analyses",
@@ -93,6 +95,9 @@ export default function ProjectDetail() {
   const project = getProject(id);
   const lifecycle = lifecycleForProject(project || {}),
     lifecycleStages = lifecycleStageLabels(lifecycle);
+  const visibleTabs = TABS.filter(
+    (item) => item !== "Risks" || lifecycle.id === "project-management",
+  );
   const [settings, setSettings] = useState(() => ({
     name: project?.name || "",
     goal: project?.goal || "",
@@ -452,6 +457,7 @@ export default function ProjectDetail() {
     }
   };
   const renderTab = () => {
+    if (tab === "Risks") return <ProjectRisks project={project} />;
     if (tab === "Project Settings")
       return (
         <form
@@ -1701,7 +1707,7 @@ export default function ProjectDetail() {
           </div>
         </div>
         <nav>
-          {TABS.map((item) => (
+          {visibleTabs.map((item) => (
             <button
               key={item}
               className={tab === item ? "active" : ""}

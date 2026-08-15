@@ -115,3 +115,43 @@ describe.each(TABLES)('%s repository',table=>{
   await expect(pmRepository[table].create({...scope})).rejects.toThrow('row-level security policy');
  });
 });
+
+describe('risks repository — Project Risks module integration shape',()=>{
+ test('create accepts the exact payload shape sent by src/components/ProjectRisks.js',async()=>{
+  const payload={project_id:scope.project_id,organization_id:scope.organization_id,created_by:scope.created_by,title:'Supplier delay',status:'Open',methodology:'pmp',lifecycle_phase:'Planning',content:{description:'Critical material may arrive late.',probability:'High',impact:'High',owner:'A. Owner',mitigation:'Qualify a second supplier.'}};
+  const created={...payload,id:'risk-1',suite:PM_SUITE_IDENTIFIER,version:1};
+  opChain.single.mockResolvedValue({data:created,error:null});
+  const result=await pmRepository.risks.create(payload);
+  expect(opChain.insert).toHaveBeenCalledWith(expect.objectContaining({suite:PM_SUITE_IDENTIFIER,content:payload.content}));
+  expect(result).toEqual(created);
+ });
+
+ test('update succeeds when created_by is stripped from the record, exactly as the risk editor does before saving',async()=>{
+  const existing={id:'risk-1',project_id:scope.project_id,organization_id:scope.organization_id,title:'Supplier delay',status:'Open',methodology:'pmp',lifecycle_phase:'Planning',version:1,content:{probability:'High',impact:'High'}};
+  expect(existing).not.toHaveProperty('created_by');
+  const updated={...existing,title:'Supplier delay updated',version:2,suite:PM_SUITE_IDENTIFIER};
+  opChain.single.mockResolvedValue({data:updated,error:null});
+  const result=await pmRepository.risks.update(existing);
+  expect(opChain.update).toHaveBeenCalledWith(expect.objectContaining({id:'risk-1',version:2}));
+  expect(opChain.eq).toHaveBeenCalledWith('version',1);
+  expect(result.version).toBe(2);
+ });
+
+ test('a concurrent edit rejects the second save with the same conflict the risk editor must surface to the user',async()=>{
+  const staleRisk={id:'risk-1',project_id:scope.project_id,organization_id:scope.organization_id,title:'Stale title',status:'Open',version:1,content:{}};
+  opChain.single.mockResolvedValue({data:null,error:{code:'PGRST116',message:'JSON object requested, multiple (or no) rows returned'}});
+  await expect(pmRepository.risks.update(staleRisk)).rejects.toThrow('pm-update-conflict');
+ });
+
+ test('list, get, and remove use the risk id and project id exactly as the component calls them',async()=>{
+  cloudRepository.list.mockResolvedValue([]);
+  cloudRepository.get.mockResolvedValue({id:'risk-1'});
+  cloudRepository.remove.mockResolvedValue(undefined);
+  await pmRepository.risks.list('project-1');
+  await pmRepository.risks.get('risk-1');
+  await pmRepository.risks.remove('risk-1');
+  expect(cloudRepository.list).toHaveBeenCalledWith('risks',{project_id:'project-1',suite:PM_SUITE_IDENTIFIER});
+  expect(cloudRepository.get).toHaveBeenCalledWith('risks','risk-1');
+  expect(cloudRepository.remove).toHaveBeenCalledWith('risks','risk-1');
+ });
+});
