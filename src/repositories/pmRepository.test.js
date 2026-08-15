@@ -304,3 +304,174 @@ describe('issues repository — Project Issues module integration shape',()=>{
   await expect(pmRepository.issues.create({...scope,title:'Blocked issue'})).rejects.toThrow('row-level security policy');
  });
 });
+
+describe('decisions repository — Project Decision Log integration shape',()=>{
+ test('create persists the full Decision Log shape using canonical columns (title, status, lifecycle_phase) plus content for everything else',async()=>{
+  const payload={project_id:scope.project_id,organization_id:scope.organization_id,created_by:scope.created_by,title:'Adopt hybrid delivery methodology',status:'Decided',methodology:'pmp',lifecycle_phase:'Planning',content:{statement:'The project will use a hybrid Agile/Waterfall delivery approach.',decisionDate:'2026-08-14',owner:'S. Sponsor',rationale:'Fixed regulatory milestones require Waterfall gates; feature delivery benefits from Agile iteration.',alternativesConsidered:'Pure Waterfall; pure Scrum.',impact:'Requires dual cadence reporting and a combined RAID log.',notes:'Revisit at Phase Gate 2.'}};
+  const created={...payload,id:'decision-1',suite:PM_SUITE_IDENTIFIER,version:1};
+  opChain.single.mockResolvedValue({data:created,error:null});
+  const result=await pmRepository.decisions.create(payload);
+  expect(mockFrom).toHaveBeenCalledWith('decisions');
+  expect(opChain.insert).toHaveBeenCalledWith(expect.objectContaining({title:payload.title,status:'Decided',lifecycle_phase:'Planning',suite:PM_SUITE_IDENTIFIER,content:payload.content}));
+  expect(result).toEqual(created);
+ });
+
+ test('update succeeds when created_by is omitted and carries the decision statement/rationale/impact forward, re-enforcing suite and version',async()=>{
+  const existing={id:'decision-1',project_id:scope.project_id,organization_id:scope.organization_id,title:'Adopt hybrid delivery methodology',status:'Decided',lifecycle_phase:'Planning',version:1,content:{statement:'The project will use a hybrid Agile/Waterfall delivery approach.',decisionDate:'2026-08-14',owner:'S. Sponsor',rationale:'Fixed regulatory milestones require Waterfall gates.',alternativesConsidered:'Pure Waterfall; pure Scrum.',impact:'Requires dual cadence reporting.',notes:''}};
+  expect(existing).not.toHaveProperty('created_by');
+  const revisedContent={...existing.content,notes:'Reaffirmed at Phase Gate 2 steering committee.'};
+  const revised={...existing,content:revisedContent,version:2,suite:PM_SUITE_IDENTIFIER};
+  opChain.single.mockResolvedValueOnce({data:revised,error:null});
+  const result=await pmRepository.decisions.update({...existing,content:revisedContent});
+  expect(opChain.update).toHaveBeenCalledWith(expect.objectContaining({id:'decision-1',version:2,suite:PM_SUITE_IDENTIFIER,content:expect.objectContaining({notes:'Reaffirmed at Phase Gate 2 steering committee.',rationale:existing.content.rationale,impact:existing.content.impact})}));
+  expect(opChain.eq).toHaveBeenCalledWith('version',1);
+  expect(result.version).toBe(2);
+
+  opChain.single.mockResolvedValueOnce({data:null,error:{code:'PGRST116',message:'JSON object requested, multiple (or no) rows returned'}});
+  await expect(pmRepository.decisions.update(existing)).rejects.toThrow('pm-update-conflict');
+ });
+
+ test('list, listOrganization, get, and remove scope to the decisions table by project, organization, and id',async()=>{
+  cloudRepository.list.mockResolvedValue([]);
+  cloudRepository.get.mockResolvedValue({id:'decision-1'});
+  cloudRepository.remove.mockResolvedValue(undefined);
+  await pmRepository.decisions.list(scope.project_id);
+  await pmRepository.decisions.listOrganization(scope.organization_id);
+  await pmRepository.decisions.get('decision-1');
+  await pmRepository.decisions.remove('decision-1');
+  expect(cloudRepository.list).toHaveBeenCalledWith('decisions',{project_id:scope.project_id,suite:PM_SUITE_IDENTIFIER});
+  expect(cloudRepository.list).toHaveBeenCalledWith('decisions',{organization_id:scope.organization_id,suite:PM_SUITE_IDENTIFIER});
+  expect(cloudRepository.get).toHaveBeenCalledWith('decisions','decision-1');
+  expect(cloudRepository.remove).toHaveBeenCalledWith('decisions','decision-1');
+ });
+
+ test('create verifies project ownership before writing, rejecting a project the caller cannot access',async()=>{
+  projectsChain.maybeSingle.mockResolvedValue({data:null,error:null});
+  await expect(pmRepository.decisions.create({...scope,title:'Unauthorized decision'})).rejects.toThrow('The target project does not exist or is not accessible.');
+  expect(opChain.insert).not.toHaveBeenCalled();
+ });
+
+ test('create is a true insert: a colliding id is rejected instead of silently overwriting an existing decision',async()=>{
+  opChain.single.mockResolvedValue({data:null,error:Object.assign(new Error('duplicate key value violates unique constraint'),{code:'23505'})});
+  await expect(pmRepository.decisions.create({id:'decision-1',...scope,title:'Should not overwrite'})).rejects.toThrow('duplicate key value violates unique constraint');
+ });
+
+ test('propagates persistence failures from the cloud client instead of swallowing them',async()=>{
+  opChain.single.mockResolvedValue({data:null,error:Object.assign(new Error('new row violates row-level security policy'),{code:'42501'})});
+  await expect(pmRepository.decisions.create({...scope,title:'Blocked decision'})).rejects.toThrow('row-level security policy');
+ });
+});
+
+describe('approvals repository — Project Approvals module integration shape',()=>{
+ test('create persists the full Approval shape using canonical columns (title, status, lifecycle_phase) plus content for everything else',async()=>{
+  const payload={project_id:scope.project_id,organization_id:scope.organization_id,created_by:scope.created_by,title:'Approve Phase 2 budget increase',status:'Pending',methodology:'pmp',lifecycle_phase:'Planning',content:{description:'Requesting an additional $40k to cover extended vendor onboarding.',approver:'S. Sponsor',requestedDate:'2026-08-14',decisionDate:'',conditions:'',notes:'Escalated after steering committee review.'}};
+  const created={...payload,id:'approval-1',suite:PM_SUITE_IDENTIFIER,version:1};
+  opChain.single.mockResolvedValue({data:created,error:null});
+  const result=await pmRepository.approvals.create(payload);
+  expect(mockFrom).toHaveBeenCalledWith('approvals');
+  expect(opChain.insert).toHaveBeenCalledWith(expect.objectContaining({title:payload.title,status:'Pending',lifecycle_phase:'Planning',suite:PM_SUITE_IDENTIFIER,content:payload.content}));
+  expect(result).toEqual(created);
+ });
+
+ test('update succeeds when created_by is omitted and carries the decision date/conditions forward when the approval is decided, re-enforcing suite and version',async()=>{
+  const existing={id:'approval-1',project_id:scope.project_id,organization_id:scope.organization_id,title:'Approve Phase 2 budget increase',status:'Pending',lifecycle_phase:'Planning',version:1,content:{description:'Requesting an additional $40k to cover extended vendor onboarding.',approver:'S. Sponsor',requestedDate:'2026-08-14',decisionDate:'',conditions:'',notes:''}};
+  expect(existing).not.toHaveProperty('created_by');
+  const decidedContent={...existing.content,decisionDate:'2026-08-15',conditions:'Contingent on Q3 forecast review.'};
+  const decided={...existing,status:'Approved',content:decidedContent,version:2,suite:PM_SUITE_IDENTIFIER};
+  opChain.single.mockResolvedValueOnce({data:decided,error:null});
+  const result=await pmRepository.approvals.update({...existing,status:'Approved',content:decidedContent});
+  expect(opChain.update).toHaveBeenCalledWith(expect.objectContaining({id:'approval-1',status:'Approved',version:2,suite:PM_SUITE_IDENTIFIER,content:expect.objectContaining({decisionDate:'2026-08-15',conditions:'Contingent on Q3 forecast review.'})}));
+  expect(opChain.eq).toHaveBeenCalledWith('version',1);
+  expect(result.status).toBe('Approved');
+
+  opChain.single.mockResolvedValueOnce({data:null,error:{code:'PGRST116',message:'JSON object requested, multiple (or no) rows returned'}});
+  await expect(pmRepository.approvals.update(existing)).rejects.toThrow('pm-update-conflict');
+ });
+
+ test('list, listOrganization, get, and remove scope to the approvals table by project, organization, and id',async()=>{
+  cloudRepository.list.mockResolvedValue([]);
+  cloudRepository.get.mockResolvedValue({id:'approval-1'});
+  cloudRepository.remove.mockResolvedValue(undefined);
+  await pmRepository.approvals.list(scope.project_id);
+  await pmRepository.approvals.listOrganization(scope.organization_id);
+  await pmRepository.approvals.get('approval-1');
+  await pmRepository.approvals.remove('approval-1');
+  expect(cloudRepository.list).toHaveBeenCalledWith('approvals',{project_id:scope.project_id,suite:PM_SUITE_IDENTIFIER});
+  expect(cloudRepository.list).toHaveBeenCalledWith('approvals',{organization_id:scope.organization_id,suite:PM_SUITE_IDENTIFIER});
+  expect(cloudRepository.get).toHaveBeenCalledWith('approvals','approval-1');
+  expect(cloudRepository.remove).toHaveBeenCalledWith('approvals','approval-1');
+ });
+
+ test('create verifies project ownership before writing, rejecting a project the caller cannot access',async()=>{
+  projectsChain.maybeSingle.mockResolvedValue({data:null,error:null});
+  await expect(pmRepository.approvals.create({...scope,title:'Unauthorized approval'})).rejects.toThrow('The target project does not exist or is not accessible.');
+  expect(opChain.insert).not.toHaveBeenCalled();
+ });
+
+ test('create is a true insert: a colliding id is rejected instead of silently overwriting an existing approval',async()=>{
+  opChain.single.mockResolvedValue({data:null,error:Object.assign(new Error('duplicate key value violates unique constraint'),{code:'23505'})});
+  await expect(pmRepository.approvals.create({id:'approval-1',...scope,title:'Should not overwrite'})).rejects.toThrow('duplicate key value violates unique constraint');
+ });
+
+ test('propagates persistence failures from the cloud client instead of swallowing them',async()=>{
+  opChain.single.mockResolvedValue({data:null,error:Object.assign(new Error('new row violates row-level security policy'),{code:'42501'})});
+  await expect(pmRepository.approvals.create({...scope,title:'Blocked approval'})).rejects.toThrow('row-level security policy');
+ });
+});
+
+describe('activities repository — Project Activity Log integration shape',()=>{
+ test('create persists the Activity Log shape using the dedicated event_type/subject_type/subject_id/occurred_at columns, not content',async()=>{
+  const payload={project_id:scope.project_id,organization_id:scope.organization_id,created_by:scope.created_by,title:'Risk escalated to High',status:'active',event_type:'risk.escalated',subject_type:'risk',subject_id:'risk-1',owner_id:scope.created_by,occurred_at:'2026-08-15T14:30:00.000Z',content:{summary:'Supplier delay risk was escalated from Medium to High after schedule review.',notes:''}};
+  const created={...payload,id:'activity-1',suite:PM_SUITE_IDENTIFIER,version:1};
+  opChain.single.mockResolvedValue({data:created,error:null});
+  const result=await pmRepository.activities.create(payload);
+  expect(mockFrom).toHaveBeenCalledWith('activities');
+  expect(opChain.insert).toHaveBeenCalledWith(expect.objectContaining({title:payload.title,event_type:'risk.escalated',subject_type:'risk',subject_id:'risk-1',occurred_at:payload.occurred_at,suite:PM_SUITE_IDENTIFIER,content:payload.content}));
+  expect(result).toEqual(created);
+ });
+
+ test('update succeeds when created_by is omitted and carries corrected notes forward, re-enforcing suite and version',async()=>{
+  const existing={id:'activity-1',project_id:scope.project_id,organization_id:scope.organization_id,title:'Risk escalated to High',status:'active',event_type:'risk.escalated',subject_type:'risk',subject_id:'risk-1',owner_id:scope.created_by,occurred_at:'2026-08-15T14:30:00.000Z',version:1,content:{summary:'Supplier delay risk was escalated from Medium to High after schedule review.',notes:''}};
+  expect(existing).not.toHaveProperty('created_by');
+  const revisedContent={...existing.content,notes:'Correction: escalation was approved by the steering committee.'};
+  const revised={...existing,content:revisedContent,version:2,suite:PM_SUITE_IDENTIFIER};
+  opChain.single.mockResolvedValueOnce({data:revised,error:null});
+  const result=await pmRepository.activities.update({...existing,content:revisedContent});
+  expect(opChain.update).toHaveBeenCalledWith(expect.objectContaining({id:'activity-1',version:2,suite:PM_SUITE_IDENTIFIER,event_type:'risk.escalated',subject_type:'risk',subject_id:'risk-1',content:expect.objectContaining({notes:'Correction: escalation was approved by the steering committee.'})}));
+  expect(opChain.eq).toHaveBeenCalledWith('version',1);
+  expect(result.version).toBe(2);
+
+  opChain.single.mockResolvedValueOnce({data:null,error:{code:'PGRST116',message:'JSON object requested, multiple (or no) rows returned'}});
+  await expect(pmRepository.activities.update(existing)).rejects.toThrow('pm-update-conflict');
+ });
+
+ test('list, listOrganization, get, and remove scope to the activities table by project, organization, and id',async()=>{
+  cloudRepository.list.mockResolvedValue([]);
+  cloudRepository.get.mockResolvedValue({id:'activity-1'});
+  cloudRepository.remove.mockResolvedValue(undefined);
+  await pmRepository.activities.list(scope.project_id);
+  await pmRepository.activities.listOrganization(scope.organization_id);
+  await pmRepository.activities.get('activity-1');
+  await pmRepository.activities.remove('activity-1');
+  expect(cloudRepository.list).toHaveBeenCalledWith('activities',{project_id:scope.project_id,suite:PM_SUITE_IDENTIFIER});
+  expect(cloudRepository.list).toHaveBeenCalledWith('activities',{organization_id:scope.organization_id,suite:PM_SUITE_IDENTIFIER});
+  expect(cloudRepository.get).toHaveBeenCalledWith('activities','activity-1');
+  expect(cloudRepository.remove).toHaveBeenCalledWith('activities','activity-1');
+ });
+
+ test('create verifies project ownership before writing, rejecting a project the caller cannot access',async()=>{
+  projectsChain.maybeSingle.mockResolvedValue({data:null,error:null});
+  await expect(pmRepository.activities.create({...scope,title:'Unauthorized activity',event_type:'note.added'})).rejects.toThrow('The target project does not exist or is not accessible.');
+  expect(opChain.insert).not.toHaveBeenCalled();
+ });
+
+ test('create is a true insert: a colliding id is rejected instead of silently overwriting an existing activity',async()=>{
+  opChain.single.mockResolvedValue({data:null,error:Object.assign(new Error('duplicate key value violates unique constraint'),{code:'23505'})});
+  await expect(pmRepository.activities.create({id:'activity-1',...scope,title:'Should not overwrite',event_type:'note.added'})).rejects.toThrow('duplicate key value violates unique constraint');
+ });
+
+ test('propagates persistence failures from the cloud client instead of swallowing them',async()=>{
+  opChain.single.mockResolvedValue({data:null,error:Object.assign(new Error('new row violates row-level security policy'),{code:'42501'})});
+  await expect(pmRepository.activities.create({...scope,title:'Blocked activity',event_type:'note.added'})).rejects.toThrow('row-level security policy');
+ });
+});
