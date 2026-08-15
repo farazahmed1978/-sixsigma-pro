@@ -7,6 +7,7 @@ import { useReport } from "../context/ReportContext";
 import { useProjectPlacement } from "../context/ProjectPlacementContext";
 import ProjectBinder from "../components/ProjectBinder";
 import ProjectRisks from "../components/ProjectRisks";
+import ProjectActions from "../components/ProjectActions";
 import SavedAnalysisResult from "../components/SavedAnalysisResult";
 import { useInteractions } from "../context/InteractionContext";
 import {
@@ -25,6 +26,7 @@ const TABS = [
   "Project Home",
   "Project Settings",
   "Risks",
+  "Actions",
   "Documents",
   "Datasets",
   "Analyses",
@@ -96,7 +98,7 @@ export default function ProjectDetail() {
   const lifecycle = lifecycleForProject(project || {}),
     lifecycleStages = lifecycleStageLabels(lifecycle);
   const visibleTabs = TABS.filter(
-    (item) => item !== "Risks" || lifecycle.id === "project-management",
+    (item) => !["Risks", "Actions"].includes(item) || lifecycle.id === "project-management",
   );
   const [settings, setSettings] = useState(() => ({
     name: project?.name || "",
@@ -458,6 +460,7 @@ export default function ProjectDetail() {
   };
   const renderTab = () => {
     if (tab === "Risks") return <ProjectRisks project={project} />;
+    if (tab === "Actions") return <ProjectActions project={project} />;
     if (tab === "Project Settings")
       return (
         <form
