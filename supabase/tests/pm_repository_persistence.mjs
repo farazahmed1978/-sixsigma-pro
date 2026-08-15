@@ -135,6 +135,54 @@ for (const table of TABLES) {
   results.tables[table] = { created: true, suiteEnforcedOnCreate: true, suiteEnforcedOnUpdate: true, ownershipPreserved: true, lifecycleMetadataPreserved: true, projectIsolation: true, organizationIsolation: true, duplicateIdCreateRejected: true, versionIncrementedOnUpdate: true, staleVersionUpdateRejected: true };
 }
 
+// Actions are a discriminated view over the tasks table (Phase 3): every write must carry the
+// content.item_type='action' marker, list()/listOrganization() must filter on it, and get/remove
+// must refuse to operate on a plain task id — while pmRepository.tasks stays completely unaffected.
+const plainTask = await pmRepository.tasks.create({ project_id: projectA.id, organization_id: ownerOrg, created_by: ownerId, title: `plain task ${stamp}`, content: { note: 'not an action item' } });
+assert(!('item_type' in (plainTask.content || {})), 'a plain tasks.create() row must not be stamped with the Action Item discriminator', plainTask);
+
+const action = await pmRepository.actions.create({ project_id: projectA.id, organization_id: ownerOrg, created_by: ownerId, title: `action ${stamp}`, status: 'Open', priority: 'high', owner_id: ownerId, content: { description: 'Circulate the revised schedule.', dueDate: '2026-09-01' } });
+assert(action.content.item_type === 'action', 'actions.create() must stamp content.item_type', action);
+
+const actionViaTasksGet = await pmRepository.tasks.get(action.id);
+assert(actionViaTasksGet.id === action.id, 'an Action Item must physically live in the tasks table', actionViaTasksGet);
+
+const actionsInProjectA = await pmRepository.actions.list(projectA.id);
+assert(actionsInProjectA.some(row => row.id === action.id), 'actions.list(projectA) must include the created action', actionsInProjectA);
+assert(!actionsInProjectA.some(row => row.id === plainTask.id), 'actions.list(projectA) must exclude ordinary Task records', { actionsInProjectA, plainTask });
+
+const actionsByOrg = await pmRepository.actions.listOrganization(ownerOrg);
+assert(actionsByOrg.some(row => row.id === action.id), 'actions.listOrganization must include the created action', actionsByOrg);
+assert(!actionsByOrg.some(row => row.id === plainTask.id), 'actions.listOrganization must exclude ordinary Task records', { actionsByOrg, plainTask });
+
+const tasksInProjectA = await pmRepository.tasks.list(projectA.id);
+assert(tasksInProjectA.some(row => row.id === plainTask.id), 'tasks.list(projectA) must still include ordinary Task records (unchanged behavior)', tasksInProjectA);
+
+let getPlainTaskViaActionsThrew = null;
+try { await pmRepository.actions.get(plainTask.id); } catch (error) { getPlainTaskViaActionsThrew = error.message || String(error); }
+assert(getPlainTaskViaActionsThrew, 'actions.get() must refuse to return a plain Task row', getPlainTaskViaActionsThrew);
+
+let removePlainTaskViaActionsThrew = null;
+try { await pmRepository.actions.remove(plainTask.id); } catch (error) { removePlainTaskViaActionsThrew = error.message || String(error); }
+assert(removePlainTaskViaActionsThrew, 'actions.remove() must refuse to delete a plain Task row', removePlainTaskViaActionsThrew);
+const plainTaskStillThere = await pmRepository.tasks.get(plainTask.id);
+assert(plainTaskStillThere.id === plainTask.id, 'a rejected actions.remove() on a plain Task id must leave the task untouched', plainTaskStillThere);
+
+const actionUpdated = await pmRepository.actions.update({ ...action, status: 'Complete' });
+assert(actionUpdated.content.item_type === 'action', 'actions.update() must re-enforce the discriminator', actionUpdated);
+assert(actionUpdated.version === action.version + 1, 'actions.update() must increment the optimistic-concurrency version', { action, actionUpdated });
+
+let staleActionUpdateThrew = null;
+try { await pmRepository.actions.update({ ...action, title: 'stale action update' }); } catch (error) { staleActionUpdateThrew = error.message || String(error); }
+assert(staleActionUpdateThrew, 'actions.update() against a stale version must throw', staleActionUpdateThrew);
+
+await pmRepository.actions.remove(action.id);
+const actionGone = await pmRepository.tasks.get(action.id).catch(error => ({ error: error.message }));
+assert(actionGone?.error, 'actions.remove() must delete the underlying tasks row', actionGone);
+await pmRepository.tasks.remove(plainTask.id);
+
+results.actions = { persistedToTasksTable: true, discriminatorStampedOnCreate: true, listExcludesPlainTasks: true, listOrganizationExcludesPlainTasks: true, tasksListUnaffected: true, getRejectsPlainTask: true, removeRejectsPlainTask: true, updateReenforcesDiscriminator: true, versionIncrementedOnUpdate: true, staleVersionUpdateRejected: true };
+
 // Ownership-mismatch persistence failure must propagate, not be silently swallowed.
 for (const table of TABLES) {
   let threw = null;

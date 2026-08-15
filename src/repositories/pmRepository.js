@@ -45,5 +45,32 @@ const pmTableRepository=table=>({
  remove:id=>cloudRepository.remove(table,id),
 });
 
+// Action Items live in the "tasks" table but must stay distinguishable from future plain Tasks
+// records, so every write is stamped with this content marker and every read filters on it.
+const ACTION_ITEM_TYPE='action';
+const isActionItem=row=>row?.content?.item_type===ACTION_ITEM_TYPE;
+const withActionMarker=record=>({...record,content:{...(record.content||{}),item_type:ACTION_ITEM_TYPE}});
+
+const pmActionsRepository=()=>{
+ const base=pmTableRepository('tasks');
+ return{
+  list:(projectId,filters={})=>base.list(projectId,{'content->>item_type':ACTION_ITEM_TYPE,...filters}),
+  listOrganization:organizationId=>cloudRepository.list('tasks',{organization_id:organizationId,suite:PM_SUITE_ID,'content->>item_type':ACTION_ITEM_TYPE}),
+  async get(id){
+   const row=await base.get(id);
+   if(!isActionItem(row))throw new Error('pm-actions-not-found: the requested record is not an Action Item');
+   return row;
+  },
+  create:record=>base.create(withActionMarker(record)),
+  update:record=>base.update(withActionMarker(record)),
+  async remove(id){
+   const row=await base.get(id);
+   if(!isActionItem(row))throw new Error('pm-actions-not-found: the requested record is not an Action Item');
+   return base.remove(id);
+  },
+ };
+};
+
 export const PM_SUITE_IDENTIFIER=PM_SUITE_ID;
 export const pmRepository=PM_TABLES.reduce((repository,table)=>({...repository,[table]:pmTableRepository(table)}),{});
+pmRepository.actions=pmActionsRepository();

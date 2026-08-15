@@ -155,3 +155,102 @@ describe('risks repository — Project Risks module integration shape',()=>{
   expect(cloudRepository.remove).toHaveBeenCalledWith('risks','risk-1');
  });
 });
+
+describe('actions repository — Action Items module integration shape',()=>{
+ test('pmRepository.actions is a distinct interface from pmRepository.tasks, not an alias',()=>{
+  expect(pmRepository.actions).not.toBe(pmRepository.tasks);
+ });
+
+ test('create persists to the tasks table and stamps the record with the Action Item discriminator',async()=>{
+  const payload={project_id:scope.project_id,organization_id:scope.organization_id,created_by:scope.created_by,title:'Send updated schedule',status:'Open',priority:'high',owner_id:scope.created_by,content:{description:'Circulate the revised schedule to stakeholders.',dueDate:'2026-09-01'}};
+  const created={...payload,id:'action-1',suite:PM_SUITE_IDENTIFIER,content:{...payload.content,item_type:'action'},version:1};
+  opChain.single.mockResolvedValue({data:created,error:null});
+  const result=await pmRepository.actions.create(payload);
+  expect(mockFrom).toHaveBeenCalledWith('tasks');
+  expect(opChain.insert).toHaveBeenCalledWith(expect.objectContaining({title:'Send updated schedule',status:'Open',priority:'high',owner_id:scope.created_by,suite:PM_SUITE_IDENTIFIER,content:expect.objectContaining({description:payload.content.description,dueDate:payload.content.dueDate,item_type:'action'})}));
+  expect(result).toEqual(created);
+ });
+
+ test('create forces the discriminator even if the caller supplies a conflicting content.item_type',async()=>{
+  const payload={...scope,title:'Spoofed action',content:{item_type:'task',description:'should still be marked as an action'}};
+  opChain.single.mockResolvedValue({data:{...payload,id:'action-2',content:{...payload.content,item_type:'action'}},error:null});
+  await pmRepository.actions.create(payload);
+  expect(opChain.insert).toHaveBeenCalledWith(expect.objectContaining({content:expect.objectContaining({item_type:'action'})}));
+ });
+
+ test('list filters on the tasks table for the discriminator, so ordinary Task records are excluded',async()=>{
+  cloudRepository.list.mockResolvedValue([]);
+  await pmRepository.actions.list(scope.project_id);
+  expect(cloudRepository.list).toHaveBeenCalledWith('tasks',{project_id:scope.project_id,suite:PM_SUITE_IDENTIFIER,'content->>item_type':'action'});
+ });
+
+ test('listOrganization filters on the tasks table for the discriminator',async()=>{
+  cloudRepository.list.mockResolvedValue([]);
+  await pmRepository.actions.listOrganization(scope.organization_id);
+  expect(cloudRepository.list).toHaveBeenCalledWith('tasks',{organization_id:scope.organization_id,suite:PM_SUITE_IDENTIFIER,'content->>item_type':'action'});
+ });
+
+ test('get returns a matching Action Item row',async()=>{
+  cloudRepository.get.mockResolvedValue({id:'action-1',content:{item_type:'action'}});
+  const result=await pmRepository.actions.get('action-1');
+  expect(cloudRepository.get).toHaveBeenCalledWith('tasks','action-1');
+  expect(result.id).toBe('action-1');
+ });
+
+ test('get rejects an id that belongs to an ordinary Task row instead of leaking it through the Actions interface',async()=>{
+  cloudRepository.get.mockResolvedValue({id:'task-1',content:{}});
+  await expect(pmRepository.actions.get('task-1')).rejects.toThrow('pm-actions-not-found');
+ });
+
+ test('remove deletes a matching Action Item row',async()=>{
+  cloudRepository.get.mockResolvedValue({id:'action-1',content:{item_type:'action'}});
+  cloudRepository.remove.mockResolvedValue(undefined);
+  await pmRepository.actions.remove('action-1');
+  expect(cloudRepository.remove).toHaveBeenCalledWith('tasks','action-1');
+ });
+
+ test('remove refuses to delete an id that belongs to an ordinary Task row',async()=>{
+  cloudRepository.get.mockResolvedValue({id:'task-1',content:{}});
+  await expect(pmRepository.actions.remove('task-1')).rejects.toThrow('pm-actions-not-found');
+  expect(cloudRepository.remove).not.toHaveBeenCalled();
+ });
+
+ test('update re-enforces the canonical suite and discriminator, increments version, and rejects a stale write',async()=>{
+  const existing={id:'action-1',project_id:scope.project_id,organization_id:scope.organization_id,title:'Send updated schedule',status:'Open',priority:'high',owner_id:scope.created_by,version:1,content:{description:'Circulate the revised schedule.',dueDate:'2026-09-01',item_type:'action'}};
+  const updated={...existing,status:'Complete',version:2,suite:PM_SUITE_IDENTIFIER};
+  opChain.single.mockResolvedValueOnce({data:updated,error:null});
+  const result=await pmRepository.actions.update({...existing,status:'Complete'});
+  expect(opChain.update).toHaveBeenCalledWith(expect.objectContaining({id:'action-1',status:'Complete',version:2,suite:PM_SUITE_IDENTIFIER,content:expect.objectContaining({item_type:'action'})}));
+  expect(opChain.eq).toHaveBeenCalledWith('version',1);
+  expect(result.version).toBe(2);
+
+  opChain.single.mockResolvedValueOnce({data:null,error:{code:'PGRST116',message:'JSON object requested, multiple (or no) rows returned'}});
+  await expect(pmRepository.actions.update(existing)).rejects.toThrow('pm-update-conflict');
+ });
+
+ test('create verifies project ownership before writing, rejecting a project the caller cannot access',async()=>{
+  projectsChain.maybeSingle.mockResolvedValue({data:null,error:null});
+  await expect(pmRepository.actions.create({...scope,title:'Unauthorized action'})).rejects.toThrow('The target project does not exist or is not accessible.');
+  expect(opChain.insert).not.toHaveBeenCalled();
+ });
+
+ test('propagates persistence failures from the cloud client instead of swallowing them',async()=>{
+  opChain.single.mockResolvedValue({data:null,error:Object.assign(new Error('new row violates row-level security policy'),{code:'42501'})});
+  await expect(pmRepository.actions.create({...scope,title:'Blocked action'})).rejects.toThrow('row-level security policy');
+ });
+});
+
+describe('tasks repository remains unaffected by the actions discriminator',()=>{
+ test('tasks.create does not stamp an Action Item marker onto content',async()=>{
+  const payload={...scope,title:'Ordinary task',content:{note:'no marker expected'}};
+  opChain.single.mockResolvedValue({data:{...payload,id:'task-1',suite:PM_SUITE_IDENTIFIER,version:1},error:null});
+  await pmRepository.tasks.create(payload);
+  expect(opChain.insert).toHaveBeenCalledWith(expect.objectContaining({content:{note:'no marker expected'}}));
+ });
+
+ test('tasks.list does not filter on the Action Item discriminator',async()=>{
+  cloudRepository.list.mockResolvedValue([]);
+  await pmRepository.tasks.list(scope.project_id);
+  expect(cloudRepository.list).toHaveBeenCalledWith('tasks',{project_id:scope.project_id,suite:PM_SUITE_IDENTIFIER});
+ });
+});
