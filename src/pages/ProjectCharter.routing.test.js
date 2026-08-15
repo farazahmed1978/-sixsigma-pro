@@ -1,4 +1,4 @@
-import {projectCharterLinkTarget} from './ProjectCharter';
+import {charterSaveStateLabel,projectCharterLinkTarget} from './ProjectCharter';
 import {readFileSync} from 'fs';
 
 test('Project Charter Continue to SIPOC opens the project-scoped SIPOC workspace directly',()=>{
@@ -10,4 +10,15 @@ test('Project Charter has no duplicate in-body Continue to SIPOC CTA',()=>{
   expect(source).not.toContain('Continue to SIPOC');
   expect(source).toContain('nextLabel="SIPOC"');
   expect(source).toContain('onNext={requestSipoc}');
+});
+
+test('Project Charter exposes honest autosave states and distinct navigation semantics',()=>{
+  expect(charterSaveStateLabel('saving')).toBe('Saving…');
+  expect(charterSaveStateLabel('saved')).toBe('Saved');
+  expect(charterSaveStateLabel('unsaved')).toBe('Unsaved changes');
+  const source=readFileSync(require.resolve('./ProjectCharter'),'utf8');
+  expect(source).toContain('backLabel="Project"');
+  expect(source).toContain('previousLabel="Previous"');
+  expect(source).toContain('onPrevious={() => navigate(-1)}');
+  expect(source).toContain('onClick={advanceSection}>Next');
 });

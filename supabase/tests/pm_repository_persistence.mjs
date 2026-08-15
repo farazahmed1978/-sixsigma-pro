@@ -1,6 +1,8 @@
-// PM Phase 1 authenticated repository verification.
+// PM Phase 1/2 authenticated repository verification.
 // Exercises the real src/repositories/pmRepository.js module (not a mock) against a running
 // local Supabase stack, using the same singleton client cloudRepository uses internally.
+// Phase 2 adds: true-insert create (duplicate id rejected, never overwritten) and
+// optimistic-concurrency update (version increments; a stale-version write is rejected).
 // Read-only against Foundation architecture; creates disposable QA rows it deletes at the end.
 const apiUrl = process.env.REACT_APP_SUPABASE_URL;
 const anonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
@@ -85,6 +87,17 @@ for (const table of TABLES) {
   assert(created.organization_id === ownerOrg && created.project_id === projectA.id && created.created_by === ownerId, `${table} create must preserve ownership fields`, created);
   assert(created.methodology === 'pmp' && created.lifecycle_phase === 'Planning' && created.priority === 'high', `${table} create must preserve shared metadata/lifecycle fields`, created);
 
+  // create is a true insert: a colliding id must be rejected, never silently overwrite the existing row.
+  let duplicateThrew = null;
+  try {
+    await pmRepository[table].create({ ...record, id: created.id, title: 'must not overwrite' });
+  } catch (error) {
+    duplicateThrew = error.message || String(error);
+  }
+  assert(duplicateThrew, `${table} create with a colliding id must throw instead of silently overwriting`, duplicateThrew);
+  const unchanged = await pmRepository[table].get(created.id);
+  assert(unchanged.title === created.title, `${table} rejected duplicate-id create must leave the existing row untouched`, unchanged);
+
   const fetched = await pmRepository[table].get(created.id);
   assert(fetched.id === created.id, `${table} get round-trip`, fetched);
 
@@ -100,6 +113,18 @@ for (const table of TABLES) {
   const updated = await pmRepository[table].update({ ...created, title: `${table} updated ${stamp}`, content: { marker: 'updated' }, suite: 'operational-excellence' });
   assert(updated.suite === PM_SUITE_IDENTIFIER, `${table} update must re-enforce the canonical PM suite identifier`, updated);
   assert(updated.content.marker === 'updated', `${table} update must persist`, updated);
+  assert(updated.version === (created.version || 1) + 1, `${table} update must increment the optimistic-concurrency version`, { created, updated });
+
+  // A write against the now-stale version (the pre-update snapshot) must be rejected, not silently lost.
+  let staleThrew = null;
+  try {
+    await pmRepository[table].update({ ...created, title: 'must be rejected as stale' });
+  } catch (error) {
+    staleThrew = error.message || String(error);
+  }
+  assert(staleThrew, `${table} update against a stale version must throw instead of silently losing the concurrent write`, staleThrew);
+  const afterStaleAttempt = await pmRepository[table].get(created.id);
+  assert(afterStaleAttempt.title === updated.title, `${table} rejected stale update must leave the current row untouched`, afterStaleAttempt);
 
   const outsiderUpdate = await outsiderRest(outsider, `${table}?id=eq.${created.id}`, { method: 'PATCH', prefer: 'return=representation', body: JSON.stringify({ title: 'forbidden' }) });
   assert(outsiderUpdate.status === 200 && outsiderUpdate.body.length === 0, `${table} organization isolation: outsider update must affect zero rows`, outsiderUpdate);
@@ -107,7 +132,7 @@ for (const table of TABLES) {
   const outsiderDelete = await outsiderRest(outsider, `${table}?id=eq.${created.id}`, { method: 'DELETE', prefer: 'return=representation' });
   assert(outsiderDelete.status === 200 && outsiderDelete.body.length === 0, `${table} organization isolation: outsider delete must affect zero rows`, outsiderDelete);
 
-  results.tables[table] = { created: true, suiteEnforcedOnCreate: true, suiteEnforcedOnUpdate: true, ownershipPreserved: true, lifecycleMetadataPreserved: true, projectIsolation: true, organizationIsolation: true };
+  results.tables[table] = { created: true, suiteEnforcedOnCreate: true, suiteEnforcedOnUpdate: true, ownershipPreserved: true, lifecycleMetadataPreserved: true, projectIsolation: true, organizationIsolation: true, duplicateIdCreateRejected: true, versionIncrementedOnUpdate: true, staleVersionUpdateRejected: true };
 }
 
 // Ownership-mismatch persistence failure must propagate, not be silently swallowed.

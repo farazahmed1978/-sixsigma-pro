@@ -2,7 +2,7 @@ import React from 'react';
 import {act} from 'react-dom/test-utils';
 import {createRoot} from 'react-dom/client';
 import {MemoryRouter,Route,Routes,useLocation} from 'react-router-dom';
-import DocumentWorkspace from './DocumentWorkspace';
+import DocumentWorkspace,{documentSaveStateLabel} from './DocumentWorkspace';
 import {DEFINE_TEMPLATES} from '../config/defineTemplates';
 
 jest.mock('./WorkspaceShell',()=>({children,className,nextLabel,onNext,nextDisabled})=><div className={className}><button type="button" data-testid="sequence-next" disabled={nextDisabled} onClick={onNext}>{nextLabel}</button><div className="workspace-shell-content">{children}</div></div>);
@@ -65,5 +65,22 @@ test('route identity remount opens shorter VOC metadata after Business Case with
   await act(async()=>root.render(<MemoryRouter><DocumentWorkspace key="project-1:voc" template={artifact('voc')} project={project} updateProject={updateProject}/></MemoryRouter>));
   expect(host.querySelector('.dw-executive h1').textContent).toBe('Voice of the Customer (VOC)');
   expect(host.querySelector('.dw-main h2').textContent).toBe('VOC Context');
+  await act(async()=>root.unmount());host.remove();
+});
+
+test('save state labels distinguish saving, saved, unsaved, and offline work',()=>{
+  expect(['saving','saved','unsaved','offline'].map(documentSaveStateLabel)).toEqual(['Saving…','Saved','Unsaved changes','Offline / retry needed']);
+});
+
+test('in-document Next saves before advancing to the next section',async()=>{
+  localStorage.setItem('axentra_document_autosave','off');
+  const template={id:'two-section',name:'Two Section',phase:'Measure',sections:[{id:'one',title:'One',fields:[{id:'oneValue',label:'One value',type:'text'}]},{id:'two',title:'Two',fields:[{id:'twoValue',label:'Two value',type:'text'}]}]};
+  const project={id:'project-1',name:'QA',documents:{},activityLog:[],sharedFields:{},artifacts:[],evidenceLibrary:[]},updateProject=jest.fn(async()=>({}));
+  const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+  await act(async()=>root.render(<MemoryRouter><DocumentWorkspace template={template} project={project} updateProject={updateProject}/></MemoryRouter>));
+  const next=[...host.querySelectorAll('.dw-main footer button')].find(button=>button.textContent.includes('Next'));
+  await act(async()=>{next.click();await Promise.resolve();await Promise.resolve()});
+  expect(updateProject).toHaveBeenCalledTimes(1);
+  expect(host.querySelector('.dw-main h2').textContent).toBe('Two');
   await act(async()=>root.unmount());host.remove();
 });

@@ -60,22 +60,30 @@ const humanize = (value) =>
 const sourceId = (item) =>
   item.documentId || item.analysisId || item.sourceId || item.id;
 const resolvePhase = (item, kind, lifecycle) => {
-  const explicit = resolveLifecycleStage(item, lifecycle);
+  const explicit = [item, item.content, item.documentSnapshot, item.analysis]
+    .map((value) =>
+      value
+        ? resolveLifecycleStage(value, lifecycle, { preserveUnknown: false })
+        : null,
+    )
+    .find(Boolean);
   if (explicit) return explicit.label;
   if (lifecycle.id !== "operational-excellence") return "";
   if (kind === "document")
     return (
       documentPhases.get(item.templateId) ||
+      documentPhases.get(item.sourceTemplateId) ||
       documentPhases.get(String(item.id || "").replace(/^document-/, "")) ||
-      "Define"
+      ""
     );
-  if (kind === "analysis")
+  if (["analysis", "evidence", "artifact"].includes(kind))
     return (
-      analysisPhase[item.toolId] || toolPhases.get(item.toolId) || "Analyze"
-    );
-  if (kind === "evidence")
-    return (
-      analysisPhase[item.toolId] || analysisPhase[item.category] || "Analyze"
+      analysisPhase[item.toolId] ||
+      analysisPhase[item.toolType] ||
+      toolPhases.get(item.toolId) ||
+      toolPhases.get(item.toolType) ||
+      toolPhases.get(item.sourceWorkflow) ||
+      "Analyze"
     );
   return "Measure";
 };
