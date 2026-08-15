@@ -254,3 +254,53 @@ describe('tasks repository remains unaffected by the actions discriminator',()=>
   expect(cloudRepository.list).toHaveBeenCalledWith('tasks',{project_id:scope.project_id,suite:PM_SUITE_IDENTIFIER});
  });
 });
+
+describe('issues repository — Project Issues module integration shape',()=>{
+ test('create accepts the exact payload shape sent by src/components/ProjectIssues.js (owner/dates/resolution inside content, priority and status as columns)',async()=>{
+  const payload={project_id:scope.project_id,organization_id:scope.organization_id,created_by:scope.created_by,title:'Checkout fails on discount codes',priority:'High',status:'Open',methodology:'pmp',lifecycle_phase:'Execution',content:{description:'Applying a discount code throws a 500 at checkout.',owner:'A. Owner',date_identified:'2026-08-10',target_resolution_date:'2026-08-20',resolution:''}};
+  const created={...payload,id:'issue-1',suite:PM_SUITE_IDENTIFIER,version:1};
+  opChain.single.mockResolvedValue({data:created,error:null});
+  const result=await pmRepository.issues.create(payload);
+  expect(mockFrom).toHaveBeenCalledWith('issues');
+  expect(opChain.insert).toHaveBeenCalledWith(expect.objectContaining({title:payload.title,priority:'High',status:'Open',suite:PM_SUITE_IDENTIFIER,content:payload.content}));
+  expect(result).toEqual(created);
+ });
+
+ test('update succeeds when created_by is stripped from the record and carries the resolution / corrective action, exactly as the issue editor does before saving',async()=>{
+  const existing={id:'issue-1',project_id:scope.project_id,organization_id:scope.organization_id,title:'Checkout fails on discount codes',priority:'High',status:'Open',methodology:'pmp',lifecycle_phase:'Execution',version:1,content:{description:'Applying a discount code throws a 500 at checkout.',owner:'A. Owner',date_identified:'2026-08-10',target_resolution_date:'2026-08-20',resolution:''}};
+  expect(existing).not.toHaveProperty('created_by');
+  const closedContent={...existing.content,resolution:'Patched the discount-code validator and deployed hotfix 4.12.1.'};
+  const closed={...existing,status:'Closed',content:closedContent,version:2,suite:PM_SUITE_IDENTIFIER};
+  opChain.single.mockResolvedValueOnce({data:closed,error:null});
+  const result=await pmRepository.issues.update({...existing,status:'Closed',content:closedContent});
+  expect(opChain.update).toHaveBeenCalledWith(expect.objectContaining({id:'issue-1',status:'Closed',version:2,suite:PM_SUITE_IDENTIFIER,content:expect.objectContaining({resolution:'Patched the discount-code validator and deployed hotfix 4.12.1.'})}));
+  expect(opChain.eq).toHaveBeenCalledWith('version',1);
+  expect(result.status).toBe('Closed');
+
+  opChain.single.mockResolvedValueOnce({data:null,error:{code:'PGRST116',message:'JSON object requested, multiple (or no) rows returned'}});
+  await expect(pmRepository.issues.update(existing)).rejects.toThrow('pm-update-conflict');
+ });
+
+ test('list, get, and remove scope to the issues table by project and id',async()=>{
+  cloudRepository.list.mockResolvedValue([]);
+  cloudRepository.get.mockResolvedValue({id:'issue-1'});
+  cloudRepository.remove.mockResolvedValue(undefined);
+  await pmRepository.issues.list('project-1');
+  await pmRepository.issues.get('issue-1');
+  await pmRepository.issues.remove('issue-1');
+  expect(cloudRepository.list).toHaveBeenCalledWith('issues',{project_id:'project-1',suite:PM_SUITE_IDENTIFIER});
+  expect(cloudRepository.get).toHaveBeenCalledWith('issues','issue-1');
+  expect(cloudRepository.remove).toHaveBeenCalledWith('issues','issue-1');
+ });
+
+ test('create verifies project ownership before writing, rejecting a project the caller cannot access',async()=>{
+  projectsChain.maybeSingle.mockResolvedValue({data:null,error:null});
+  await expect(pmRepository.issues.create({...scope,title:'Unauthorized issue'})).rejects.toThrow('The target project does not exist or is not accessible.');
+  expect(opChain.insert).not.toHaveBeenCalled();
+ });
+
+ test('propagates persistence failures from the cloud client instead of swallowing them',async()=>{
+  opChain.single.mockResolvedValue({data:null,error:Object.assign(new Error('new row violates row-level security policy'),{code:'42501'})});
+  await expect(pmRepository.issues.create({...scope,title:'Blocked issue'})).rejects.toThrow('row-level security policy');
+ });
+});
