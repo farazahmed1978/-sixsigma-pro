@@ -22,12 +22,13 @@ export default function ProjectsHome() {
   const { projects, createProject, deleteProject, deletingProjectId } = useProjects();
   const {confirm,toast}=useInteractions();
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: '', goal: '', owner: '', champion: '' });
+  const emptyForm = { name: '', goal: '', owner: '', champion: '', suiteId: 'operational-excellence' };
+  const [form, setForm] = useState(emptyForm);
 
   const handleCreate = () => {
     if (!form.name.trim()) return;
-    createProject(form);
-    setForm({ name: '', goal: '', owner: '', champion: '' });
+    createProject({ ...form, methodology: form.suiteId === 'project-management' ? 'pmp' : 'lean-six-sigma' });
+    setForm(emptyForm);
     setShowForm(false);
   };
 
@@ -80,6 +81,16 @@ export default function ProjectsHome() {
                 value={form.champion}
                 onChange={e => setForm(p => ({ ...p, champion: e.target.value }))}
               />
+            </div>
+            <div className="form-group">
+              <label>Suite</label>
+              <select
+                value={form.suiteId}
+                onChange={e => setForm(p => ({ ...p, suiteId: e.target.value }))}
+              >
+                <option value="operational-excellence">Operational Excellence</option>
+                <option value="project-management">Project Management</option>
+              </select>
             </div>
           </div>
           <button className="btn-primary" style={{ marginTop: '1rem' }} onClick={handleCreate}>
