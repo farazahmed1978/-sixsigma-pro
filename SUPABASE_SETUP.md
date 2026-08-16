@@ -9,7 +9,15 @@ Aureqin uses Supabase Auth and Postgres. Until the two public environment variab
 3. Choose an organization, project name, database password, and region.
 4. Wait for provisioning to finish.
 
-Use separate Supabase projects for development and production so test users and data cannot affect production.
+Use separate Supabase projects for development and production so test users and data cannot affect production. Aureqin's fixed environment model is:
+
+| Runtime | Supabase project | Project ref |
+| --- | --- | --- |
+| Local `npm start` | Aureqin staging | `ghxcditmnognoeiqlisn` |
+| Vercel Preview | Aureqin staging | `ghxcditmnognoeiqlisn` |
+| Vercel Production | Original hosted project | `mzfmwwxxocereizxmwqy` |
+
+These are separate Auth stores. A same-email user in both projects is still two unrelated identities with different UUIDs and ownership.
 
 ## 2. Find the Project URL and anon key
 
@@ -22,16 +30,25 @@ In the Supabase dashboard:
 
 Use only the public anon key in React. Never place the `service_role` key in `.env`, Vercel browser variables, or frontend code.
 
-## 3. Create the local environment file
+## 3. Create environment-specific local files
 
-From the repository root, copy `.env.example` to a new file named `.env.local` and enter the values:
+Do not put Supabase variables in `.env.local`; the preflight rejects that ambiguous cross-environment fallback.
+
+For local development, create `.env.development.local` with the staging public credentials:
 
 ```env
-REACT_APP_SUPABASE_URL=https://your-project-ref.supabase.co
-REACT_APP_SUPABASE_ANON_KEY=your-public-anon-key
+REACT_APP_SUPABASE_URL=https://ghxcditmnognoeiqlisn.supabase.co
+REACT_APP_SUPABASE_ANON_KEY=staging-public-anon-key
 ```
 
-`.env.local` is ignored by Git. Do not commit it.
+For a local production build, create `.env.production.local` with the original hosted project's public credentials:
+
+```env
+REACT_APP_SUPABASE_URL=https://mzfmwwxxocereizxmwqy.supabase.co
+REACT_APP_SUPABASE_ANON_KEY=production-public-anon-key
+```
+
+Both `*.local` files are ignored by Git. The tracked `.env.development` and `.env.production` files contain only non-secret environment identity and expected project refs.
 
 ## 4. Apply the database migration
 
@@ -61,6 +78,8 @@ Create React App reads environment variables only when it starts. Stop the runni
 npm.cmd start
 ```
 
+`prestart` validates the complete Create React App precedence chain before starting. It fails if credentials are missing, the URL disagrees with the expected project ref, a secret key is placed in a browser variable, or `.env.local` reintroduces a shared Supabase override. Development also displays the resolved environment and project ref in the application badge.
+
 Reload `/start`. The configuration screen should be replaced by onboarding.
 
 ## 7. Configure Vercel
@@ -69,12 +88,14 @@ For each Vercel environment—Development, Preview, and Production:
 
 1. Open the Vercel project.
 2. Go to **Settings → Environment Variables**.
-3. Add `REACT_APP_SUPABASE_URL`.
-4. Add `REACT_APP_SUPABASE_ANON_KEY`.
-5. Select the intended environment scopes.
-6. Redeploy; environment changes do not alter an already-built deployment.
+3. Add `REACT_APP_ENVIRONMENT`.
+4. Add `REACT_APP_SUPABASE_PROJECT_REF`.
+5. Add `REACT_APP_SUPABASE_URL`.
+6. Add `REACT_APP_SUPABASE_ANON_KEY`.
+7. Select the intended environment scopes.
+8. Redeploy; environment changes do not alter an already-built deployment.
 
-Production should use the production Supabase project. Preview should normally use the development/staging project.
+Preview must use staging (`ghxcditmnognoeiqlisn`). Production must use the original project (`mzfmwwxxocereizxmwqy`). The `prebuild` check stops a deployment whose URL, label, and project ref disagree.
 
 ## Remaining launch configuration
 

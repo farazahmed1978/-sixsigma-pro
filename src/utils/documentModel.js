@@ -1,10 +1,10 @@
 export const DOCUMENT_SCHEMA_VERSION = 1;
 export const documentIdFor = templateId => `document-${templateId}`;
 export const documentResumeIndex=(template,record,resumeTarget)=>Math.max(0,template.sections.findIndex(section=>(section.id||section.title)===(record?.sectionState?.activeSectionId||(resumeTarget?.artifactId===template.id?resumeTarget.sectionId:''))));
-export function createDocument(template, projectId, existing) {
+export function createDocument(template, projectId, existing,metadata={}) {
   const now = new Date().toISOString();
   const base = { schemaVersion: DOCUMENT_SCHEMA_VERSION, id: documentIdFor(template.id), templateId: template.id, projectId, title: template.name, status: 'draft', sectionState: {}, createdAt: now, updatedAt: now };
-  return { ...base, ...existing, values: { ...(existing?.values || {}) }, references: { datasetIds: [], analysisIds: [], evidenceIds: [], reportIds: [], documentIds: [], ...(existing?.references || {}) } };
+  return { ...base, ...metadata, ...existing, values: { ...(existing?.values || {}) }, references: { datasetIds: [], analysisIds: [], evidenceIds: [], reportIds: [], documentIds: [], ...(existing?.references || {}) } };
 }
 export const textValue = value => String(value || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
 export function documentScores(template, values) {

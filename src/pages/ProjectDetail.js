@@ -9,6 +9,8 @@ import ProjectBinder from "../components/ProjectBinder";
 import ProjectRisks from "../components/ProjectRisks";
 import ProjectActions from "../components/ProjectActions";
 import ProjectIssues from "../components/ProjectIssues";
+import ProjectDecisions from "../components/ProjectDecisions";
+import ProjectApprovals from "../components/ProjectApprovals";
 import SavedAnalysisResult from "../components/SavedAnalysisResult";
 import { useInteractions } from "../context/InteractionContext";
 import {
@@ -29,6 +31,8 @@ const TABS = [
   "Risks",
   "Actions",
   "Issues",
+  "Decisions",
+  "Approvals",
   "Documents",
   "Datasets",
   "Analyses",
@@ -40,13 +44,6 @@ const TABS = [
   "Team",
   "Timeline",
 ];
-const phaseDocs = {
-  Define: "charter",
-  Measure: "data-collection-plan",
-  Analyze: "hypothesis-plan",
-  Improve: "factorial-plan",
-  Control: "control-plan",
-};
 const formatDate = (value) =>
   value ? new Date(value).toLocaleDateString() : "Not recorded";
 
@@ -100,7 +97,7 @@ export default function ProjectDetail() {
   const lifecycle = lifecycleForProject(project || {}),
     lifecycleStages = lifecycleStageLabels(lifecycle);
   const visibleTabs = TABS.filter(
-    (item) => !["Risks", "Actions", "Issues"].includes(item) || lifecycle.id === "project-management",
+    (item) => !["Risks", "Actions", "Issues", "Decisions", "Approvals"].includes(item) || lifecycle.id === "project-management",
   );
   const [settings, setSettings] = useState(() => ({
     name: project?.name || "",
@@ -109,7 +106,7 @@ export default function ProjectDetail() {
     champion: project?.champion || "",
     targetDate: project?.targetDate || "",
     status: project?.status || "Active",
-    currentPhase: project?.currentPhase || "Define",
+    currentPhase: project?.currentPhase || lifecycleStages[0] || "Define",
   }));
   const projectDatasets = projectDatasetInventory(datasets, id);
   const projectAnalyses = analysisResults.filter(
@@ -225,7 +222,7 @@ export default function ProjectDetail() {
         champion: project.champion || "",
         targetDate: project.targetDate || "",
         status: project.status || "Active",
-        currentPhase: project.currentPhase || "Define",
+        currentPhase: project.currentPhase || lifecycleStages[0] || "Define",
       });
   }, [project]);
   useEffect(() => {
@@ -464,6 +461,8 @@ export default function ProjectDetail() {
     if (tab === "Risks") return <ProjectRisks project={project} />;
     if (tab === "Actions") return <ProjectActions project={project} />;
     if (tab === "Issues") return <ProjectIssues project={project} />;
+    if (tab === "Decisions") return <ProjectDecisions project={project} />;
+    if (tab === "Approvals") return <ProjectApprovals project={project} />;
     if (tab === "Project Settings")
       return (
         <form
@@ -790,114 +789,27 @@ export default function ProjectDetail() {
               )}
             </section>
           </div>
-          {lifecycle.id === "operational-excellence" && <section className="ph-section">
-            <div className="ph-section-title">
-              <div>
-                <span>DMAIC</span>
-                <h2>Phase workspaces</h2>
-              </div>
-            </div>
-            <div className="ph-phases">
-              {Object.entries(phaseDocs).map(([phase, documentId]) => (
-                <Link
-                  key={phase}
-                  to={
-                    documentId === "charter"
-                      ? `/projects/${id}/charter`
-                      : `/projects/${id}/documents/${documentId}`
-                  }
-                >
-                  <i className={`badge-${phase.toLowerCase()}`}>
-                    {phase.charAt(0)}
-                  </i>
-                  <strong>{phase}</strong>
-                  <span>Open workspace →</span>
-                </Link>
-              ))}
-            </div>
-          </section>}
-        </>
-      );
-    if (tab === "Project Home")
-      return (
-        <>
-          <div className="ph-metrics">
-            <div>
-              <span>Documents</span>
-              <strong>{documents.length + (project.charter ? 1 : 0)}</strong>
-            </div>
-            <div>
-              <span>Datasets</span>
-              <strong>{projectDatasets.length}</strong>
-            </div>
-            <div>
-              <span>Analyses</span>
-              <strong>{projectAnalyses.length}</strong>
-            </div>
-            <div>
-              <span>Reports</span>
-              <strong>{projectReports.length}</strong>
-            </div>
-            <div>
-              <span>Evidence</span>
-              <strong>{evidence.length}</strong>
-            </div>
-          </div>
-          {lifecycle.id === "operational-excellence" && <section className="ph-section">
-            <div className="ph-section-title">
-              <div>
-                <span>QUICK ACTIONS</span>
-                <h2>Continue project work</h2>
-              </div>
-            </div>
-            <div className="ph-actions">
-              <Link to={`/projects/${id}/charter`}>
-                <b>📋</b>
-                <span>
-                  Project Charter<small>Define project authorization</small>
-                </span>
-              </Link>
-              <Link to={`/projects/${id}/documents/minutes`}>
-                <b>📝</b>
-                <span>
-                  Meeting Minutes<small>Capture decisions and actions</small>
-                </span>
-              </Link>
-              <Link to="/worksheet">
-                <b>▦</b>
-                <span>
-                  Data Worksheet<small>Manage project datasets</small>
-                </span>
-              </Link>
-              <Link to="/report">
-                <b>▤</b>
-                <span>
-                  Report Builder<small>Assemble executive reporting</small>
-                </span>
-              </Link>
-            </div>
-          </section>}
           <section className="ph-section">
             <div className="ph-section-title">
               <div>
-                <span>DMAIC</span>
+                <span>{lifecycle.methodology}</span>
                 <h2>Phase workspaces</h2>
               </div>
             </div>
             <div className="ph-phases">
-              {Object.entries(phaseDocs).map(([phase, documentId]) => (
+              {lifecycle.stages.filter((stage) => stage.recommendedDocumentId).map((stage) => (
                 <Link
-                  key={phase}
+                  key={stage.id}
                   to={
-                    documentId === "charter"
+                    stage.recommendedDocumentId === "charter"
                       ? `/projects/${id}/charter`
-                      : `/projects/${id}/documents/${documentId}`
+                      : `/projects/${id}/documents/${stage.recommendedDocumentId}`
                   }
                 >
-                  <i className={`badge-${phase.toLowerCase()}`}>
-                    {phase.charAt(0)}
+                  <i className={`badge-${stage.id}`}>
+                    {stage.label.charAt(0)}
                   </i>
-                  <strong>{phase}</strong>
+                  <strong>{stage.label}</strong>
                   <span>Open workspace →</span>
                 </Link>
               ))}

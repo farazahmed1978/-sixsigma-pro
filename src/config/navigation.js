@@ -13,33 +13,33 @@ const PRODUCT_DEVELOPMENT=tool('product-development','Product & Design Developme
 const LEAN_ENTERPRISE=tool('lean-enterprise','Lean Enterprise Workspace',undefined,'workspace',{aliases:['vsm','value stream','current state','future state','takt','cycle time','capacity','bottleneck','constraint','yamazumi','line balance','standard work','standardized work','standard work combination sheet','kanban','pull','supermarket','fifo','heijunka','production leveling','epei','oee','tpm','six big losses','smed','changeover','jidoka','andon','a3','kaizen','gemba','layered audit','daily management','sqdcp','hoshin','x-matrix','catchball']});
 
 const OE_GROUPS=[
- {id:'define',name:'Define',color:'var(--yellow)',clusters:[
+ {id:'define',name:'Define',color:'var(--yellow)',recommendedDocumentId:'charter',clusters:[
   cluster('project-framing','Project Framing',[doc('charter','Project Charter','workspace'),doc('business-case','Business Case','workspace')]),
   cluster('customer-requirements','Customer & Requirements',[doc('voc','Voice of the Customer (VOC)','workspace',{aliases:['voice of customer']}),doc('ctq-tree','CTQ Tree','diagram',{aliases:['critical to quality']}),PRODUCT_DEVELOPMENT]),
   cluster('process-boundaries','Process Boundaries',[doc('sipoc','SIPOC','diagram',{aliases:['supplier input process output customer']})]),
   cluster('stakeholder-alignment','Stakeholder Alignment',[doc('stakeholder-register','Stakeholder Register','workspace')]),
  ]},
- {id:'measure',name:'Measure',color:'var(--green)',clusters:[
+ {id:'measure',name:'Measure',color:'var(--green)',recommendedDocumentId:'data-collection-plan',clusters:[
   cluster('data-collection','Data Collection',[doc('data-collection-plan','Data Collection Plan','workspace'),doc('sampling-plan','Sampling Plan','workspace'),doc('measurement-plan','Measurement Plan','workspace'),tool('sample-size-calculator','Sample Size Calculator',undefined,'calculator'),tool('power-calculator','Power Calculator',undefined,'calculator')]),
   cluster('process-understanding','Process Understanding',[doc('process-map','Process Map','diagram'),doc('swimlane-process-map','Swimlane Process Map','diagram'),doc('value-stream-map','Value Stream Map','diagram'),doc('operational-definitions','Operational Definitions','workspace'),doc('baseline-metrics','Baseline Metrics','workspace')]),
   cluster('measurement-system','Measurement System',[doc('msa-workspace','MSA Workspace','workspace',{aliases:['measurement system analysis']}),tool('msa','Gage R&R',undefined,'analysis',{aliases:['gage','gauge','grr','measurement system']})]),
   cluster('process-performance','Process Performance',[doc('process-capability-study','Process Capability Study','workspace'),tool('capability','Capability Analysis',undefined,'analysis',{aliases:['cpk','ppk','process capability']}),CONTROL_CHART,ATTRIBUTE_CHART,RUN_CHART,tool('histogram','Histogram'),tool('descriptive','Descriptive Statistics',undefined,'analysis',{aliases:['summary statistics','mean','standard deviation']}),tool('sigma-calculator','Sigma Level / DPMO',undefined,'calculator')]),
  ]},
- {id:'analyze',name:'Analyze',color:'var(--orange)',clusters:[
+ {id:'analyze',name:'Analyze',color:'var(--orange)',recommendedDocumentId:'hypothesis-plan',clusters:[
   cluster('cause-discovery','Cause Discovery',[doc('fishbone-workspace','Fishbone Diagram Workspace','diagram'),tool('fishbone','Fishbone Diagram',undefined,'diagram'),doc('five-whys','5 Whys','workspace'),doc('affinity-diagram','Affinity Diagram','diagram'),doc('xy-matrix','Cause & Effect Matrix / X-Y Matrix','workspace')]),
   cluster('prioritization-risk','Prioritization & Risk',[tool('pareto','Pareto Chart'),FMEA]),
   cluster('hypothesis-comparison','Hypothesis & Comparison',[doc('hypothesis-plan','Hypothesis Test Plan','workspace'),tool('hypothesis','Hypothesis Testing','/hypothesis','analysis',{aliases:['test','p value','significance']}),tool('boxplot','Box Plot'),tool('anova','ANOVA',undefined,'analysis',{aliases:['analysis of variance']}),tool('effect-size','Effect Size Calculators',undefined,'calculator')]),
   cluster('relationships-prediction','Relationships & Prediction',[tool('scatter','Scatter Plot'),tool('multivari','Multi-Vari Chart'),tool('correlation','Correlation Matrix'),tool('regression','Regression',undefined,'analysis',{aliases:['linear model','prediction']}),tool('multiregression','Multiple Regression'),tool('logistic','Logistic Regression')]),
   cluster('verification-synthesis','Verification & Synthesis',[doc('root-cause-verification','Root Cause Verification Plan','workspace'),tool('distribution-analysis','Distribution Analysis',undefined,'analysis',{aliases:['probability plot','distribution fit','box cox']}),tool('reliability','Reliability Analysis Workspace',undefined,'workspace',{aliases:['weibull','life data','reliability','survival','kaplan meier','censored','suspensions','alt','accelerated life','arrhenius','warranty','mtbf','crow amsaa','reliability growth','tolerance interval']}),PRODUCT_DEVELOPMENT,doc('statistical-analysis-summary','Statistical Analysis Summary','workspace')]),
  ]},
- {id:'improve',name:'Improve',color:'var(--purple)',clusters:[
+ {id:'improve',name:'Improve',color:'var(--purple)',recommendedDocumentId:'factorial-plan',clusters:[
   cluster('solution-design','Solution Design',[doc('solution-selection-matrix','Solution Selection Matrix / Pugh Matrix','workspace'),doc('impact-effort-matrix','Impact-Effort Matrix','workspace'),doc('future-state-process-map','Future-State Process Map','diagram'),tool('vsm','Value Stream Map Analysis'),LEAN_ENTERPRISE]),
   cluster('experimentation','Experimentation',[doc('factorial-plan','DOE Experiment Plan','workspace'),tool('doe','Design of Experiments','/doe','analysis',{aliases:['doe','factorial experiment']}),PRODUCT_DEVELOPMENT]),
   cluster('risk-proofing','Risk Proofing',[FMEA]),
   cluster('pilot-delivery','Pilot & Delivery',[doc('pilot-plan','Pilot Plan','workspace'),doc('implementation-plan','Implementation Plan','workspace'),doc('action-plan','Action Plan','workspace'),doc('kaizen-event-summary','Kaizen Event Summary','workspace')]),
   cluster('benefits','Benefits',[doc('cost-benefit-analysis','Cost-Benefit Analysis','workspace')]),
  ]},
- {id:'control',name:'Control',color:'var(--cyan)',clusters:[
+ {id:'control',name:'Control',color:'var(--cyan)',recommendedDocumentId:'control-plan',clusters:[
   cluster('process-control','Process Control',[doc('control-plan','Control Plan','workspace'),doc('reaction-plan','Reaction Plan','workspace'),CONTROL_CHART]),
   cluster('monitoring-audit','Monitoring & Audit',[doc('monitoring-plan','Monitoring Plan','workspace'),doc('audit-checklist','Audit Checklist','workspace'),tool('reliability-acceptance','Acceptance Sampling','/tool/reliability','workspace',{aliases:['acceptance sampling','aql','ltpd','rql','oc curve']}),PRODUCT_DEVELOPMENT,ATTRIBUTE_CHART,RUN_CHART]),
   cluster('closeout-learning','Closeout & Learning',[doc('lessons-learned','Lessons Learned','workspace'),doc('project-closure','Project Closure','workspace')]),
@@ -47,12 +47,12 @@ const OE_GROUPS=[
 ];
 
 const PM_GROUPS=[
- {id:'initiation',name:'Initiation',clusters:[
+ {id:'initiation',name:'Initiation',color:'var(--yellow)',recommendedDocumentId:'charter',clusters:[
   cluster('justification-benefits','Justification & Benefits',[pmDoc('Business Case','business-case','workspace'),pmDoc('Benefits Management Plan')]),
   cluster('authorization-assumptions','Authorization & Assumptions',[pmDoc('Project Charter','charter','workspace'),pmDoc('Assumption Log')]),
   cluster('stakeholder-identification','Stakeholder Identification',[pmDoc('Stakeholder Register','stakeholder-register','workspace')]),
  ]},
- {id:'planning',name:'Planning',clusters:[
+ {id:'planning',name:'Planning',color:'var(--cyan)',recommendedDocumentId:'project-management-plan',clusters:[
   cluster('integration-governance','Integration & Governance',[pmDoc('Project Management Plan'),pmDoc('Configuration Management Plan'),pmDoc('Change Management Plan')]),
   cluster('scope-requirements','Scope & Requirements',[pmDoc('Scope Management Plan'),pmDoc('Scope Statement'),pmDoc('WBS','wbs','diagram'),pmDoc('WBS Dictionary'),pmDoc('Requirements Management Plan'),pmDoc('Requirements Traceability Matrix')]),
   cluster('schedule','Schedule',[pmDoc('Schedule Management Plan'),pmDoc('Schedule Baseline')]),
@@ -63,18 +63,18 @@ const PM_GROUPS=[
   cluster('procurement','Procurement',[pmDoc('Procurement Management Plan')]),
   cluster('quality','Quality',[pmDoc('Quality Management Plan')]),
  ]},
- {id:'execution',name:'Execution',clusters:[
+ {id:'execution',name:'Execution',color:'var(--purple)',recommendedDocumentId:'issue-log',clusters:[
   cluster('delivery-governance','Delivery Governance',[pmDoc('Issue Log'),pmDoc('Decision Log'),pmDoc('Action Item Log'),pmDoc('RAID Log')]),
   cluster('meetings-change','Meetings & Change',[pmDoc('Meeting Minutes','minutes','workspace'),pmDoc('Change Request')]),
   cluster('procurement-vendors','Procurement & Vendors',[pmDoc('Procurement Documents'),pmDoc('Vendor Evaluation')]),
   cluster('team-performance','Team Performance',[pmDoc('Team Performance Reviews'),pmDoc('Lessons Learned Register')]),
  ]},
- {id:'monitoring-controlling',name:'Monitoring & Controlling',clusters:[
+ {id:'monitoring-controlling',name:'Monitoring & Controlling',color:'var(--orange)',recommendedDocumentId:'status-report',clusters:[
   cluster('performance-reporting','Performance Reporting',[pmDoc('Status Report'),pmDoc('Executive Dashboard','executive-dashboard','workspace'),pmDoc('Variance Report'),pmDoc('EVM Dashboard','evm-dashboard','workspace'),pmDoc('Milestone Report'),pmDoc('KPI Dashboard','kpi-dashboard','workspace')]),
   cluster('change-quality','Change & Quality',[pmDoc('Change Log'),pmDoc('Quality Audit')]),
   cluster('risk-review','Risk Review',[pmDoc('Risk Review')]),
  ]},
- {id:'closing',name:'Closing',clusters:[
+ {id:'closing',name:'Closing',color:'var(--green)',recommendedDocumentId:'final-project-report',clusters:[
   cluster('formal-closure','Formal Closure',[pmDoc('Final Project Report'),pmDoc('Project Closure Report'),pmDoc('Acceptance Signoff'),pmDoc('Archive Checklist')]),
   cluster('transition-benefits','Transition & Benefits',[pmDoc('Transition Plan'),pmDoc('Benefits Realization Review')]),
   cluster('knowledge-transfer','Knowledge Transfer',[pmDoc('Lessons Learned Report')]),

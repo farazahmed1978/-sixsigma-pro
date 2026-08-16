@@ -3,6 +3,9 @@ import {createRoot} from 'react-dom/client';
 import ReportBuilder from './ReportBuilder';
 
 jest.mock('jspdf',()=>jest.fn());
+jest.mock('react-router-dom',()=>({useNavigate:()=>jest.fn()}));
+jest.mock('../context/AuthContext',()=>({useAuth:()=>({profile:null})}));
+jest.mock('../repositories/documentRepository',()=>({documentRepository:{listStandalone:jest.fn()}}));
 global.IS_REACT_ACT_ENVIRONMENT=true;
 
 const reportItems=[
@@ -24,6 +27,8 @@ const click=element=>act(()=>element.dispatchEvent(new MouseEvent('click',{bubbl
 test('real ReportBuilder Print button opens options and previews the actual selected report items',()=>{
  const host=document.createElement('div'),root=createRoot(host);
  act(()=>root.render(<ReportBuilder/>));
+ expect(host.textContent).toContain('ProjectReal Report Test');
+ expect(host.querySelector('input').value).toBe('Real Report Test — Project Report');
  const printButton=[...host.querySelectorAll('button')].find(button=>button.textContent==='Print');
  expect(printButton).toBeTruthy();
  click(printButton);

@@ -7,7 +7,7 @@ const aliases={
 const slug=value=>String(value||'').trim().toLowerCase().replace(/&/g,'and').replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
 const fromNavigation=NAVIGATION.filter(section=>section.suiteId&&section.groups).map(section=>({
  id:section.suiteId,label:section.section,methodology:section.suiteId==='operational-excellence'?'DMAIC':section.section,
- stages:section.groups.map((group,index)=>({id:group.id,label:group.name,order:index,workflowClusters:(group.clusters||[]).map((cluster,clusterIndex)=>({id:cluster.id,label:cluster.label,order:clusterIndex}))})),
+ stages:section.groups.map((group,index)=>({id:group.id,label:group.name,order:index,color:group.color||null,recommendedDocumentId:group.recommendedDocumentId||null,workflowClusters:(group.clusters||[]).map((cluster,clusterIndex)=>({id:cluster.id,label:cluster.label,order:clusterIndex}))})),
 }));
 
 export const createLifecycleRegistry=(definitions=fromNavigation)=>{

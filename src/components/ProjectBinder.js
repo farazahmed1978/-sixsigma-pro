@@ -131,6 +131,7 @@ export const placementDraftForAnalysis = (
   reportItem: reportItemForAnalysis(analysis),
   includeReport,
 });
+export const analysesWithProjectPlacements=(analyses,placements,projectId)=>analyses.map((analysis)=>{const canonicalPlacement=placements.find((item)=>item.artifactId===analysis.id&&item.projectId===projectId&&item.isPrimary);return canonicalPlacement?{...analysis,phase:canonicalPlacement.phase||analysis.phase,workflowCluster:canonicalPlacement.workflowCluster||analysis.workflowCluster}:analysis});
 const itemStage = (item) =>
   item.kind === "document"
     ? "Documents"
@@ -196,6 +197,8 @@ const issuesFor = (item) => {
         : `${humanize(key)} needs more specific supporting detail`,
     );
 };
+export const compactAnalysisSummary=analysis=>{if(!analysis)return'';const result=analysis.result||analysis.structuredOutput||{},p=result.pValue??result.p??result.statsSummary?.p,significant=Number.isFinite(Number(p))?(Number(p)<.05?'Statistically significant':'Not statistically significant'):'Saved result';return`${analysis.title||analysis.name||'Analysis result'} · ${significant}${p!==undefined?` · p = ${Number.isFinite(Number(p))?Number(p).toLocaleString(undefined,{maximumFractionDigits:6}):p}`:''}`};
+export const openResultSearch=analysisId=>({openResult:analysisId});
 
 export function buildProjectReviewModel(
   project,
@@ -325,12 +328,7 @@ export function buildProjectReviewModel(
       ],
       [
         "Conclusions",
-        firstValue(phaseItems("Analyze"), [
-          "conclusions",
-          "resultsSummary",
-          "interpretation",
-          "summary",
-        ]),
+        compactAnalysisSummary(analyses.find(item=>resolvePhase(item,"analysis",lifecycle)==="Analyze")) || firstValue(phaseItems("Analyze"), ["conclusions","resultsSummary","summary"]),
       ],
     ],
     Improve: [
@@ -550,15 +548,16 @@ export default function ProjectBinder({
   updateProject,
 }) {
   const placement = useProjectPlacement(),
-    [searchParams] = useSearchParams(),
+    [searchParams,setSearchParams] = useSearchParams(),
     [openResult, setOpenResult] = useState(null);
+  const placedAnalyses=useMemo(()=>analysesWithProjectPlacements(analyses,placement.placements,project.id),[analyses,placement.placements,project.id]);
   useEffect(() => {
     const requested = searchParams.get("openResult");
     if (requested) {
-      const saved = analyses.find((record) => sourceId(record) === requested);
+      const saved = placedAnalyses.find((record) => sourceId(record) === requested);
       if (saved) setOpenResult(saved);
     }
-  }, [analyses, searchParams]);
+  }, [placedAnalyses, searchParams]);
   const placedLean = useMemo(
     () =>
       placement.placements
@@ -583,7 +582,7 @@ export default function ProjectBinder({
     () =>
       buildProjectReviewModel(project, {
         documents,
-        analyses,
+        analyses:placedAnalyses,
         evidence,
         artifacts: [
           ...artifacts,
@@ -593,7 +592,7 @@ export default function ProjectBinder({
         ],
         datasets,
       }),
-    [project, documents, analyses, evidence, artifacts, datasets, placedLean],
+    [project, documents, placedAnalyses, evidence, artifacts, datasets, placedLean],
   );
   const configuredStages = lifecycleStageLabels(model.lifecycle);
   const PHASES = [
@@ -644,7 +643,7 @@ export default function ProjectBinder({
   const managePlacement = (item) => {
     const existing = placement.primaryPlacementFor(item.sourceId, project.id),
       analysis =
-        analyses.find((record) => sourceId(record) === item.sourceId) || item;
+        placedAnalyses.find((record) => sourceId(record) === item.sourceId) || item;
     placement.requestPlacement(
       placementDraftForAnalysis(project.id, analysis, existing?.reportIncluded),
     );
@@ -752,6 +751,7 @@ export default function ProjectBinder({
                           <strong>{item.title}</strong>
                           <small>
                             {item.kind} ·{" "}
+                            {item.kind === "analysis" && item.workflowCluster ? `${item.phase} → ${item.workflowCluster} · ` : ""}
                             {item.completion === null
                               ? "Completion not scored"
                               : `${item.completion}% complete`}{" "}
@@ -782,14 +782,7 @@ export default function ProjectBinder({
                           {item.kind === "analysis" ? (
                             <>
                               <button
-                                onClick={() =>
-                                  setOpenResult(
-                                    analyses.find(
-                                      (record) =>
-                                        sourceId(record) === item.sourceId,
-                                    ) || item,
-                                  )
-                                }
+                                onClick={() => {const saved=placedAnalyses.find((record)=>sourceId(record)===item.sourceId)||item;setOpenResult(saved);setSearchParams(openResultSearch(item.sourceId));}}
                               >
                                 Open Result
                               </button>
@@ -842,7 +835,7 @@ export default function ProjectBinder({
       {openResult && (
         <SavedAnalysisResult
           analysis={openResult}
-          onClose={() => setOpenResult(null)}
+          onClose={() => {setOpenResult(null);const next=new URLSearchParams(searchParams);next.delete('openResult');setSearchParams(next)}}
         />
       )}
     </>

@@ -12,7 +12,9 @@ import { BOOK_EXCERPTS } from '../utils/bookExcerpts';
 import { buildAssumptionReport } from '../utils/assumptionDiagnostics';
 import AssumptionReportCard from '../components/AssumptionReportCard';
 import AnalysisContextSelector from '../components/AnalysisContextSelector';
+import AnalysisPrintResult from '../components/AnalysisPrintResult';
 import {useAnalysis} from '../context/AnalysisContext';
+import {useProjects} from '../context/ProjectsContext';
 import '../tools/Tool.css';
 import './HypothesisTesting.css';
 
@@ -387,6 +389,7 @@ function ResultBox({ result, testId }) {
 export default function HypothesisTesting() {
   const [searchParams,setSearchParams]=useSearchParams();
   const { activeDataset, columns, getColumnData, hasData } = useWorksheet();
+  const {projects}=useProjects();
   const {registerAnalysisResult}=useAnalysis();
   const { addReportItem, addReportOnly } = useReport();
   const resultRef = useRef(null);
@@ -399,6 +402,8 @@ export default function HypothesisTesting() {
   const [methodSearch,setMethodSearch]=useState('');
   const [showGuide, setShowGuide] = useState(false);
   const [addedToReport, setAddedToReport] = useState(false);
+  const [placedProjectId,setPlacedProjectId]=useState('');
+  const [placedDatasetName,setPlacedDatasetName]=useState('');
   const bookExcerpt = BOOK_EXCERPTS.hypothesis;
   useEffect(()=>{const context=HYPOTHESIS_METHOD_CONTEXT[searchParams.get('method')];if(context){setSelectedTest(context);setInputs(previous=>({...previous,pooled:searchParams.get('method')==='pooled-two-sample-t'}));setResult(null);setError('')}},[searchParams]);
   useEffect(()=>{const names=new Set(columns.map(column=>column.name));setInputs(previous=>({...previous,col1:names.has(previous.col1)?previous.col1:'',col2:names.has(previous.col2)?previous.col2:'',groups:previous.groups.map(name=>names.has(name)?name:'')}));setResult(null);setError('')},[activeDataset?.id,columns]);
@@ -412,8 +417,9 @@ export default function HypothesisTesting() {
     const { summary, interpretation } = buildReportContent(test, result);
     const catalogId=Object.keys(HYPOTHESIS_METHOD_CONTEXT).find(id=>HYPOTHESIS_METHOD_CONTEXT[id]===selectedTest),validationStatus=analyticsById(catalogId)?.validationStatus||'UNVALIDATED';
     const variableMapping={first:inputs.col1||null,second:inputs.col2||null,groups:inputs.groups.filter(Boolean)};
-    const analysisId=reportOnly?null:registerAnalysisResult({title:test.name,toolId:'hypothesis',phase:'Analyze',projectId:activeDataset?.projectId||'',datasetIds:[activeDataset?.id].filter(Boolean),datasetVersionIds:[activeDataset?.versionId].filter(Boolean),datasetVersion:activeDataset?.version||1,method:result.method||catalogId||selectedTest,methodVersion:result.methodVersion||'1',validationStatus,inputConfiguration:{testId:selectedTest,variables:variableMapping,mu0:inputs.mu0,p0:inputs.p0,sigma0:inputs.sigma0,pooled:inputs.pooled},variableMapping,result,interpretation});
-    (reportOnly?addReportOnly:addReportItem)({
+    const manualInputs={manualD1:inputs.manualD1||'',manualD2:inputs.manualD2||'',groups:inputs.groups.map((name,index)=>name?'':(inputs[`manualG${index}`]||''))},inputConfiguration={testId:selectedTest,variables:variableMapping,mu0:inputs.mu0,p0:inputs.p0,sigma0:inputs.sigma0,pooled:inputs.pooled,manualInputs};
+    const analysisId=reportOnly?null:registerAnalysisResult({title:test.name,toolId:'hypothesis',phase:'Analyze',projectId:activeDataset?.projectId||'',datasetIds:[activeDataset?.id].filter(Boolean),datasetVersionIds:[activeDataset?.versionId].filter(Boolean),datasetVersion:activeDataset?.version||1,method:result.method||catalogId||selectedTest,methodVersion:result.methodVersion||'1',validationStatus,inputConfiguration,variableMapping,result,interpretation});
+    const placement=await (reportOnly?addReportOnly:addReportItem)({
       title: test.name,
       toolId: 'hypothesis',
       projectId:activeDataset?.projectId||'',
@@ -425,7 +431,10 @@ export default function HypothesisTesting() {
       assumptionReport: result.assumptionReport || null,
       provenance: result.method ? { analysisId,projectId:activeDataset?.projectId||null,method:result.method, methodVersion:result.methodVersion, datasetId:activeDataset?.id||null,datasetVersionId:activeDataset?.versionId||null,variableMapping,parameters:{mu0:inputs.mu0,p0:inputs.p0,sigma0:inputs.sigma0,pooled:inputs.pooled},nAnalyzed:[result.n,result.nA+result.nB,result.n1+result.n2].find(Number.isFinite)||null,missingHandling: result.missingHandling||{policy:'finite worksheet values or explicit manual input'},validationStatus} : null,
       rawData: [],
+      inputConfiguration,
+      manualDataset:!activeDataset&&manualInputs.manualD1?{columns:[{name:'Measurement',data:parseManual(manualInputs.manualD1),type:'numeric'}]}:null,
     });
+    if(!reportOnly&&placement?.projectId){setPlacedProjectId(placement.projectId);setPlacedDatasetName(placement.metadata?.inputDatasetName||'');}
     if(reportOnly)setAddedToReport(previous=>!previous);
   }, [result, selectedTest, addReportItem,addReportOnly,activeDataset,inputs,registerAnalysisResult]);
 
@@ -534,8 +543,8 @@ export default function HypothesisTesting() {
 
   return (
     <div className="ht-page">
-      <AnalysisContextSelector />
-      <div className="ht-header">
+      <div className="no-print"><AnalysisContextSelector /></div>
+      <div className="ht-header no-print">
         <div>
           <h1>Hypothesis Testing</h1>
           <p>Select a test, choose your data, and get instant statistical results with interpretation.</p>
@@ -566,7 +575,7 @@ export default function HypothesisTesting() {
         </div>
       )}
 
-      <div className="ht-layout">
+      <div className="ht-layout no-print">
         {/* Test selector */}
         <div className="ht-test-panel">
           <div className="form-group" style={{marginBottom:'.75rem'}}><label>Find a known method</label><input type="search" value={methodSearch} onChange={event=>setMethodSearch(event.target.value)} placeholder="Mann-Whitney, Fisher exact, variance…" /></div>
@@ -816,6 +825,15 @@ export default function HypothesisTesting() {
           )}
         </div>
       </div>
+      {result&&<AnalysisPrintResult
+        title={TESTS.find(test=>test.id===selectedTest)?.name}
+        projectName={projects.find(project=>project.id===(activeDataset?.projectId||placedProjectId))?.name}
+        datasetName={activeDataset?.name||placedDatasetName}
+        testId={selectedTest}
+        result={result}
+        interpretation={buildReportContent(TESTS.find(test=>test.id===selectedTest),result).interpretation}
+        assumptionReport={result.assumptionReport}
+      />}
     </div>
   );
 }

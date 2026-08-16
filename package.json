@@ -17,7 +17,9 @@
     "stripe": "^18.5.0"
   },
   "scripts": {
+    "prestart": "node scripts/validate-supabase-target.js development",
     "start": "react-scripts start",
+    "prebuild": "node scripts/validate-supabase-target.js production",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "validate:statistics": "react-scripts test --watchAll=false --runTestsByPath src/foundation/statisticalValidationReport.test.js",

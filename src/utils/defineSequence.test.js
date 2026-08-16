@@ -1,6 +1,6 @@
 import {DEFINE_TEMPLATES} from '../config/defineTemplates';
 import {createDocument,documentIdFor} from './documentModel';
-import {defineAdvanceState,dmaicSequence,nextDefineArtifact,projectDocumentRoute} from './defineSequence';
+import {defineAdvanceState,dmaicSequence,nextDefineArtifact,previousDmaicArtifact,projectDocumentRoute} from './defineSequence';
 
 const template=id=>DEFINE_TEMPLATES.find(item=>item.id===id);
 const completeValues=artifact=>Object.fromEntries(artifact.sections.flatMap(section=>section.fields).filter(field=>field.required!==false).map(field=>[field.id,field.type==='table'?[{id:'row'}]:'complete value']));
@@ -39,8 +39,8 @@ test('incomplete artifact reports the exact required blockers',()=>{
   expect(state.missing).toEqual(expect.arrayContaining(artifact.sections.flatMap(section=>section.fields).filter(field=>field.required!==false).map(field=>field.label)));
 });
 
-test('end of Define sequence advances to the canonical first Measure artifact',()=>{
-  const artifact=template('ctq-tree');
+test('end of the configured Define cadence advances to the canonical first Measure artifact',()=>{
+  const artifact=template('voc');
   const state=defineAdvanceState({template:artifact,activeIndex:artifact.sections.length-1,values:completeValues(artifact)});
   expect(state.next).toEqual(expect.objectContaining({id:'data-collection-plan',name:'Data Collection Plan',phase:'Measure'}));
   expect(state.label).toBe('Data Collection Plan');
@@ -56,12 +56,19 @@ test('Business Case routes to the registered VOC workspace and reuses its canoni
   expect(createDocument(successor,'project-1',existing)).toEqual(expect.objectContaining({id:'document-voc',templateId:'voc',values:{researchOwner:'Saved owner'}}));
 });
 
-test('VOC advances to CTQ Tree and CTQ Tree ends the sequence',()=>{
+test('Business Case sequence navigation is bounded by Project Charter and Voice of Customer',()=>{
+  expect(previousDmaicArtifact('business-case')).toEqual(expect.objectContaining({id:'charter',name:'Project Charter'}));
+  expect(nextDefineArtifact('business-case')).toEqual(expect.objectContaining({id:'voc'}));
+  expect(previousDmaicArtifact('charter')).toBeNull();
+  expect(nextDefineArtifact('project-closure')).toBeNull();
+});
+
+test('VOC crosses directly into the Measure cadence with project-qualified routing',()=>{
   const voc=template('voc');
   const vocState=defineAdvanceState({template:voc,activeIndex:voc.sections.length-1,values:completeValues(voc)});
-  expect(vocState.label).toBe('CTQ Tree');
-  expect(projectDocumentRoute('project-1',vocState.next.id)).toBe('/projects/project-1/documents/ctq-tree');
-  expect(nextDefineArtifact('ctq-tree').id).toBe('data-collection-plan');
+  expect(vocState.label).toBe('Data Collection Plan');
+  expect(projectDocumentRoute('project-1',vocState.next.id)).toBe('/projects/project-1/documents/data-collection-plan');
+  expect(previousDmaicArtifact('data-collection-plan')).toEqual(expect.objectContaining({id:'voc'}));
 });
 
 test('guided progression describes incomplete status without changing document values',()=>{
@@ -81,9 +88,9 @@ test('all DMAIC phase boundaries resolve through the configured template registr
   expect(dmaicSequence().at(-1).id).toBe('project-closure');
 });
 
-test('incomplete CTQ Tree exposes guided status while retaining its Measure successor',()=>{
-  const artifact=template('ctq-tree'),state=defineAdvanceState({template:artifact,activeIndex:artifact.sections.length-1,values:{}});
-  expect(state.completion).toBeLessThan(100);
-  expect(state.missingDetails.length).toBeGreaterThan(0);
-  expect(projectDocumentRoute('project-1',state.next.id)).toBe('/projects/project-1/documents/data-collection-plan');
+test('project routes remain qualified in both directions across representative DMAIC boundaries',()=>{
+  [['measurement-plan','hypothesis-plan'],['statistical-analysis-summary','factorial-plan'],['action-plan','control-plan']].forEach(([from,to])=>{
+    expect(projectDocumentRoute('project-1',nextDefineArtifact(from).id)).toBe(`/projects/project-1/documents/${to}`);
+    expect(previousDmaicArtifact(to)).toEqual(expect.objectContaining({id:from}));
+  });
 });

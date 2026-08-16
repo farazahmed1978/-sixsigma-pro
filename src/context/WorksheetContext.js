@@ -138,12 +138,13 @@ export function WorksheetProvider({ children }) {
     }));
   }, [activeDatasetId]);
 
-  const createDataset = useCallback(({ name = 'New Worksheet', description = '', projectId = '', columns: initialColumns = [] } = {}) => {
+  const createDatasetRecord = useCallback(({ name = 'New Worksheet', description = '', projectId = '', columns: initialColumns = [] } = {}) => {
     const dataset = normalizeDataset({ id: makeId(), name, description, projectId, organizationId:profile?.default_organization_id||'',createdBy:user?.id||'', columns: initialColumns, history: [historyItem('Dataset created')] });
     setDatasets(previous => [...previous, dataset]);
     setActiveDatasetId(dataset.id);
-    return dataset.id;
+    return dataset;
   }, [profile,user]);
+  const createDataset = useCallback(options=>createDatasetRecord(options).id,[createDatasetRecord]);
 
   const createDerivedDataset = useCallback(({ name, derivedColumns, operation, parameters = {}, sourceDatasetIds = [] }) => {
     if (!activeDataset) throw new Error('Select a source dataset first.');
@@ -216,7 +217,7 @@ export function WorksheetProvider({ children }) {
   return <WorksheetContext.Provider value={{
     columns, fileName, rowCount, hasData: columns.length > 0, datasets, activeDataset, activeDatasetId, viewRowIndices, viewSort,
     loadData, clearData, addColumn, updateCell, renameColumn, deleteColumn, addBlankColumn, addBlankRow, deleteRow, startBlankSheet,
-    createDataset, createDerivedDataset, switchDataset, renameDataset, updateDatasetMetadata, duplicateDataset, archiveDataset, deleteDataset, assignDatasetProject, changeColumnType, sortColumn, clearViewSort,
+    createDataset, createDatasetRecord, createDerivedDataset, switchDataset, renameDataset, updateDatasetMetadata, duplicateDataset, archiveDataset, deleteDataset, assignDatasetProject, changeColumnType, sortColumn, clearViewSort,
     deriveCalculatedColumn, deriveTransformedColumn, deriveRecodedColumn, deriveJoinedDataset, deriveStackedDataset, deriveUnpivotedDataset, derivePivotedDataset,
     getNumericColumns, getCategoricalColumns, getColumnData, getRawColumnData,
     hydrationStatus,persistenceError,

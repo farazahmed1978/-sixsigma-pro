@@ -1,7 +1,10 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import jsPDF from "jspdf";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import { useReport } from "../context/ReportContext";
 import { useProjects } from "../context/ProjectsContext";
+import { documentRepository } from "../repositories/documentRepository";
 import { assembleReportModel } from "../foundation/reportAssembly";
 import {
   allPrintArtifactIds,
@@ -11,6 +14,93 @@ import {
 import ReportPrintOptions from "./ReportPrintOptions";
 import ReportPrintPreview from "./ReportPrintPreview";
 import "../pages/Templates.css";
+
+const standaloneTemplateId = (document) => document.content?.templateId || "";
+
+export function StandaloneArtifacts() {
+  const navigate = useNavigate();
+  const { profile } = useAuth();
+  const organizationId = profile?.default_organization_id;
+  const [documents, setDocuments] = useState([]);
+  const [status, setStatus] = useState("loading");
+  const [error, setError] = useState("");
+  const [reload, setReload] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    if (!organizationId) {
+      setDocuments([]);
+      setStatus("ready");
+      return () => { active = false; };
+    }
+    setStatus("loading");
+    setError("");
+    documentRepository.listStandalone(organizationId)
+      .then((rows) => {
+        if (!active) return;
+        setDocuments([...rows].sort((left, right) =>
+          String(right.updated_at || "").localeCompare(String(left.updated_at || "")),
+        ));
+        setStatus("ready");
+      })
+      .catch((loadError) => {
+        if (!active) return;
+        setError(loadError.message || "Standalone artifacts could not be loaded from Aureqin.");
+        setStatus("error");
+      });
+    return () => { active = false; };
+  }, [organizationId, reload]);
+
+  const openDocument = (document) => {
+    const templateId = standaloneTemplateId(document);
+    if (!templateId) return;
+    navigate(`/documents/${encodeURIComponent(templateId)}?standalone=${encodeURIComponent(document.id)}`);
+  };
+
+  return (
+    <section className="card" style={{ padding: "1.5rem", marginBottom: "1.5rem" }} aria-labelledby="standalone-artifacts-heading">
+      <div className="templates-header" style={{ marginBottom: "1rem" }}>
+        <h2 id="standalone-artifacts-heading">Standalone Artifacts</h2>
+        <p>Project-independent documents saved to your Aureqin organization.</p>
+      </div>
+      {status === "loading" && <p>Loading standalone artifacts…</p>}
+      {status === "error" && (
+        <div className="alert alert-danger">
+          {error}
+          <button className="btn-secondary" onClick={() => setReload((value) => value + 1)}>Retry</button>
+        </div>
+      )}
+      {status === "ready" && !documents.length && (
+        <p style={{ color: "var(--text-secondary)" }}>No standalone artifacts yet.</p>
+      )}
+      {status === "ready" && documents.length > 0 && (
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th>Title</th><th>Template / Type</th><th>Phase</th><th>Updated</th><th><span className="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {documents.map((document) => {
+                const templateId = standaloneTemplateId(document);
+                return (
+                  <tr key={document.id}>
+                    <td>{document.title || document.content?.title || "Untitled artifact"}</td>
+                    <td>{templateId || "Unknown document type"}</td>
+                    <td>{document.lifecycle_phase || document.dmaic_phase || document.content?.phase || "—"}</td>
+                    <td>{document.updated_at ? new Date(document.updated_at).toLocaleString() : "—"}</td>
+                    <td><button className="btn-secondary" disabled={!templateId} onClick={() => openDocument(document)}>Open</button></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
 
 export default function ReportBuilder() {
   const {
@@ -23,16 +113,19 @@ export default function ReportBuilder() {
     dismissStorageWarning,
   } = useReport();
   const { projects, addArtifact } = useProjects();
+  const { profile } = useAuth();
+  const project = projects.find(
+    (entry) => entry.id === items.find((item) => item.projectId)?.projectId,
+  );
   const [reportTitle, setReportTitle] = useState("Project Report");
-  const [preparedBy, setPreparedBy] = useState("");
+  const [preparedBy, setPreparedBy] = useState(()=>profile?.full_name||profile?.display_name||profile?.name||"");
+  const titleEdited=useRef(false);
   const [printOptionsOpen, setPrintOptionsOpen] = useState(false),
     [printMode, setPrintMode] = useState(PRINT_MODES.ENTIRE),
     [selectedPrintIds, setSelectedPrintIds] = useState(new Set()),
     [printModel, setPrintModel] = useState(null),
     [printError, setPrintError] = useState("");
-  const project = projects.find(
-    (entry) => entry.id === items.find((item) => item.projectId)?.projectId,
-  );
+  useEffect(()=>{if(project&&!titleEdited.current&&reportTitle==="Project Report")setReportTitle(`${project.name} — Project Report`)},[project,reportTitle]);
   const reportModel = useMemo(
       () => assembleReportModel(items, project || {}),
       [items, project],
@@ -223,23 +316,6 @@ export default function ReportBuilder() {
         onBack={() => setPrintModel(null)}
       />
     );
-  if (!items.length)
-    return (
-      <div
-        style={{
-          padding: "2rem",
-          maxWidth: 700,
-          margin: "0 auto",
-          textAlign: "center",
-        }}
-      >
-        <h2>Report Builder</h2>
-        <p style={{ color: "var(--text-secondary)" }}>
-          No project assets added yet. Add a document workspace or completed
-          analysis to build a connected project report here.
-        </p>
-      </div>
-    );
   return (
     <div className="templates-page">
       <div>
@@ -258,6 +334,19 @@ export default function ReportBuilder() {
             then print or generate a local PDF.
           </p>
         </div>
+        <StandaloneArtifacts />
+        {!items.length && (
+          <section className="card" style={{ padding: "1.5rem", marginBottom: "1.5rem", textAlign: "center" }}>
+            <h2>Project Artifacts</h2>
+            <p style={{ color: "var(--text-secondary)" }}>
+              No project assets added yet. Add a document workspace or completed
+              analysis to build a connected project report here.
+            </p>
+          </section>
+        )}
+        {items.length > 0 && <>
+        <h2 style={{ marginBottom: "1rem" }}>Project Artifacts</h2>
+        <div className="card" style={{ padding: "1rem 1.5rem", marginBottom: "1rem" }}><span style={{ color: "var(--text-secondary)" }}>Project</span><h3 style={{ margin: ".25rem 0 0" }}>{project?.name || "Project context unavailable"}</h3></div>
         <div
           className="card"
           style={{ padding: "1.5rem", marginBottom: "1.5rem" }}
@@ -267,7 +356,7 @@ export default function ReportBuilder() {
               <label>Report Title</label>
               <input
                 value={reportTitle}
-                onChange={(event) => setReportTitle(event.target.value)}
+                onChange={(event) => {titleEdited.current=true;setReportTitle(event.target.value)}}
               />
             </div>
             <div className="form-group">
@@ -388,6 +477,7 @@ export default function ReportBuilder() {
             Clear All
           </button>
         </div>
+        </>}
       </div>
       {printOptionsOpen && (
         <ReportPrintOptions

@@ -89,11 +89,11 @@ export function createActivityEvent(input = {}) {
   if (!input.eventType) throw new Error('Activity events require an eventType.');
   return {
     ...createPlatformObject('activity_event', { ...input, title: input.title || input.eventType }),
-    eventType: input.eventType,
+    event_type: input.eventType,
     actorId: input.actorId || input.createdBy || '',
-    objectType: input.subjectType || input.objectType || '',
-    objectId: input.subjectId || input.objectId || '',
-    occurredAt: input.occurredAt || input.createdAt || now(),
+    subject_type: input.subjectType || input.objectType || '',
+    subject_id: input.subjectId || input.objectId || '',
+    occurred_at: input.occurredAt || input.createdAt || now(),
     summary: input.summary || '',
     // Payloads are deliberately metadata-only; callers must not include secrets or raw datasets.
     metadata: input.metadata || {},

@@ -117,8 +117,9 @@ function ToolRoute({ toolId }) {
 }
 
 function DevelopmentEnvironmentBadge() {
-  if (process.env.NODE_ENV !== 'development' || process.env.REACT_APP_ENVIRONMENT !== 'staging') return null;
-  return <div className="development-environment-badge" data-environment="staging" data-project-ref={process.env.REACT_APP_SUPABASE_PROJECT_REF} title={process.env.REACT_APP_SUPABASE_URL}>STAGING · {process.env.REACT_APP_SUPABASE_PROJECT_REF}</div>;
+  if (process.env.NODE_ENV !== 'development') return null;
+  const environment=process.env.REACT_APP_ENVIRONMENT||'unconfigured',projectRef=process.env.REACT_APP_SUPABASE_PROJECT_REF||'missing-project-ref';
+  return <div className="development-environment-badge" data-environment={environment} data-project-ref={projectRef} title={process.env.REACT_APP_SUPABASE_URL}>{environment.toUpperCase()} · {projectRef}</div>;
 }
 
 export default function App() {

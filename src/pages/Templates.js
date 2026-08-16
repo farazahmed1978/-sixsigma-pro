@@ -1,7 +1,13 @@
-import React, { useState } from 'react';
-import { Navigate, useNavigate, useParams } from 'react-router-dom';
+import React, { useEffect, useRef, useState } from 'react';
+import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useProjects } from '../context/ProjectsContext';
 import DocumentWorkspace from '../components/DocumentWorkspace';
+import StandaloneDocumentWorkspace from '../components/StandaloneDocumentWorkspace';
+import ArtifactContextGate from '../components/ArtifactContextGate';
+import {artifactContextDecision,artifactDefinition,existingProjectArtifact,matchingSharedFields} from '../config/artifactContext';
+import {createDocument} from '../utils/documentModel';
+import {documentRepository} from '../repositories/documentRepository';
+import {useAuth} from '../context/AuthContext';
 import logoMark from '../assets/axentra-mark.svg';
 import { DEFINE_TEMPLATES } from '../config/defineTemplates';
 import { MEASURE_TEMPLATES } from '../config/measureTemplates';
@@ -9,6 +15,11 @@ import { CONTROL_TEMPLATES } from '../config/controlTemplates';
 import { ANALYZE_TEMPLATES } from '../config/analyzeTemplates';
 import { IMPROVE_TEMPLATES } from '../config/improveTemplates';
 import { PMP_TEMPLATES } from '../config/pmpTemplates';
+import { NAVIGATION } from '../config/navigation';
+import { SUITES } from '../config/suites';
+import { navigationItems } from '../utils/navigationTools';
+import { resolveProjectSuiteId, lifecycleRegistry, OE_LIFECYCLE } from '../foundation/lifecycle';
+import { useEntitlements } from '../context/EntitlementContext';
 import './Templates.css';
 
 const LEGACY_TEMPLATES = [
@@ -271,7 +282,56 @@ const LEGACY_TEMPLATES = [
   },
 ];
 
-export const TEMPLATES = [...DEFINE_TEMPLATES, ...MEASURE_TEMPLATES, ...ANALYZE_TEMPLATES, ...IMPROVE_TEMPLATES, ...CONTROL_TEMPLATES, ...PMP_TEMPLATES, ...LEGACY_TEMPLATES.filter(template => !['Define','Measure','Analyze','Improve','Control'].includes(template.phase))];
+// Collapses template.phase (OE catalogs) and template.pmpLifecycle (the PMP catalog) into one
+// canonical stageId, resolved against the same stage-id space lifecycleRegistry already defines
+// per suite (derived from NAVIGATION) — so callers filter on one field instead of maintaining
+// two separate phase/lifecycle controls. 'All' is a legacy catch-all value, not a real stage.
+const stageIdForLabel = label => {
+  if (!label) return null;
+  for (const definition of lifecycleRegistry.definitions) {
+    const stage = definition.stages.find(item => item.label === label);
+    if (stage) return stage.id;
+  }
+  return null;
+};
+const withStageId = template => ({ ...template, stageId: stageIdForLabel(template.pmpLifecycle || (template.phase && template.phase !== 'All' ? template.phase : '')) });
+export const TEMPLATES = [...DEFINE_TEMPLATES, ...MEASURE_TEMPLATES, ...ANALYZE_TEMPLATES, ...IMPROVE_TEMPLATES, ...CONTROL_TEMPLATES, ...PMP_TEMPLATES, ...LEGACY_TEMPLATES.filter(template => !['Define','Measure','Analyze','Improve','Control'].includes(template.phase))].map(withStageId);
+
+// Per-template suite membership, derived from NAVIGATION (the same mechanism DocumentSuiteGate
+// uses) rather than pmpTemplates.js/defineTemplates.js's own metadata, since neither catalog
+// carries a canonical suite field. A template with no NAVIGATION mapping has unknown suite
+// membership and is treated as suite-agnostic (always shown) rather than silently hidden.
+const TEMPLATE_SUITE_IDS = (() => {
+  const map = {};
+  navigationItems(NAVIGATION).forEach(item => {
+    if (typeof item.path !== 'string' || !item.suiteId) return;
+    const match = item.path.match(/^\/documents\/([^/]+)$/);
+    if (!match) return;
+    (map[match[1]] ||= new Set()).add(item.suiteId);
+  });
+  return map;
+})();
+const suiteIdsForTemplate = template => [...(TEMPLATE_SUITE_IDS[template.id] || [])];
+export const UNMAPPED_SUITE_TEMPLATE_IDS = TEMPLATES.filter(template => !suiteIdsForTemplate(template).length).map(template => template.id);
+
+function ProjectDocumentEntry({template,project,updateProject}){
+  const existing=existingProjectArtifact({definition:artifactDefinition({kind:'document',template}),project});
+  const [record,setRecord]=useState(existing);
+  const [error,setError]=useState('');
+  const started=useRef(false);
+  useEffect(()=>{
+    if(record||started.current)return;
+    started.current=true;
+    const created=createDocument(template,project.id,null,{artifactContext:artifactContextDecision({mode:'project',projectId:project.id})});
+    Promise.resolve(updateProject(project.id,{documents:{...(project.documents||{}),[created.id]:created}}))
+      .then(()=>setRecord(created))
+      .catch(loadError=>setError(loadError.message||'The project document could not be created.'));
+  },[project,record,template,updateProject]);
+  if(error)return <div className="templates-not-found"><h1>Document could not be opened</h1><p>{error}</p></div>;
+  if(!record)return <div className="templates-not-found"><h1>Opening {template.name}…</h1><p>Creating this document in {project.name}.</p></div>;
+  const workspaceProject={...project,documents:{...(project.documents||{}),[record.id]:record}};
+  return <DocumentWorkspace key={`${project.id}:${template.id}`} template={template} project={workspaceProject} updateProject={updateProject}/>;
+}
 
 const phaseColor = {
   Define: '#1a56a0', Measure: '#00875a', Analyze: '#c05500',
@@ -527,24 +587,48 @@ function TemplateForm({ template }) {
 export default function Templates() {
   const { projectId, templateId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { projects, getProject, updateProject } = useProjects();
+  const {user,profile}=useAuth()||{};
+  const {canAccess}=useEntitlements()||{};
   const [selected, setSelected] = useState(null);
-  const [filter, setFilter] = useState('All');
+  const [stageFilter, setStageFilter] = useState('All');
   const [search, setSearch] = useState('');
-  const [lifecycleFilter, setLifecycleFilter] = useState('All');
   const [typeFilter, setTypeFilter] = useState('All');
-  const [activeProjectId, setActiveProjectId] = useState(() => projectId || projects[0]?.id || '');
-  const phases = ['All', 'Define', 'Measure', 'Analyze', 'Improve', 'Control'];
+  const [combinedView, setCombinedView] = useState(false);
+  const [activeProjectId, setActiveProjectId] = useState(() => projectId || searchParams.get('project') || projects[0]?.id || '');
   const activeProject = projects.find(project => project.id === activeProjectId);
   const documentTypes = ['All', ...new Set(TEMPLATES.map(template => template.documentType || 'Workspace'))];
-  const lifecycles = ['All', ...new Set(TEMPLATES.map(template => template.pmpLifecycle).filter(Boolean))];
-  const filtered = TEMPLATES.filter(template => (filter === 'All' || template.phase === filter) && (lifecycleFilter === 'All' || template.pmpLifecycle === lifecycleFilter) && (typeFilter === 'All' || (template.documentType || 'Workspace') === typeFilter) && `${template.name} ${template.desc}`.toLowerCase().includes(search.toLowerCase()));
+  const ownedSuiteIds = SUITES.map(suite => suite.id).filter(id => canAccess?.(id));
+  const ownsBothCoreSuites = ownedSuiteIds.includes('operational-excellence') && ownedSuiteIds.includes('project-management');
+  const contextSuiteId = activeProject ? resolveProjectSuiteId(activeProject) : ownedSuiteIds[0] || null;
+  const passesSuiteFilter = template => {
+    if (combinedView && ownsBothCoreSuites) return true;
+    const suiteIds = suiteIdsForTemplate(template);
+    if (!suiteIds.length) return true;
+    return suiteIds.includes(contextSuiteId);
+  };
+  // One stage filter, driven by whichever suite lifecycle(s) are in scope right now, instead of
+  // a hardcoded DMAIC phase tab bar plus a separate PMP-lifecycle dropdown for the same concept.
+  const lifecyclesInScope = (combinedView && ownsBothCoreSuites)
+    ? lifecycleRegistry.definitions.filter(definition => ['operational-excellence', 'project-management'].includes(definition.id))
+    : [lifecycleRegistry.get(contextSuiteId) || OE_LIFECYCLE];
+  const stageOptions = lifecyclesInScope.flatMap(definition => definition.stages);
+  const filtered = TEMPLATES.filter(template => (stageFilter === 'All' || template.stageId === stageFilter) && (typeFilter === 'All' || (template.documentType || 'Workspace') === typeFilter) && passesSuiteFilter(template) && `${template.name} ${template.desc}`.toLowerCase().includes(search.toLowerCase()));
+  useEffect(() => { setStageFilter('All'); }, [contextSuiteId, combinedView]);
   const workspaceStatus = template => { const record = template.id === 'charter' ? activeProject?.charter : activeProject?.documents?.[`document-${template.id}`]; if (!record) return 'Not Started'; return record.status === 'complete' ? 'Available' : 'In Progress'; };
 
   if (templateId && !projectId) {
     const template = TEMPLATES.find(item => item.id === templateId);
     if (!template) return <div className="templates-not-found"><h1>Document not found</h1><p>This document is not registered in the library.</p><button className="btn-primary" onClick={() => navigate('/templates')}>Open Document Library</button></div>;
-    return <div className="document-launcher"><div className="document-launcher-card"><span>{template.phase.toUpperCase()} DOCUMENT</span><div>{template.icon}</div><h1>{template.name}</h1><p>{template.desc}</p><label>Active project<select value={activeProjectId} onChange={event => setActiveProjectId(event.target.value)}><option value="">Select a project</option>{projects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>{projects.length ? <button className="btn-primary" disabled={!activeProjectId} onClick={() => navigate(template.id === 'charter' ? `/projects/${activeProjectId}/charter` : `/projects/${activeProjectId}/documents/${template.id}`)}>Open Workspace →</button> : <><p>Create a project before opening this workspace.</p><button className="btn-primary" onClick={() => navigate('/projects')}>Create Project</button></>}<button className="btn-ghost" onClick={() => navigate('/templates')}>Browse Document Library</button></div></div>;
+    const standaloneId=searchParams.get('standalone');
+    if(standaloneId)return <StandaloneDocumentWorkspace key={standaloneId} template={template} instanceId={standaloneId}/>;
+    const project=projects.find(item=>item.id===activeProjectId),definition=artifactDefinition({kind:'document',template}),existing=project?existingProjectArtifact({definition,project}):null;
+    if(existing)return <Navigate to={template.id==='charter'?`/projects/${project.id}/charter`:`/projects/${project.id}/documents/${template.id}`} replace/>;
+    const advisories=project?matchingSharedFields(template,project.sharedFields):[];
+    const useProject=async()=>{if(!project)return;if(template.id==='charter'){navigate(`/projects/${project.id}/charter`);return}const record=createDocument(template,project.id,null,{artifactContext:artifactContextDecision({mode:'project',projectId:project.id})});await updateProject(project.id,{documents:{...(project.documents||{}),[record.id]:record}});navigate(`/projects/${project.id}/documents/${template.id}`)};
+    const useStandalone=async()=>{if(!user?.id||!profile?.default_organization_id)throw new Error('Authenticated user and organization context are required.');const record=createDocument(template,'',null,{id:undefined,organizationId:profile.default_organization_id,createdBy:user.id,artifactContext:artifactContextDecision({mode:'standalone'})}),row=await documentRepository.createStandalone({project_id:null,organization_id:profile.default_organization_id,created_by:user.id,status:'draft',methodology:'lean-six-sigma',lifecycle_phase:template.phase,dmaic_phase:template.phase,title:template.name,content:record});navigate(`/documents/${template.id}?standalone=${encodeURIComponent(row.id)}`)};
+    return <ArtifactContextGate title={template.name} project={project} projects={projects} selectedProjectId={activeProjectId} onSelectProject={setActiveProjectId} advisories={advisories} onUseProject={useProject} onStandalone={useStandalone} onCancel={()=>navigate('/templates')}/>;
   }
 
   if (projectId && templateId) {
@@ -552,12 +636,11 @@ export default function Templates() {
     const template = TEMPLATES.find(item => item.id === templateId);
     if (!project || !template) return <div className="templates-not-found"><h1>Document workspace not found</h1><p>Select a valid project and template from the document library.</p><button className="btn-primary" onClick={() => navigate('/templates')}>Return to templates</button></div>;
     if (template.id === 'charter') return <Navigate to={`/projects/${project.id}/charter`} replace />;
-    return <DocumentWorkspace key={`${project.id}:${template.id}`} template={template} project={project} updateProject={updateProject} />;
+    return <ProjectDocumentEntry template={template} project={project} updateProject={updateProject}/>;
   }
 
   const openTemplate = template => {
-    if (!activeProjectId) return;
-    navigate(template.id === 'charter' ? `/projects/${activeProjectId}/charter` : `/projects/${activeProjectId}/documents/${template.id}`);
+    navigate(`/documents/${template.id}${activeProjectId?`?project=${encodeURIComponent(activeProjectId)}`:''}`);
   };
 
   return (
@@ -570,15 +653,16 @@ export default function Templates() {
 
       {!selected ? (
         <>
-          <div className="library-controls no-print"><label>Search documents<input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search by document name" /></label><label>PMP lifecycle<select value={lifecycleFilter} onChange={event => setLifecycleFilter(event.target.value)}>{lifecycles.map(value => <option key={value}>{value}</option>)}</select></label><label>Document type<select value={typeFilter} onChange={event => setTypeFilter(event.target.value)}>{documentTypes.map(value => <option key={value}>{value}</option>)}</select></label></div>
+          <div className="library-controls no-print"><label>Search documents<input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search by document name" /></label><label>Document type<select value={typeFilter} onChange={event => setTypeFilter(event.target.value)}>{documentTypes.map(value => <option key={value}>{value}</option>)}</select></label>{ownsBothCoreSuites&&<label className="templates-combined-toggle"><input type="checkbox" checked={combinedView} onChange={event=>setCombinedView(event.target.checked)}/>Show combined Operational Excellence + Project Management library</label>}</div>
           <div className="tab-bar no-print" style={{ marginBottom: '1.5rem' }}>
-            {phases.map(p => (
-              <button key={p} className={`tab-btn ${filter === p ? 'active' : ''}`} onClick={() => setFilter(p)}>{p}</button>
+            <button className={`tab-btn ${stageFilter === 'All' ? 'active' : ''}`} onClick={() => setStageFilter('All')}>All</button>
+            {stageOptions.map(stage => (
+              <button key={stage.id} className={`tab-btn ${stageFilter === stage.id ? 'active' : ''}`} onClick={() => setStageFilter(stage.id)}>{stage.label}</button>
             ))}
           </div>
           <div className="templates-grid no-print">
             {filtered.map(t => (
-              <button key={t.id} className="template-card" disabled={!activeProjectId} onClick={() => openTemplate(t)}>
+              <button key={t.id} className="template-card" onClick={() => openTemplate(t)}>
                 <div className="template-icon">{t.icon}</div>
                 <div className="template-phase-badge" style={{ color: phaseColor[t.phase] }}>{t.phase}</div>
                 <h3>{t.name}</h3>

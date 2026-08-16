@@ -21,7 +21,7 @@ describe('Foundation-0 shared contracts', () => {
 
   test('creates metadata-only activity events', () => {
     const event = createActivityEvent({ eventType: 'dataset.changed', subjectType: 'dataset', subjectId: 'd1', metadata: { changedColumns: 2 } });
-    expect(event).toMatchObject({ eventType: 'dataset.changed', objectType: 'dataset', objectId: 'd1' });
+    expect(event).toMatchObject({ event_type: 'dataset.changed', subject_type: 'dataset', subject_id: 'd1' });
     expect(event).not.toHaveProperty('rawData');
   });
 

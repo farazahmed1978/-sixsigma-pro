@@ -1,4 +1,4 @@
-import {boundedVerify,isCurrentGeneration,nextGeneration,validateProjectOwnership} from './persistenceSafety';
+import {boundedVerify,isCurrentGeneration,nextGeneration,validateProjectOwnership,validateStandaloneOwnership,PROJECT_OWNED_TABLES,STANDALONE_CAPABLE_TABLES} from './persistenceSafety';
 
 const valid={userId:'user-a',organizationId:'org-a',projectId:'project-a',createdBy:'user-a',project:{id:'project-a',organization_id:'org-a'}};
 
@@ -32,4 +32,24 @@ test('delete verification fails after the configured bound',async()=>{
   let checks=0;
   await expect(boundedVerify(async()=>{checks+=1;return false},{attempts:3,delay:1})).rejects.toThrow(/could not be verified/);
   expect(checks).toBe(3);
+});
+
+const validStandalone={userId:'user-a',organizationId:'org-a',createdBy:'user-a',projectId:null};
+
+test.each([
+  [{...validStandalone,projectId:'project-a'},/must not reference a project_id/],
+  [{...validStandalone,userId:''},/Authenticated user/],
+  [{...validStandalone,organizationId:''},/Organization context/],
+  [{...validStandalone,createdBy:''},/created_by is required/],
+  [{...validStandalone,createdBy:'user-b'},/does not match the authenticated user/],
+])('rejects unsafe standalone writes', (input,expected)=>expect(()=>validateStandaloneOwnership(input)).toThrow(expected));
+
+test('a well-formed standalone write is accepted',()=>{
+  expect(validateStandaloneOwnership(validStandalone)).toBe(true);
+});
+
+test('only documents is registered as standalone-capable, so no other project-owned table can bypass project ownership checks',()=>{
+  expect(STANDALONE_CAPABLE_TABLES.has('documents')).toBe(true);
+  expect([...STANDALONE_CAPABLE_TABLES].every(table=>PROJECT_OWNED_TABLES.has(table))).toBe(true);
+  expect(STANDALONE_CAPABLE_TABLES.size).toBe(1);
 });

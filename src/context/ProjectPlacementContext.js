@@ -14,6 +14,7 @@ import { useAuth } from "./AuthContext";
 import { useWorksheet } from "./WorksheetContext";
 import {
   createProjectPlacement,
+  connectAnalysisToProject,
   normalizePlacement,
   placementDestinations,
   placementLabel,
@@ -42,9 +43,10 @@ const load = () => {
 };
 
 export function ProjectPlacementProvider({ children }) {
-  const { analysisResults, registerAnalysisResult } = useAnalysis(),
+  const { analysisResults, registerAnalysisResult, updateAnalysis } = useAnalysis(),
     { addReportItem, removeReportItem } = useReport(),
     { projects, recordActivity } = useProjects(),
+    { createDatasetRecord } = useWorksheet(),
     { user, profile, configured } = useAuth();
   const [placements, setPlacements] = useState(() =>
       configured ? [] : load(),
@@ -196,6 +198,9 @@ export function ProjectPlacementProvider({ children }) {
           includeReport: existing
             ? existing.reportIncluded
             : draft?.includeReport !== false,
+          saveInputDataset:false,
+          datasetName:`${draft?.title||draft?.analysis?.title||"Analysis"} — Input Data`,
+          datasetDescription:"Input values saved with the project analysis.",
         });
       }),
     [placements],
@@ -223,6 +228,10 @@ export function ProjectPlacementProvider({ children }) {
     }
     try {
       let artifactId = request.existing?.artifactId || draft.artifactId;
+      let inputDataset=null;
+      if(request.saveInputDataset&&draft.manualDataset){
+        inputDataset=createDatasetRecord({name:request.datasetName.trim()||`${request.title} — Input Data`,description:request.datasetDescription.trim(),projectId:project.id,columns:draft.manualDataset.columns});
+      }
       if (!artifactId) {
         artifactId = registerAnalysisResult({
           ...draft.analysis,
@@ -230,7 +239,17 @@ export function ProjectPlacementProvider({ children }) {
           projectId: project.id,
           organizationId:
             project.organizationId || profile?.default_organization_id || "",
+          datasetIds:inputDataset?[inputDataset.id]:(draft.analysis?.datasetIds||[]),
+          datasetVersionIds:inputDataset?[inputDataset.versionId]:(draft.analysis?.datasetVersionIds||[]),
         });
+      } else {
+        const canonicalAnalysis=analysisResults.find((item)=>item.id===artifactId),organizationId=project.organizationId||profile?.default_organization_id||"";
+        if(canonicalAnalysis){
+          const connected=connectAnalysisToProject(canonicalAnalysis,{projectId:project.id,organizationId});
+          updateAnalysis(artifactId,{projectId:connected.projectId,organizationId:connected.organizationId,...(inputDataset?{datasetIds:[inputDataset.id],datasetVersionIds:[inputDataset.versionId]}:{})});
+        }else if(draft.analysis){
+          registerAnalysisResult({...draft.analysis,id:artifactId,title:request.title,projectId:project.id,organizationId});
+        }
       }
       let reportItemId = request.existing?.reportItemId || "";
       if (request.includeReport && !reportItemId && draft.reportItem)
@@ -256,8 +275,8 @@ export function ProjectPlacementProvider({ children }) {
         createdBy: user?.id || "",
         reportIncluded: request.includeReport,
         reportItemId,
-        datasetIds: draft.analysis?.datasetIds || [],
-        datasetVersionIds: draft.analysis?.datasetVersionIds || [],
+        datasetIds: inputDataset ? [inputDataset.id] : (draft.analysis?.datasetIds || []),
+        datasetVersionIds: inputDataset ? [inputDataset.versionId] : (draft.analysis?.datasetVersionIds || []),
         method:
           draft.analysis?.method || draft.reportItem?.provenance?.method || "",
         sourceWorkflow: draft.toolId || draft.analysis?.toolId || "",
@@ -265,6 +284,7 @@ export function ProjectPlacementProvider({ children }) {
           title: request.title,
           toolId: draft.toolId || draft.analysis?.toolId || "",
           validationStatus: draft.analysis?.validationStatus || "",
+          ...(inputDataset ? { inputDatasetName: inputDataset.name } : {}),
           ...(request.existing?.metadata || {}),
         },
         updatedAt: new Date().toISOString(),
@@ -480,6 +500,7 @@ export function ProjectPlacementProvider({ children }) {
                 <small>Uses the selected project's configured lifecycle and sequencing.</small>
               </span>
             </label>
+            {request.draft.manualDataset&&<><label className="placement-report-toggle"><input type="checkbox" checked={request.saveInputDataset} onChange={event=>setRequest(previous=>({...previous,saveInputDataset:event.target.checked}))}/><span><strong>Save input data as reusable project dataset</strong><small>Analysis Only leaves the exact input in the saved analysis without creating a dataset.</small></span></label>{request.saveInputDataset&&<><div className="form-group"><label>Dataset name</label><input value={request.datasetName} onChange={event=>setRequest(previous=>({...previous,datasetName:event.target.value}))}/></div><div className="form-group"><label>Description (optional)</label><textarea value={request.datasetDescription} onChange={event=>setRequest(previous=>({...previous,datasetDescription:event.target.value}))}/></div></>}</>}
             {notice && <div className="alert alert-warning">{notice}</div>}
             <footer>
               <button className="btn-secondary" onClick={() => close(null)}>
@@ -542,7 +563,9 @@ export function useProjectReportPlacement() {
             diagnostics: reportItem.diagnostics,
           },
           interpretation: reportItem.interpretation || "",
+          inputConfiguration:reportItem.inputConfiguration||{},
         },
+        manualDataset:reportItem.manualDataset,
         reportItem,
       });
     },
