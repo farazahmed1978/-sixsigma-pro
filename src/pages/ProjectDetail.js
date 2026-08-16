@@ -224,8 +224,8 @@ export default function ProjectDetail() {
         status: project.status || "Active",
         currentPhase: project.currentPhase || lifecycleStages[0] || "Define",
       });
-  }, [project]);
-  useEffect(() => {
+  }, [project, lifecycleStages]);
+    useEffect(() => {
     const host = document.querySelector(".project-hub .ph-hub-actions");
     if (!host) return;
     let button = host.querySelector("[data-edit-project]");
