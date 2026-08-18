@@ -8,6 +8,7 @@ import WorkspaceShell from '../components/WorkspaceShell';
 import {artifactResume,documentRoute} from '../utils/projectResume';
 import {lifecycleForProject} from '../foundation/lifecycle';
 import {nextDmaicArtifact} from '../utils/defineSequence';
+import {PROJECT_CHARTER_SCHEMA_VERSION,PROJECT_CHARTER_EMPTY,CHARTER_TABLE_COLUMNS} from '../config/charterTemplate';
 import './ProjectCharter.css';
 
 export const projectCharterLinkTarget=(projectId,to)=>to==='/templates'?documentRoute(projectId,'sipoc'):to;
@@ -15,7 +16,6 @@ export const charterSaveStateLabel=state=>({saving:'Saving…',saved:'Saved',uns
 export const mergeCharterSharedFields=(charter,shared={})=>({...charter,...Object.fromEntries([['targetDate','targetDate'],['businessCase','businessCaseSummary'],['goalStatement','goalSummary'],['scopeIn','scopeSummary']].filter(([,key])=>shared[key]!==undefined).map(([field,key])=>[field,shared[key]]))});
 function Link({to,...props}){const{id}=useParams();return <RouterLink to={projectCharterLinkTarget(id,to)} {...props}/>}
 
-export const PROJECT_CHARTER_SCHEMA_VERSION = 2;
 export const PROJECT_CHARTER_SECTIONS = [
   { id: 'overview', label: 'Project Overview', icon: '01', fields: ['projectSummary', 'targetDate'], tip: 'Summarize the mandate in language an executive can understand in under one minute.', next: 'Confirm the sponsor, owner, and target completion date.' },
   { id: 'need', label: 'Business Need', icon: '02', fields: ['businessCase', 'problemStatement'], tip: 'Use baseline evidence and explain the customer, cost, compliance, or strategic consequence.', next: 'Quantify the gap and validate the baseline with the process owner.' },
@@ -32,7 +32,6 @@ export const PROJECT_CHARTER_SECTIONS = [
 ];
 const SECTIONS = PROJECT_CHARTER_SECTIONS;
 
-const EMPTY = { schemaVersion: PROJECT_CHARTER_SCHEMA_VERSION, projectSummary: '', targetDate: '', businessCase: '', problemStatement: '', goalStatement: '', scopeIn: '', scopeOut: '', team: [], stakeholders: [], timeline: [], financialImpact: '', risks: [], assumptions: '', constraints: '', approvals: [] };
 const plain = value => String(value || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
 const rowId = prefix => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
@@ -83,7 +82,7 @@ export default function ProjectCharter() {
   const { addReportItem } = useReport();
   const project = getProject(id);
   const exists = Boolean(project);
-  const [charter, setCharter] = useState(() => ({ ...EMPTY, ...(project?.charter || {}) }));
+  const [charter, setCharter] = useState(() => ({ ...PROJECT_CHARTER_EMPTY, ...(project?.charter || {}) }));
   const [activeIndex, setActiveIndex] = useState(() => Math.max(0,SECTIONS.findIndex(section=>section.id===(project?.resumeTarget?.artifactId==='charter'?project.resumeTarget.sectionId:'overview'))));
   const [saveState, setSaveState] = useState('saved');
   const [guideOpen, setGuideOpen] = useState(true);
@@ -95,7 +94,7 @@ export default function ProjectCharter() {
   const previewRef = useRef(null);
   const hydrated = useRef(id);
 
-  useEffect(() => { if (hydrated.current !== id) { setCharter({ ...EMPTY, ...(project?.charter || {}) });setActiveIndex(Math.max(0,SECTIONS.findIndex(section=>section.id===(project?.resumeTarget?.artifactId==='charter'?project.resumeTarget.sectionId:'overview')))); hydrated.current = id; } }, [id, project]);
+  useEffect(() => { if (hydrated.current !== id) { setCharter({ ...PROJECT_CHARTER_EMPTY, ...(project?.charter || {}) });setActiveIndex(Math.max(0,SECTIONS.findIndex(section=>section.id===(project?.resumeTarget?.artifactId==='charter'?project.resumeTarget.sectionId:'overview')))); hydrated.current = id; } }, [id, project]);
   useEffect(()=>{if(!project)return;const sectionId=SECTIONS[activeIndex]?.id,currentResume=project.resumeTarget;if(currentResume?.artifactId==='charter'&&currentResume.sectionId===sectionId)return;updateProject(id,{resumeTarget:artifactResume({projectId:id,artifactId:'charter',artifactName:'Project Charter',sectionId})}).catch(()=>{})},[activeIndex,id,project,updateProject]);
   useEffect(()=>{if(!project)return;setCharter(current=>{const next=mergeCharterSharedFields(current,project.sharedFields);return next.targetDate===current.targetDate&&next.businessCase===current.businessCase&&next.goalStatement===current.goalStatement&&next.scopeIn===current.scopeIn?current:next})},[project]);
   useEffect(() => { if (!exists) return undefined; setSaveState('saving'); const timer = window.setTimeout(async () => { try { await updateProject(id, { charter: { ...charter, updatedAt: new Date().toISOString() } }); setSaveState('saved'); } catch { setSaveState('unsaved'); } }, 700); return () => window.clearTimeout(timer); }, [charter, exists, id, updateProject]);
@@ -126,13 +125,7 @@ export default function ProjectCharter() {
 
   if (!project) return <div className="pc-not-found"><h1>Project not found</h1><p>This charter is not connected to an active project.</p><Link className="btn-primary" to="/projects">Return to projects</Link></div>;
 
-  const table = {
-    team: [{ key: 'name', label: 'Name', placeholder: 'Full name' }, { key: 'role', label: 'Role', placeholder: 'Process owner' }, { key: 'allocation', label: 'Allocation', placeholder: '20%' }],
-    stakeholders: [{ key: 'name', label: 'Stakeholder', placeholder: 'Name or group' }, { key: 'interest', label: 'Interest', placeholder: 'Primary concern' }, { key: 'engagement', label: 'Engagement', placeholder: 'Weekly review' }],
-    timeline: [{ key: 'milestone', label: 'Milestone', placeholder: 'Define gate' }, { key: 'owner', label: 'Owner', placeholder: 'Accountable lead' }, { key: 'date', label: 'Target date', type: 'date' }],
-    risks: [{ key: 'risk', label: 'Risk', placeholder: 'Describe exposure' }, { key: 'impact', label: 'Impact', placeholder: 'High / Medium / Low' }, { key: 'mitigation', label: 'Mitigation', placeholder: 'Action and owner' }],
-    approvals: [{ key: 'name', label: 'Approver', placeholder: 'Full name' }, { key: 'role', label: 'Role', placeholder: 'Executive sponsor' }, { key: 'status', label: 'Status', placeholder: 'Pending / Approved' }, { key: 'date', label: 'Date', type: 'date' }],
-  };
+  const table = CHARTER_TABLE_COLUMNS;
 
   const renderActiveSection = () => {
     switch (current.id) {
