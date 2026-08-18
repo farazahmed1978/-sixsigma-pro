@@ -24,6 +24,7 @@ import {
   lifecycleStageLabels,
 } from "../foundation/lifecycle";
 import HelpButton from "../components/HelpButton";
+import ProjectHealthDashboard from "../components/ProjectHealthDashboard";
 import "./ProjectDetail.css";
 
 // Central, queryable tab membership: which suite(s) a Project Hub tab applies to. Analyses and
@@ -724,47 +725,85 @@ export default function ProjectDetail() {
     if (tab === "Project Home")
       return (
         <>
-          <div className="ph-intelligence">
-            <div>
-              <span>Documents Completed</span>
-              <strong>
-                {documents.filter((document) => document.status === "complete")
-                  .length + (project.charter && completion === 100 ? 1 : 0)}
-              </strong>
-            </div>
-            <div>
-              <span>Datasets</span>
-              <strong>
-                {
-                  projectDatasets.filter((dataset) => !dataset.archivedAt)
-                    .length
-                }
-              </strong>
-            </div>
-            <div>
-              <span>Analyses</span>
-              <strong>{projectAnalyses.length}</strong>
-            </div>
-            <div>
-              <span>Reports</span>
-              <strong>{projectReports.length}</strong>
-            </div>
-            <div>
-              <span>Open Risks</span>
-              <strong>{openRisks}</strong>
-            </div>
-            <div>
-              <span>Quality Score</span>
-              <strong>
-                {qualityScore}
-                <small>/100</small>
-              </strong>
-            </div>
-            <div>
-              <span>Days Remaining</span>
-              <strong>{daysRemaining === null ? "—" : daysRemaining}</strong>
-            </div>
-          </div>
+          {suiteId === "project-management" ? (
+            <ProjectHealthDashboard
+              project={project}
+              onOpenTab={(tabId) => {
+                const target = tabDefinitions.find((item) => item.id === tabId);
+                if (target) setTab(target.label);
+              }}
+            />
+          ) : (
+            <>
+              <div className="ph-intelligence">
+                <div>
+                  <span>Documents Completed</span>
+                  <strong>
+                    {documents.filter((document) => document.status === "complete")
+                      .length + (project.charter && completion === 100 ? 1 : 0)}
+                  </strong>
+                </div>
+                <div>
+                  <span>Datasets</span>
+                  <strong>
+                    {
+                      projectDatasets.filter((dataset) => !dataset.archivedAt)
+                        .length
+                    }
+                  </strong>
+                </div>
+                <div>
+                  <span>Analyses</span>
+                  <strong>{projectAnalyses.length}</strong>
+                </div>
+                <div>
+                  <span>Reports</span>
+                  <strong>{projectReports.length}</strong>
+                </div>
+                <div>
+                  <span>Open Risks</span>
+                  <strong>{openRisks}</strong>
+                </div>
+                <div>
+                  <span>Quality Score</span>
+                  <strong>
+                    {qualityScore}
+                    <small>/100</small>
+                  </strong>
+                </div>
+                <div>
+                  <span>Days Remaining</span>
+                  <strong>{daysRemaining === null ? "—" : daysRemaining}</strong>
+                </div>
+              </div>
+              <section className="ph-section">
+                <div className="ph-section-title">
+                  <div>
+                    <span>{lifecycle.methodology}</span>
+                    <h2>Phase workspaces</h2>
+                  </div>
+                </div>
+                <div className="ph-phases">
+                  {lifecycle.stages.filter((stage) => stage.recommendedDocumentId).map((stage) => (
+                    <Link
+                      key={stage.id}
+                      to={
+                        stage.recommendedDocumentId === "charter"
+                          ? `/projects/${id}/charter`
+                          : `/projects/${id}/documents/${stage.recommendedDocumentId}`
+                      }
+                    >
+                      <i className={`badge-${stage.id}`}>
+                        {stage.label.charAt(0)}
+                      </i>
+                      <strong>{stage.label}</strong>
+                      <span>Open workspace →</span>
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            </>
+          )}
           <div className="ph-dashboard-grid">
             <section className="ph-section">
               <div className="ph-section-title">
@@ -815,32 +854,6 @@ export default function ProjectDetail() {
               )}
             </section>
           </div>
-          <section className="ph-section">
-            <div className="ph-section-title">
-              <div>
-                <span>{lifecycle.methodology}</span>
-                <h2>Phase workspaces</h2>
-              </div>
-            </div>
-            <div className="ph-phases">
-              {lifecycle.stages.filter((stage) => stage.recommendedDocumentId).map((stage) => (
-                <Link
-                  key={stage.id}
-                  to={
-                    stage.recommendedDocumentId === "charter"
-                      ? `/projects/${id}/charter`
-                      : `/projects/${id}/documents/${stage.recommendedDocumentId}`
-                  }
-                >
-                  <i className={`badge-${stage.id}`}>
-                    {stage.label.charAt(0)}
-                  </i>
-                  <strong>{stage.label}</strong>
-                  <span>Open workspace →</span>
-                </Link>
-              ))}
-            </div>
-          </section>
         </>
       );
     if (tab === "Documents")

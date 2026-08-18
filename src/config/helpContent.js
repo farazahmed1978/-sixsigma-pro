@@ -233,6 +233,15 @@ export const HELP_CONTENT = {
       connectsTo: "History (← Previous) returns to whatever screen you were on before, which may not be the previous document in the sequence.",
     },
   },
+  "project-health-dashboard": {
+    "project-management": {
+      title: "Project Health Dashboard",
+      summary: "Five traffic-light cards — Schedule, Cost, Risk, Actions and Issues, Approvals and Decisions — computed live from your project's own documents, plus an overall weighted score.",
+      whenToUse: "Check this first when picking up a project: it tells you which area needs attention before you open any single document.",
+      example: "Cost Health turns Red when CPI drops below 0.9 (or no EVM data has been entered yet) — click through to EVM Dashboard to see why.",
+      connectsTo: "Every card links straight to the document it reads from (e.g. Risk Exposure → Risk Register), and computeProjectHealth() is the same pure function an AI daily brief uses.",
+    },
+  },
 };
 
 // Looks up help content for a surface, preferring the project's specific suite and falling back to
