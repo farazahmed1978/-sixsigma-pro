@@ -46,38 +46,52 @@ const OE_GROUPS=[
  ]},
 ];
 
+// PMBOK 8th Edition realigns the PM suite from 10 PMBOK 6th Edition Knowledge Areas to 8
+// Performance Domains (Stakeholder, Team, Development Approach & Life Cycle, Planning, Project
+// Work, Delivery, Measurement, Uncertainty) plus Governance (replacing Integration Management) and
+// three cross-cutting additions PMBOK 8 introduces: Value Delivery, AI Impact Assessment, and
+// Sustainability. The 5 Focus Areas below (renamed from PMBOK 6's Process Groups, structurally the
+// same 5 stages) are unchanged — every document keeps its existing stage/pmpLifecycle assignment in
+// pmpTemplates.js; only the *cluster* a document is grouped under within its stage changes, from a
+// Knowledge Area to the Performance Domain that best fits it. A domain's cluster id/label recurs
+// across stages by design (e.g. 'Uncertainty' clusters both Planning's Risk Management Plan/Risk
+// Register/Risk Report and Monitoring & Controlling's Risk Review) since PMBOK 8 domains are meant
+// to apply throughout the lifecycle, not confine to one stage.
 const PM_GROUPS=[
  {id:'initiation',name:'Initiation',color:'var(--yellow)',recommendedDocumentId:'charter',clusters:[
-  cluster('justification-benefits','Justification & Benefits',[pmDoc('Business Case','business-case','workspace'),pmDoc('Benefits Management Plan')]),
-  cluster('authorization-assumptions','Authorization & Assumptions',[pmDoc('Project Charter','charter','workspace'),pmDoc('Assumption Log')]),
-  cluster('stakeholder-identification','Stakeholder Identification',[pmDoc('Stakeholder Register','stakeholder-register','workspace')]),
+  cluster('governance','Governance',[pmDoc('Project Charter','charter','workspace'),pmDoc('Business Case','business-case','workspace')]),
+  cluster('stakeholder','Stakeholder',[pmDoc('Stakeholder Register','stakeholder-register','workspace')]),
+  cluster('uncertainty','Uncertainty',[pmDoc('Assumption Log')]),
+  cluster('value-delivery','Value Delivery',[pmDoc('Benefits Management Plan')]),
  ]},
  {id:'planning',name:'Planning',color:'var(--cyan)',recommendedDocumentId:'project-management-plan',clusters:[
-  cluster('integration-governance','Integration & Governance',[pmDoc('Project Management Plan'),pmDoc('Configuration Management Plan'),pmDoc('Change Management Plan')]),
-  cluster('scope-requirements','Scope & Requirements',[pmDoc('Scope Management Plan'),pmDoc('Scope Statement'),pmDoc('WBS','wbs','diagram'),pmDoc('WBS Dictionary'),pmDoc('Requirements Management Plan'),pmDoc('Requirements Traceability Matrix')]),
-  cluster('schedule','Schedule',[pmDoc('Schedule Management Plan'),pmDoc('Schedule Baseline')]),
-  cluster('cost','Cost',[pmDoc('Cost Management Plan'),pmDoc('Cost Baseline')]),
-  cluster('resources','Resources',[pmDoc('Resource Management Plan'),pmDoc('Resource Calendar')]),
-  cluster('stakeholders-communications','Stakeholders & Communications',[pmDoc('Communications Management Plan'),pmDoc('Stakeholder Engagement Plan')]),
-  cluster('risk','Risk',[pmDoc('Risk Management Plan'),pmDoc('Risk Register'),pmDoc('Risk Report')]),
-  cluster('procurement','Procurement',[pmDoc('Procurement Management Plan')]),
-  cluster('quality','Quality',[pmDoc('Quality Management Plan')]),
+  cluster('governance','Governance',[pmDoc('Project Management Plan'),pmDoc('Configuration Management Plan'),pmDoc('Change Management Plan'),pmDoc('Project Governance Framework')]),
+  cluster('stakeholder','Stakeholder',[pmDoc('Communications Management Plan'),pmDoc('Stakeholder Engagement Plan')]),
+  cluster('team','Team',[pmDoc('Resource Management Plan'),pmDoc('Resource Calendar')]),
+  cluster('development-approach','Development Approach & Life Cycle',[pmDoc('Scope Statement'),pmDoc('WBS','wbs','diagram'),pmDoc('WBS Dictionary')]),
+  cluster('planning-domain','Planning',[pmDoc('Scope Management Plan'),pmDoc('Requirements Management Plan'),pmDoc('Requirements Traceability Matrix'),pmDoc('Schedule Management Plan'),pmDoc('Schedule Baseline'),pmDoc('Cost Management Plan'),pmDoc('Cost Baseline'),pmDoc('Quality Management Plan'),pmDoc('Procurement Management Plan')]),
+  cluster('uncertainty','Uncertainty',[pmDoc('Risk Management Plan'),pmDoc('Risk Register'),pmDoc('Risk Report')]),
+  cluster('value-delivery','Value Delivery',[pmDoc('Value Realization Plan')]),
+  cluster('ai-impact','AI Impact Assessment',[pmDoc('AI and Automation Impact Assessment')]),
+  cluster('sustainability','Sustainability',[pmDoc('Sustainability Impact Assessment')]),
  ]},
  {id:'execution',name:'Execution',color:'var(--purple)',recommendedDocumentId:'issue-log',clusters:[
-  cluster('delivery-governance','Delivery Governance',[pmDoc('Issue Log'),pmDoc('Decision Log'),pmDoc('Action Item Log'),pmDoc('RAID Log')]),
-  cluster('meetings-change','Meetings & Change',[pmDoc('Meeting Minutes','minutes','workspace'),pmDoc('Change Request')]),
-  cluster('procurement-vendors','Procurement & Vendors',[pmDoc('Procurement Documents'),pmDoc('Vendor Evaluation')]),
-  cluster('team-performance','Team Performance',[pmDoc('Team Performance Reviews'),pmDoc('Lessons Learned Register')]),
+  cluster('governance','Governance',[pmDoc('Decision Log')]),
+  cluster('team','Team',[pmDoc('Team Performance Reviews')]),
+  cluster('project-work','Project Work',[pmDoc('Issue Log'),pmDoc('Action Item Log'),pmDoc('RAID Log'),pmDoc('Change Request'),pmDoc('Meeting Minutes','minutes','workspace'),pmDoc('Procurement Documents'),pmDoc('Vendor Evaluation')]),
+  cluster('measurement','Measurement',[pmDoc('Lessons Learned Register')]),
  ]},
  {id:'monitoring-controlling',name:'Monitoring & Controlling',color:'var(--orange)',recommendedDocumentId:'status-report',clusters:[
-  cluster('performance-reporting','Performance Reporting',[pmDoc('Status Report'),pmDoc('Executive Dashboard','executive-dashboard','workspace'),pmDoc('Variance Report'),pmDoc('EVM Dashboard','evm-dashboard','workspace'),pmDoc('Milestone Report'),pmDoc('KPI Dashboard','kpi-dashboard','workspace')]),
-  cluster('change-quality','Change & Quality',[pmDoc('Change Log'),pmDoc('Quality Audit')]),
-  cluster('risk-review','Risk Review',[pmDoc('Risk Review')]),
+  cluster('governance','Governance',[pmDoc('Change Log')]),
+  cluster('measurement','Measurement',[pmDoc('Status Report'),pmDoc('Executive Dashboard','executive-dashboard','workspace'),pmDoc('Variance Report'),pmDoc('EVM Dashboard','evm-dashboard','workspace'),pmDoc('Milestone Report'),pmDoc('KPI Dashboard','kpi-dashboard','workspace')]),
+  cluster('delivery','Delivery',[pmDoc('Quality Audit')]),
+  cluster('uncertainty','Uncertainty',[pmDoc('Risk Review')]),
+  cluster('value-delivery','Value Delivery',[pmDoc('Benefits Tracking Register')]),
  ]},
  {id:'closing',name:'Closing',color:'var(--green)',recommendedDocumentId:'final-project-report',clusters:[
-  cluster('formal-closure','Formal Closure',[pmDoc('Final Project Report'),pmDoc('Project Closure Report'),pmDoc('Acceptance Signoff'),pmDoc('Archive Checklist')]),
-  cluster('transition-benefits','Transition & Benefits',[pmDoc('Transition Plan'),pmDoc('Benefits Realization Review')]),
-  cluster('knowledge-transfer','Knowledge Transfer',[pmDoc('Lessons Learned Report')]),
+  cluster('delivery','Delivery',[pmDoc('Final Project Report'),pmDoc('Project Closure Report'),pmDoc('Acceptance Signoff'),pmDoc('Transition Plan')]),
+  cluster('value-delivery','Value Delivery',[pmDoc('Benefits Realization Review')]),
+  cluster('measurement','Measurement',[pmDoc('Lessons Learned Report'),pmDoc('Archive Checklist')]),
  ]},
 ];
 

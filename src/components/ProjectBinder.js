@@ -6,6 +6,7 @@ import {
   resolveLifecycleStage,
   stageRank,
 } from "../foundation/lifecycle";
+import { SHARED_LEAD_IN_IDS } from "../utils/defineSequence";
 import { NAVIGATION } from "../config/navigation";
 import { navigationItems } from "../utils/navigationTools";
 import { useProjectPlacement } from "../context/ProjectPlacementContext";
@@ -60,6 +61,18 @@ const humanize = (value) =>
 const sourceId = (item) =>
   item.documentId || item.analysisId || item.sourceId || item.id;
 const resolvePhase = (item, kind, lifecycle) => {
+  // Charter, Business Case, and Stakeholder Register are shared documents (defined once, surfaced
+  // under both suites — see SHARED_LEAD_IN_IDS) whose saved record always carries their static
+  // Define-phase template.phase, the same convention DocumentWorkspace.js and
+  // utils/projectReport.js already follow for these three. On a non-OE project that phase doesn't
+  // match any PM lifecycle stage, so without this they'd resolve to no phase at all and vanish
+  // from every PM stage's phaseItems() — never appearing in stage narratives or readiness checks.
+  if (
+    kind === "document" &&
+    lifecycle.id !== "operational-excellence" &&
+    SHARED_LEAD_IN_IDS.includes(item.templateId)
+  )
+    return lifecycle.stages[0]?.label || "";
   const explicit = [item, item.content, item.documentSnapshot, item.analysis]
     .map((value) =>
       value
@@ -380,35 +393,127 @@ export function buildProjectReviewModel(
       ],
     ],
   };
+  // PMBOK 8 Focus Area narratives (the 5 PM stages, renamed from PMBOK 6th Edition Process
+  // Groups — same 5 stages, same PHASES/lifecycle stage labels, only the language and the
+  // Performance Domain framing change). Each row pulls from the field ids the corresponding
+  // Performance Domain's documents actually use (see config/pmpTemplates.js and
+  // config/charterTemplate.js), the same firstValue-over-phaseItems pattern oeSummaries uses above,
+  // so a PM project gets binder narratives as specific to its stage as an OE project's.
+  const pmSummaries = {
+    Initiation: [
+      [
+        "Mandate and business case",
+        firstValue(phaseItems("Initiation"), [
+          "projectSummary",
+          "businessCase",
+          "purpose",
+        ]),
+      ],
+      [
+        "Benefits and value case",
+        firstValue(phaseItems("Initiation"), ["benefitRows", "financialImpact"]),
+      ],
+      [
+        "Stakeholders identified",
+        firstValue(phaseItems("Initiation"), ["stakeholders", "items"]),
+      ],
+    ],
+    Planning: [
+      [
+        "Development approach and scope",
+        firstValue(phaseItems("Planning"), ["wbsRows", "purpose", "approach"]),
+      ],
+      [
+        "Schedule and cost baselines",
+        firstValue(phaseItems("Planning"), ["scheduleRows", "items"]),
+      ],
+      [
+        "Risk and uncertainty exposure",
+        firstValue(phaseItems("Planning"), ["riskRows", "purpose"]),
+      ],
+    ],
+    Execution: [
+      [
+        "Delivery governance and decisions",
+        firstValue(phaseItems("Execution"), ["decisionRows", "items"]),
+      ],
+      ["Open issues and actions", firstValue(phaseItems("Execution"), ["items"])],
+      [
+        "Team performance",
+        firstValue(phaseItems("Execution"), ["items"]),
+      ],
+    ],
+    "Monitoring & Controlling": [
+      [
+        "Performance against baseline",
+        firstValue(phaseItems("Monitoring & Controlling"), [
+          "interpretation",
+          "items",
+        ]),
+      ],
+      [
+        "Benefits tracked",
+        firstValue(phaseItems("Monitoring & Controlling"), ["benefitRows"]),
+      ],
+      [
+        "Risk and change activity",
+        firstValue(phaseItems("Monitoring & Controlling"), ["items"]),
+      ],
+    ],
+    Closing: [
+      [
+        "Formal closure and acceptance",
+        firstValue(phaseItems("Closing"), ["items", "purpose"]),
+      ],
+      [
+        "Benefits realized",
+        firstValue(phaseItems("Closing"), ["benefitRows", "items"]),
+      ],
+      [
+        "Lessons and knowledge transfer",
+        firstValue(phaseItems("Closing"), ["items"]),
+      ],
+    ],
+  };
   const summaries =
     lifecycle.id === "operational-excellence"
       ? oeSummaries
-      : Object.fromEntries(
-          PHASES.map((phase) => [
-            phase,
-            [
+      : lifecycle.id === "project-management"
+        ? pmSummaries
+        : Object.fromEntries(
+            PHASES.map((phase) => [
+              phase,
               [
-                "Connected records",
-                `${phaseItems(phase).length} connected asset(s)`,
+                [
+                  "Connected records",
+                  `${phaseItems(phase).length} connected asset(s)`,
+                ],
+                [
+                  "Recorded context",
+                  firstValue(phaseItems(phase), [
+                    "summary",
+                    "description",
+                    "interpretation",
+                    "notes",
+                  ]),
+                ],
               ],
-              [
-                "Recorded context",
-                firstValue(phaseItems(phase), [
-                  "summary",
-                  "description",
-                  "interpretation",
-                  "notes",
-                ]),
-              ],
-            ],
-          ]),
-        );
+            ]),
+          );
   const requiredDocs = {
     Define: ["charter"],
     Measure: ["data-collection-plan"],
     Analyze: ["statistical-analysis-summary"],
     Improve: ["action-plan"],
     Control: ["control-plan"],
+    // PM stage-readiness minimums (PMBOK 8 Focus Areas). Every id here must exist for the stage to
+    // read "complete" — see the `.every()` check below, not `.some()`, since these are each a
+    // minimum SET of required documents, not alternatives.
+    Initiation: ["charter", "business-case"],
+    Planning: ["wbs", "risk-register", "schedule-baseline"],
+    Execution: ["issue-log", "action-item-log"],
+    "Monitoring & Controlling": ["status-report", "evm-dashboard"],
+    Closing: ["project-closure-report", "lessons-learned-report"],
   };
   const checks = [
     {
@@ -437,14 +542,18 @@ export function buildProjectReviewModel(
       action: "Set a target completion date.",
     },
     ...PHASES.map((phase) => {
+      // Every id in requiredDocs[phase] is a minimum required document for that stage, not a
+      // choice of alternatives — a stage with two required documents needs both, not either. A
+      // stage with no requiredDocs entry (none currently, but future suites may add stages before
+      // populating this map) is trivially satisfied rather than blocked.
       const expected = requiredDocs[phase] || [],
-        present =
-          !expected.length ||
-          expected.some((id) =>
-            items.some(
+        missing = expected.filter(
+          (id) =>
+            !items.some(
               (item) => item.kind === "document" && item.templateId === id,
             ),
-          );
+        ),
+        present = !missing.length;
       const phaseAssets = phaseItems(phase);
       const low = phaseAssets.some(
         (item) => item.quality !== null && item.quality < 70,
@@ -454,7 +563,7 @@ export function buildProjectReviewModel(
         label: `${phase} stage readiness`,
         status: !present ? "missing" : low ? "attention" : "complete",
         action: !present
-          ? `Add ${expected.map(humanize).join(" or ")}.`
+          ? `Add ${missing.map(humanize).join(" and ")}.`
           : low
             ? "Improve the flagged record quality."
             : "Stage evidence is present.",
