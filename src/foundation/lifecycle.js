@@ -26,6 +26,12 @@ export function resolveProjectSuiteId(project={}){
  return aliases[slug(explicit)]||aliases[slug(project.methodology)]||slug(explicit)||'operational-excellence';
 }
 export const lifecycleForProject=project=>lifecycleRegistry.get(resolveProjectSuiteId(project))||OE_LIFECYCLE;
+// The single, central suite-membership check every component should use to decide what's visible
+// in a project's context (tabs, quick actions, catalogs, report content, help copy) instead of each
+// one independently re-deriving or hardcoding a suite comparison. Built on the same
+// resolveProjectSuiteId() every other suite-aware function in this file already uses, so there is
+// exactly one place project->suite resolution is authored.
+export const isSuite=(project,suiteId)=>resolveProjectSuiteId(project)===suiteId;
 export const lifecycleStageLabels=lifecycle=>lifecycle.stages.map(stage=>stage.label);
 export function resolveLifecycleStage(value,lifecycle,{preserveUnknown=true}={}){
  const raw=typeof value==='object'?(value.stageId||value.phaseId||value.lifecyclePhase||value.lifecycle_phase||value.currentPhase||value.dmaicPhase||value.dmaic_phase||value.phase):value;

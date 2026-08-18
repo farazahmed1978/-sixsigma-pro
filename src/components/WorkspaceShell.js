@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import HelpButton from './HelpButton';
 import './WorkspaceShell.css';
 
 export default function WorkspaceShell({
@@ -8,7 +9,7 @@ export default function WorkspaceShell({
   onPrevious, onNext, onMinimize, onMaximize, onRestore, breadcrumb, onSave, onExport,
   onPrint, onHelp, saveLabel = 'Save', saving = false, sequencePreviousLabel,
   sequenceNextLabel, sequencePreviousDisabled = false, sequenceNextDisabled = false,
-  onSequencePrevious, onSequenceNext,
+  onSequencePrevious, onSequenceNext, suiteId,
 }) {
   useEffect(() => {
     const handleEscape = event => { if (event.key === 'Escape' && mode !== 'normal') onRestore?.(); };
@@ -30,6 +31,7 @@ export default function WorkspaceShell({
       </div>
       {onSequenceNext && <div className="workspace-shell-sequence" aria-label="Ordered workflow navigation">
         <span>Sequence</span>
+        <HelpButton surfaceId="workspace-shell-sequence" suiteId={suiteId}/>
         <button type="button" onClick={onSequencePrevious} disabled={sequencePreviousDisabled} title="Move to the previous item in the ordered workflow">&larr; {sequencePreviousLabel || 'Previous item'}</button>
         <button type="button" onClick={onSequenceNext} disabled={sequenceNextDisabled} title="Move to the next item in the ordered workflow">{sequenceNextLabel || 'Next item'} &rarr;</button>
       </div>}

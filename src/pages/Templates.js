@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useProjects } from '../context/ProjectsContext';
 import DocumentWorkspace from '../components/DocumentWorkspace';
 import StandaloneDocumentWorkspace from '../components/StandaloneDocumentWorkspace';
@@ -20,7 +20,26 @@ import { SUITES } from '../config/suites';
 import { navigationItems } from '../utils/navigationTools';
 import { resolveProjectSuiteId, lifecycleRegistry, OE_LIFECYCLE } from '../foundation/lifecycle';
 import { useEntitlements } from '../context/EntitlementContext';
+import HelpButton from '../components/HelpButton';
 import './Templates.css';
+
+// Per-document-card help. Rather than hand-authoring an entry for every one of the ~50 document
+// templates in a central list, this derives help content from data every template already
+// carries — its own desc and its first section's guidance — the same "what is this, when do I use
+// it" a curated entry would say, without a second, easily-drifting copy of the same information.
+// "What a good version contains" is computed from the template's own required-field count, so it
+// stays accurate as templates change instead of being a hand-written number that can go stale.
+const documentCardHelp = template => {
+  const requiredFields = (template.sections || []).flatMap(section => section.fields || []).filter(field => field.required !== false);
+  return {
+    title: template.name,
+    summary: template.desc,
+    whenToUse: template.sections?.[0]?.guidance || `Complete this document as part of the project's ${template.phase || 'workflow'} stage.`,
+    example: requiredFields.length
+      ? `A complete, high-quality version fills in every required field (${requiredFields.length} across ${template.sections.length} section${template.sections.length === 1 ? '' : 's'}) with specific, substantive detail — not placeholder text.`
+      : undefined,
+  };
+};
 
 const LEGACY_TEMPLATES = [
   {
@@ -653,6 +672,7 @@ export default function Templates() {
         <h1>Document Library</h1>
         <label className="templates-project-select">Active project<select value={activeProjectId} onChange={event => setActiveProjectId(event.target.value)}><option value="">Select a project</option>{projects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
         <p>Search project-connected Lean Six Sigma and Project Management workspaces.</p>
+        {(projectId || searchParams.get('project')) && <Link to={`/projects/${projectId || searchParams.get('project')}`}>&larr; Back to Project Hub</Link>}
       </div>
 
       {!selected ? (
@@ -666,14 +686,14 @@ export default function Templates() {
           </div>
           <div className="templates-grid no-print">
             {filtered.map(t => (
-              <button key={t.id} className="template-card" onClick={() => openTemplate(t)}>
+              <div key={t.id} className="template-card" role="button" tabIndex={0} onClick={() => openTemplate(t)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openTemplate(t); } }}>
                 <div className="template-icon">{t.icon}</div>
                 <div className="template-phase-badge" style={{ color: phaseColor[t.phase] }}>{t.phase}</div>
-                <h3>{t.name}</h3>
+                <h3>{t.name}<HelpButton content={documentCardHelp(t)} label={t.name}/></h3>
                 <p>{t.desc}</p>
                 <span className={`library-status status-${workspaceStatus(t).toLowerCase().replace(' ','-')}`}>{workspaceStatus(t)}</span>
                 <div className="template-open-btn">Open Template →</div>
-              </button>
+              </div>
             ))}
           </div>
         </>

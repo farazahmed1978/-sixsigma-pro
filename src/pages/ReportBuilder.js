@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import jsPDF from "jspdf";
-import { useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useReport } from "../context/ReportContext";
 import { useProjects } from "../context/ProjectsContext";
 import { documentRepository } from "../repositories/documentRepository";
 import { assembleReportModel } from "../foundation/reportAssembly";
+import { lifecycleForProject } from "../foundation/lifecycle";
+import HelpButton from "../components/HelpButton";
 import {
   allPrintArtifactIds,
   createPrintModel,
@@ -114,9 +116,24 @@ export default function ReportBuilder() {
   } = useReport();
   const { projects, addArtifact } = useProjects();
   const { profile } = useAuth();
-  const project = projects.find(
-    (entry) => entry.id === items.find((item) => item.projectId)?.projectId,
-  );
+  const location = useLocation();
+  // When Report Builder is opened from a specific project (Project Hub's "Build Report"), it must
+  // show only that project's own documents/analyses/artifacts — the previous behavior inferred
+  // "the project" from whichever report item happened to be first in the entire cross-project,
+  // cross-suite items list, so a PM project's report could surface OE tools and DMAIC artifacts
+  // left over from browsing an OE project earlier. contextProjectId, when present, is the single
+  // source of truth for both which project this report is and which items belong in it — a project
+  // only ever has one suite, so scoping by project inherently scopes by suite too.
+  const contextProjectId = location.state?.projectId || "";
+  const project = contextProjectId
+    ? projects.find((entry) => entry.id === contextProjectId)
+    : projects.find(
+        (entry) => entry.id === items.find((item) => item.projectId)?.projectId,
+      );
+  const scopedItems = contextProjectId
+    ? items.filter((item) => item.projectId === contextProjectId)
+    : items;
+  const suiteId = project ? lifecycleForProject(project).id : null;
   const [reportTitle, setReportTitle] = useState("Project Report");
   const [preparedBy, setPreparedBy] = useState(()=>profile?.full_name||profile?.display_name||profile?.name||"");
   const titleEdited=useRef(false);
@@ -127,8 +144,8 @@ export default function ReportBuilder() {
     [printError, setPrintError] = useState("");
   useEffect(()=>{if(project&&!titleEdited.current&&reportTitle==="Project Report")setReportTitle(`${project.name} — Project Report`)},[project,reportTitle]);
   const reportModel = useMemo(
-      () => assembleReportModel(items, project || {}),
-      [items, project],
+      () => assembleReportModel(scopedItems, project || {}),
+      [scopedItems, project],
     ),
     visibleItems = reportModel.items,
     PHASES = reportModel.sections.map((section) => section.phase),
@@ -328,14 +345,15 @@ export default function ReportBuilder() {
           </div>
         )}
         <div className="templates-header">
-          <h1>Report Builder</h1>
+          <h1>Report Builder<HelpButton surfaceId="report-builder" suiteId={suiteId}/></h1>
           <p>
             Review the project in {reportModel.lifecycle.methodology} sequence,
             then print or generate a local PDF.
           </p>
+          {contextProjectId && <Link to={`/projects/${contextProjectId}`}>&larr; Back to Project Hub</Link>}
         </div>
         <StandaloneArtifacts />
-        {!items.length && (
+        {!scopedItems.length && (
           <section className="card" style={{ padding: "1.5rem", marginBottom: "1.5rem", textAlign: "center" }}>
             <h2>Project Artifacts</h2>
             <p style={{ color: "var(--text-secondary)" }}>
@@ -344,7 +362,7 @@ export default function ReportBuilder() {
             </p>
           </section>
         )}
-        {items.length > 0 && <>
+        {scopedItems.length > 0 && <>
         <h2 style={{ marginBottom: "1rem" }}>Project Artifacts</h2>
         <div className="card" style={{ padding: "1rem 1.5rem", marginBottom: "1rem" }}><span style={{ color: "var(--text-secondary)" }}>Project</span><h3 style={{ margin: ".25rem 0 0" }}>{project?.name || "Project context unavailable"}</h3></div>
         <div

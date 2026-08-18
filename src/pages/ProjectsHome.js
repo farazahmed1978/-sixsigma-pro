@@ -6,6 +6,7 @@ import { useInteractions } from '../context/InteractionContext';
 import './ProjectWorkspace.css';
 import {projectResumeCta} from '../utils/projectResume';
 import {printProjectReport,exportProjectReportToFile} from '../utils/projectReport';
+import HelpButton from '../components/HelpButton';
 
 function projectProgress(project) {
   const stages=lifecycleStageLabels(lifecycleForProject(project));
@@ -53,6 +54,7 @@ function ProjectCard({ project, resume, progress, phase, deletingProjectId, onDe
         <Link to={`/projects/${project.id}`} className="btn-secondary pw-open-btn">Open Project →</Link>
         <button type="button" className="btn-secondary pw-open-btn" onClick={() => printProjectReport(project, { onStatus: setNotice })}>🖨️ Print All</button>
         <button type="button" className="btn-secondary pw-open-btn" onClick={() => exportProjectReportToFile(project, { onStatus: setNotice })}>⬇ Save to File</button>
+        <HelpButton surfaceId="project-workspace-home" suiteId={lifecycleForProject(project).id} label="Print All / Save to File"/>
       </div>
       {notice && <p className="pw-project-notice">{notice}</p>}
     </div>

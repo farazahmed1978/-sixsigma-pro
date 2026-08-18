@@ -11,6 +11,7 @@ import { NAVIGATION } from "../config/navigation";
 import { navigationItems } from "../utils/navigationTools";
 import { useProjectPlacement } from "../context/ProjectPlacementContext";
 import SavedAnalysisResult from "./SavedAnalysisResult";
+import HelpButton from "./HelpButton";
 import "./ProjectBinder.css";
 
 const oeItems = navigationItems(NAVIGATION).filter(
@@ -763,7 +764,7 @@ export default function ProjectBinder({
         <header>
           <div>
             <span>PROJECT INTELLIGENCE</span>
-            <h2>Project Binder</h2>
+            <h2>Project Binder<HelpButton surfaceId="project-binder" suiteId={model.lifecycle.id}/></h2>
             <p>
               A continuous {model.lifecycle.methodology} review assembled from
               authoritative project records.

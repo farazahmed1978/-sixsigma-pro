@@ -5,7 +5,7 @@ import {documentRepository} from '../repositories/documentRepository';
 
 jest.mock('jspdf',()=>jest.fn());
 const mockNavigate=jest.fn();
-jest.mock('react-router-dom',()=>({useNavigate:()=>mockNavigate}));
+jest.mock('react-router-dom',()=>({useNavigate:()=>mockNavigate,useLocation:()=>({state:null}),Link:({to,children,...rest})=>require('react').createElement('a',{href:to,...rest},children)}));
 jest.mock('../context/AuthContext',()=>({useAuth:()=>({profile:{default_organization_id:'org-1'}})}));
 jest.mock('../repositories/documentRepository',()=>({documentRepository:{listStandalone:jest.fn()}}));
 jest.mock('../context/ReportContext',()=>({useReport:()=>({items:[],removeReportItem:jest.fn(),toggleIncludeRawData:jest.fn(),reorderItems:jest.fn(),clearReport:jest.fn(),storageWarning:null,dismissStorageWarning:jest.fn()})}));

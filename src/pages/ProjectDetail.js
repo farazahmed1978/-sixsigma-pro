@@ -23,27 +23,45 @@ import {
   lifecycleForProject,
   lifecycleStageLabels,
 } from "../foundation/lifecycle";
+import HelpButton from "../components/HelpButton";
 import "./ProjectDetail.css";
 
-const TABS = [
-  "Project Home",
-  "Project Settings",
-  "Risks",
-  "Actions",
-  "Issues",
-  "Decisions",
-  "Approvals",
-  "Documents",
-  "Datasets",
-  "Analyses",
-  "Placements",
-  "Evidence Library",
-  "Artifacts",
-  "Project Binder",
-  "Reports",
-  "Team",
-  "Timeline",
+// Central, queryable tab membership: which suite(s) a Project Hub tab applies to. Analyses and
+// Placements are OE-only (statistical analyses and their DMAIC workflow-cluster placement don't
+// exist as a PM concept yet); Risks/Actions/Issues/Decisions/Approvals are PM-only governance
+// surfaces. Everything else applies to both. A future PM-specific analysis surface should add
+// 'project-management' to Analyses' suites here, not add a parallel PM-only tab elsewhere.
+export const TAB_DEFINITIONS = [
+  { id: "project-home", label: "Project Home", suites: ["operational-excellence", "project-management"] },
+  { id: "project-settings", label: "Project Settings", suites: ["operational-excellence", "project-management"] },
+  { id: "documents", label: "Documents", suites: ["operational-excellence", "project-management"] },
+  { id: "datasets", label: "Datasets", suites: ["operational-excellence", "project-management"] },
+  { id: "analyses", label: "Analyses", suites: ["operational-excellence"] },
+  { id: "placements", label: "Placements", suites: ["operational-excellence"] },
+  { id: "risks", label: "Risks", suites: ["project-management"] },
+  { id: "issues", label: "Issues", suites: ["project-management"] },
+  { id: "actions", label: "Actions", suites: ["project-management"] },
+  { id: "decisions", label: "Decisions", suites: ["project-management"] },
+  { id: "approvals", label: "Approvals", suites: ["project-management"] },
+  { id: "evidence-library", label: "Evidence Library", suites: ["operational-excellence", "project-management"] },
+  { id: "artifacts", label: "Artifacts", suites: ["operational-excellence", "project-management"] },
+  { id: "project-binder", label: "Project Binder", suites: ["operational-excellence", "project-management"] },
+  { id: "reports", label: "Reports", suites: ["operational-excellence", "project-management"] },
+  { id: "team", label: "Team", suites: ["operational-excellence", "project-management"] },
+  { id: "timeline", label: "Timeline", suites: ["operational-excellence", "project-management"] },
 ];
+// Suite-specific tab order. PM's order puts governance tabs (its most-used surfaces) right after
+// Documents and pushes Datasets — an OE-oriented, rarely-used-on-PM-projects surface — to the end.
+// A suite without an entry here falls back to TAB_DEFINITIONS' own declaration order (OE's order).
+export const TAB_ORDER = {
+  "project-management": ["project-home", "project-settings", "documents", "risks", "issues", "actions", "decisions", "approvals", "evidence-library", "artifacts", "project-binder", "reports", "team", "timeline", "datasets"],
+};
+export const tabsForSuite = (suiteId) => {
+  const order = TAB_ORDER[suiteId] || TAB_DEFINITIONS.map((item) => item.id);
+  return order
+    .map((id) => TAB_DEFINITIONS.find((item) => item.id === id))
+    .filter((item) => item && item.suites.includes(suiteId));
+};
 const formatDate = (value) =>
   value ? new Date(value).toLocaleDateString() : "Not recorded";
 
@@ -96,9 +114,10 @@ export default function ProjectDetail() {
   const project = getProject(id);
   const lifecycle = lifecycleForProject(project || {}),
     lifecycleStages = lifecycleStageLabels(lifecycle);
-  const visibleTabs = TABS.filter(
-    (item) => !["Risks", "Actions", "Issues", "Decisions", "Approvals"].includes(item) || lifecycle.id === "project-management",
-  );
+  const suiteId = lifecycle.id;
+  const tabDefinitions = tabsForSuite(suiteId);
+  const visibleTabs = tabDefinitions.map((item) => item.label);
+  const activeTabId = tabDefinitions.find((item) => item.label === tab)?.id;
   const [settings, setSettings] = useState(() => ({
     name: project?.name || "",
     goal: project?.goal || "",
@@ -213,6 +232,13 @@ export default function ProjectDetail() {
         0,
       );
   }, [location.state]);
+  // Suite isolation guard: a tab the current suite doesn't define (e.g. "Analyses" reached via
+  // stale returnTab navigation state on a PM project, or by switching projects mid-session) must
+  // never render that tab's content — TAB_DEFINITIONS' suites list is the single source of truth
+  // for what's valid, not just what's clickable in the nav.
+  useEffect(() => {
+    if (!visibleTabs.includes(tab)) setTab("Project Home");
+  }, [visibleTabs, tab]);
   useEffect(() => {
     if (project)
       setSettings({
@@ -1584,7 +1610,11 @@ export default function ProjectDetail() {
     ) : (
       <Empty
         title="Evidence Library is ready"
-        body="Save completed histograms, control charts, capability studies, hypothesis tests, ANOVA, regression, DOE, FMEA, and other analysis outputs here. Evidence stores references to existing assets rather than duplicating calculations."
+        body={
+          suiteId === "project-management"
+            ? "Save approval records, vendor documents, meeting minutes, sign-offs, inspection reports, and other supporting data here. Evidence stores references to existing records rather than duplicating them."
+            : "Save completed histograms, control charts, capability studies, hypothesis tests, ANOVA, regression, DOE, FMEA, and other analysis outputs here. Evidence stores references to existing assets rather than duplicating calculations."
+        }
       />
     );
   };
@@ -1637,18 +1667,23 @@ export default function ProjectDetail() {
               ) : null}
             </button>
           ))}
+          {activeTabId && (
+            <HelpButton surfaceId={activeTabId} suiteId={suiteId} label={tab} />
+          )}
         </nav>
       </header>
       <main>
         <div className="ph-hub-actions">
           <Link to={`/projects/${id}/charter`}>Open Charter</Link>
-          <Link to="/worksheet">Add Dataset</Link>
-          <Link to="/templates">Create Document</Link>
-          <Link to="/hypothesis">Run Analysis</Link>
+          <Link to="/worksheet" state={{ projectId: id }}>Add Dataset</Link>
+          <Link to={`/templates?project=${encodeURIComponent(id)}`}>Create Document</Link>
+          {suiteId === "operational-excellence" && (
+            <Link to="/hypothesis" state={{ projectId: id }}>Run Analysis</Link>
+          )}
           <button onClick={() => setTab("Evidence Library")}>
             Open Evidence Library
           </button>
-          <Link to="/report">Build Report</Link>
+          <Link to="/report" state={{ projectId: id }}>Build Report</Link>
         </div>
         {renderTab()}
         {tab === "Project Home" && (
