@@ -30,6 +30,14 @@
       "react-app"
     ]
   },
+  "jest": {
+    "moduleNameMapper": {
+      "^!!raw-loader!(.*)$": "$1"
+    },
+    "transform": {
+      "^.+\\.css$": "<rootDir>/scripts/jest/rawCssTransform.js"
+    }
+  },
   "browserslist": {
     "production": [
       ">0.2%",
@@ -43,6 +51,7 @@
     ]
   },
   "devDependencies": {
+    "raw-loader": "^4.0.2",
     "supabase": "^2.114.0"
   }
 }

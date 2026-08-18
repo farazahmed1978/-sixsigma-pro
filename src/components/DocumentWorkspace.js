@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {createRoot} from 'react-dom/client';
+import {flushSync} from 'react-dom';
 import {syncService} from '../services/syncService';
 import { Link,useNavigate } from 'react-router-dom';
 import html2canvas from 'html2canvas';
@@ -9,10 +11,13 @@ import { useAnalysis } from '../context/AnalysisContext';
 import WorkspaceShell from './WorkspaceShell';
 import ExpandableEditor from './ExpandableEditor';
 import CTQTreeDiagram from './CTQTreeDiagram';
+import WBSTreeDiagram from './WBSTreeDiagram';
+import DocumentReport, {collectDocumentCss} from './DocumentReport';
 import { createDocument, documentIdFor, documentResumeIndex, documentScores, textValue } from '../utils/documentModel';
 import {artifactResume} from '../utils/projectResume';
-import {defineAdvanceState,nextDmaicArtifact,previousDmaicArtifact,projectDocumentRoute} from '../utils/defineSequence';
+import {SHARED_LEAD_IN_IDS,defineAdvanceState,nextDmaicArtifact,previousDmaicArtifact,projectDocumentRoute} from '../utils/defineSequence';
 import {sharedFieldForTarget} from '../config/artifactContext';
+import {lifecycleForProject} from '../foundation/lifecycle';
 import './DocumentWorkspace.css';
 
 const rowId = prefix => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -88,6 +93,15 @@ function AssetReferences({ project, references, datasets, analyses, evidence, re
   return <div className="dw-assets" role="dialog" aria-modal="true" aria-label="Linked project assets"><button type="button" className="dw-assets-backdrop" onClick={onClose} aria-label="Close linked assets" /><section><header><div><span>PROJECT CONTEXT</span><h2>Linked Assets</h2><p>References remain stable IDs so future automation and AI can retrieve the latest project asset.</p></div><button type="button" onClick={onClose}>&times;</button></header>{groups.map(group=><div key={group.key}><h3>{group.label}<small>{(references[group.key]||[]).length} linked</small></h3>{group.items.length?<div className="dw-asset-list">{group.items.map(item=><label key={item.id}><input type="checkbox" checked={(references[group.key]||[]).includes(item.id)} onChange={()=>toggle(group.key,item.id)} /><span>{item.name||item.title||item.datasetName||item.id}</span></label>)}</div>:<p>No compatible {group.label.toLowerCase()} are available for this project.</p>}</div>)}</section></div>;
 }
 
+// Templates whose data is better read as a rendered diagram than a raw data-entry grid. Each
+// entry's selector must match the root class the renderer outputs, since exportPdf/print target
+// that element instead of the whole editing workspace. Add future diagram-shaped documents here
+// rather than re-forking the isCTQ-only special case this replaced.
+const DIAGRAM_TEMPLATES={
+  'ctq-tree':{selector:'.ctq-diagram',label:'CTQ Tree',orientation:'l',pageWidth:277,pageHeight:190,render:(record,project)=><CTQTreeDiagram branches={record.values.ctqTree} projectName={project.name}/>},
+  wbs:{selector:'.wbs-diagram',label:'WBS',orientation:'l',pageWidth:277,pageHeight:190,render:(record,project)=><WBSTreeDiagram rows={record.values.wbsRows} projectName={project.name}/>},
+};
+
 export default function DocumentWorkspace({ template, project, updateProject, standalone=false }) {
   const navigate=useNavigate();
   const { addReportItem, items:reportItems } = useReport();
@@ -105,13 +119,19 @@ export default function DocumentWorkspace({ template, project, updateProject, st
   const [assetsOpen,setAssetsOpen] = useState(false);
   const [previewOpen,setPreviewOpen] = useState(false);
   const workspaceRef = useRef(null);
-  const outputRef = useRef(null);
-  useEffect(()=>{if(workspaceRef.current)workspaceRef.current.classList.add('dw-edit-output')},[]);
   const documentsRef = useRef(project.documents || {}); documentsRef.current = project.documents || {};
   const activityRef = useRef(project.activityLog || []); activityRef.current = project.activityLog || [];
   const hydratedKey = useRef(`${project.id}:${template.id}`);
   const current = template.sections[activeIndex];
   const scores = useMemo(() => documentScores(template,record.values),[template,record.values]);
+  // Charter, Stakeholder Register, and Business Case are shared documents (defined once in
+  // DEFINE_TEMPLATES with a hardcoded phase:'Define') surfaced under both suites. 'Define' isn't
+  // a real Project Management stage, so for these three the displayed phase must follow the
+  // project's own suite lifecycle instead of the static template.phase — the same fix already
+  // applied to ProjectCharter.js for the Charter document itself. Every other template (the OE
+  // DMAIC catalogs and the PMP catalog) already carries its own correct phase/pmpLifecycle label,
+  // so this must not touch template.phase for anything outside the shared three.
+  const displayPhase = SHARED_LEAD_IN_IDS.includes(template.id) ? (lifecycleForProject(project).stages[0]?.label || template.phase) : template.phase;
 
   useEffect(() => { const key=`${project.id}:${template.id}`; if(hydratedKey.current!==key){const saved=project.documents?.[documentIdFor(template.id)];setRecord(createDocument(template,project.id,saved));setActiveIndex(documentResumeIndex(template,saved,project.resumeTarget));hydratedKey.current=key;} },[project,template]);
   useEffect(()=>{const fieldIds=template.sections.flatMap(section=>section.fields.map(field=>field.id));setRecord(previous=>{const values=mergeSharedDocumentValues(previous.values,project.sharedFields,fieldIds);return Object.keys(values).some(id=>values[id]!==previous.values[id])?{...previous,values}:previous})},[project.sharedFields,template.sections]);
@@ -132,16 +152,64 @@ export default function DocumentWorkspace({ template, project, updateProject, st
   const openSuccessor=async()=>{if(!project.id){setNotice('A valid project is required before opening the next document.');return;}await openSequenceArtifact(sequenceNext);};
   const requestSequenceNext=()=>{if(!sequenceNext)return;if(advanceState.missing.length){setProgressionWarning(true);return;}openSuccessor();};
   const advance=async()=>{if(!advanceState.atLast){const saved=await saveNow();if(saved){setActiveIndex(index=>index+1);setNotice('Section saved · continue to the next section');}return;}if(advanceState.next){if(advanceState.missing.length){setProgressionWarning(true);return;}await openSuccessor();return;}setNotice(`${template.name} completes the configured DMAIC sequence. Return to Project Binder when ready.`);};
-  const isCTQ=template.id==='ctq-tree';
-  const print=()=>window.print();
-  const exportPdf=async()=>{setNotice('Preparing PDF...');const target=isCTQ?outputRef.current?.querySelector('.ctq-diagram'):workspaceRef.current,previousDisplay=target?.style.display;if(isCTQ&&target)target.style.display='block';try{const canvas=await html2canvas(target,{scale:1.5,backgroundColor:'#ffffff'}),pdf=new jsPDF(isCTQ?'l':'p','mm','a4'),width=isCTQ?277:190,pageHeight=isCTQ?190:277,height=canvas.height*width/canvas.width;let offset=0;while(offset<height){pdf.addImage(canvas.toDataURL('image/jpeg',.9),'JPEG',10,10-offset,width,height);offset+=pageHeight;if(offset<height)pdf.addPage();}pdf.save(`${project.name}-${template.name}.pdf`.replace(/[^a-z0-9.-]+/gi,'-').toLowerCase());setNotice('PDF exported')}finally{if(isCTQ&&target)target.style.display=previousDisplay||''}};
-  const addToReport=async()=>{await addReportItem({toolId:`document-${template.id}`,title:`${template.name} — ${project.name}`,timestamp:new Date().toISOString(),projectId:project.id,phase:template.phase,assetType:'document',documentId:record.id,statsSummary:{Completion:`${scores.completion}%`,Quality:`${scores.quality}/100`},interpretation:`${template.name} project document. ${scores.populated} of ${scores.total} required elements are complete.`,documentSnapshot:{schemaVersion:record.schemaVersion,templateId:record.templateId,values:record.values}});setNotice('Added to Report Builder');};
+  const diagram=DIAGRAM_TEMPLATES[template.id]||null;
+  const reportElement=()=><DocumentReport template={template} project={project} record={record} phase={displayPhase} diagram={diagram?diagram.render(record,project):null}/>;
+  // Both Print and Export PDF render the full multi-section report (every section, and the
+  // diagram when there is one) into their own isolated DOM target — an iframe's own document for
+  // Print, an off-screen container for Export PDF — rather than toggling visibility on a node
+  // shared with the live editor. That prior approach depended on CSS cascade order and browser
+  // print-event timing lining up correctly and proved unreliable. This render uses createRoot
+  // directly on the target (the browser's own live React runtime, the same mechanism the whole
+  // app already renders through), not a serialize-to-string step, so there's no separate
+  // serialization/parsing path that could produce something different from what's on screen.
+  const print=()=>{
+    const iframe=document.createElement('iframe');
+    iframe.style.position='fixed';iframe.style.right='0';iframe.style.bottom='0';iframe.style.width='0';iframe.style.height='0';iframe.style.border='0';
+    document.body.appendChild(iframe);
+    const frameDoc=iframe.contentDocument;
+    frameDoc.open();frameDoc.write('<!doctype html><html><head><meta charset="utf-8"></head><body></body></html>');frameDoc.close();
+    frameDoc.title=`${template.name} — ${project.name}`;
+    const styleEl=frameDoc.createElement('style');
+    styleEl.textContent=`${collectDocumentCss()}\nbody{margin:0;background:#fff}@page{margin:12mm}`;
+    frameDoc.head.appendChild(styleEl);
+    const printRoot=createRoot(frameDoc.body);
+    const cleanup=()=>{try{printRoot.unmount()}catch{}if(iframe.parentNode)iframe.parentNode.removeChild(iframe)};
+    // flushSync forces this root's initial commit to happen synchronously, so the DOM is
+    // guaranteed populated the instant this call returns — no delay-and-hope-it-was-enough-time
+    // needed to know the report actually rendered before we act on it.
+    flushSync(()=>printRoot.render(reportElement()));
 
-  return <WorkspaceShell className={`document-workspace ${guideOpen?'':'guidance-closed'}`} mode={mode} backTo={standalone?'/templates':`/projects/${project.id}`} backLabel={standalone?'Templates':'Project'} breadcrumb={standalone?<span>Standalone / {template.phase} / {template.name}</span>:<><Link to={`/projects/${project.id}`}>Project Home</Link><span> / </span><span>{template.phase} / {template.name}</span></>} previousLabel="Previous" previousDisabled={false} onPrevious={()=>navigate(-1)} sequencePreviousLabel={sequencePrevious?.sequenceLabel} sequenceNextLabel={sequenceNext?.sequenceLabel} sequencePreviousDisabled={!sequencePrevious} sequenceNextDisabled={!sequenceNext} onSequencePrevious={standalone?undefined:()=>openSequenceArtifact(sequencePrevious)} onSequenceNext={standalone?undefined:requestSequenceNext} onMinimize={()=>setMode('minimized')} onMaximize={()=>setMode('maximized')} onRestore={()=>setMode('normal')} onSave={saveNow} saving={saveState==='saving'} onExport={exportPdf} onPrint={print} onHelp={()=>setGuideOpen(true)}>
-    <div ref={workspaceRef}><header className="dw-executive"><div><span className={`badge badge-${template.phase.toLowerCase()}`}>{standalone?'Standalone':template.phase} workspace</span><h1>{template.name}</h1><p>{project.name} &middot; {template.desc}</p></div><div className={`dw-autosave ${saveState}`}><i />{documentSaveStateLabel(saveState)}</div><div className="dw-score"><div><span>Completion</span><strong>{scores.completion}%</strong><i><b style={{width:`${scores.completion}%`}} /></i></div><div><span>Quality score</span><strong>{scores.quality}<small>/100</small></strong><p>{scores.quality>=80?'Review ready':'Needs development'}</p></div><div><span>{standalone?'Context':'Project'}</span><strong>{project.name}</strong><p>{scores.populated} of {scores.total} required elements</p></div><div className="dw-report-action">{!standalone&&<><button type="button" className="btn-secondary" onClick={()=>setAssetsOpen(true)}>Linked Assets</button><button type="button" className="btn-secondary" onClick={addToReport}>+ Add to Report</button></>}{notice&&<span>{notice}</span>}</div></div></header>
+    if(!frameDoc.body.textContent.trim()){cleanup();setNotice('Print preview could not be generated. Please try again.');return;}
+    // The content is committed; this remaining wait is only for the browser's own layout/paint
+    // pass on that already-present content before invoking print, not for React.
+    window.setTimeout(()=>{
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+      window.setTimeout(cleanup,1000);
+    },200);
+  };
+  const exportPdf=async()=>{
+    setNotice('Preparing PDF...');
+    const container=document.createElement('div');
+    container.style.cssText='position:fixed;left:-10000px;top:0;width:900px;background:#fff';
+    document.body.appendChild(container);
+    const exportRoot=createRoot(container);
+    try{
+      flushSync(()=>exportRoot.render(reportElement()));
+      if(!container.textContent.trim())throw new Error('The report could not be generated for export.');
+      await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+      const canvas=await html2canvas(container,{scale:1.5,backgroundColor:'#ffffff'}),pdf=new jsPDF(diagram?diagram.orientation:'p','mm','a4'),width=diagram?diagram.pageWidth:190,pageHeight=diagram?diagram.pageHeight:277,height=canvas.height*width/canvas.width;
+      let offset=0;while(offset<height){pdf.addImage(canvas.toDataURL('image/jpeg',.9),'JPEG',10,10-offset,width,height);offset+=pageHeight;if(offset<height)pdf.addPage();}
+      pdf.save(`${project.name}-${template.name}.pdf`.replace(/[^a-z0-9.-]+/gi,'-').toLowerCase());
+      setNotice('PDF exported');
+    }finally{exportRoot.unmount();document.body.removeChild(container);}
+  };
+  const addToReport=async()=>{await addReportItem({toolId:`document-${template.id}`,title:`${template.name} — ${project.name}`,timestamp:new Date().toISOString(),projectId:project.id,phase:displayPhase,assetType:'document',documentId:record.id,statsSummary:{Completion:`${scores.completion}%`,Quality:`${scores.quality}/100`},interpretation:`${template.name} project document. ${scores.populated} of ${scores.total} required elements are complete.`,documentSnapshot:{schemaVersion:record.schemaVersion,templateId:record.templateId,values:record.values}});setNotice('Added to Report Builder');};
+
+  return <WorkspaceShell className={`document-workspace ${guideOpen?'':'guidance-closed'}`} mode={mode} backTo={standalone?'/templates':`/projects/${project.id}`} backLabel={standalone?'Templates':'Project'} breadcrumb={standalone?<span>Standalone / {displayPhase} / {template.name}</span>:<><Link to={`/projects/${project.id}`}>Project Home</Link><span> / </span><span>{displayPhase} / {template.name}</span></>} previousLabel="Previous" previousDisabled={false} onPrevious={()=>navigate(-1)} sequencePreviousLabel={sequencePrevious?.sequenceLabel} sequenceNextLabel={sequenceNext?.sequenceLabel} sequencePreviousDisabled={!sequencePrevious} sequenceNextDisabled={!sequenceNext} onSequencePrevious={standalone?undefined:()=>openSequenceArtifact(sequencePrevious)} onSequenceNext={standalone?undefined:requestSequenceNext} onMinimize={()=>setMode('minimized')} onMaximize={()=>setMode('maximized')} onRestore={()=>setMode('normal')} onSave={saveNow} saving={saveState==='saving'} onExport={exportPdf} onPrint={print} onHelp={()=>setGuideOpen(true)}>
+    <div ref={workspaceRef}><header className="dw-executive"><div><span className={`badge badge-${displayPhase.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'')}`}>{standalone?'Standalone':displayPhase} workspace</span><h1>{template.name}</h1><p>{project.name} &middot; {template.desc}</p></div><div className={`dw-autosave ${saveState}`}><i />{documentSaveStateLabel(saveState)}</div><div className="dw-score"><div><span>Completion</span><strong>{scores.completion}%</strong><i><b style={{width:`${scores.completion}%`}} /></i></div><div><span>Quality score</span><strong>{scores.quality}<small>/100</small></strong><p>{scores.quality>=80?'Review ready':'Needs development'}</p></div><div><span>{standalone?'Context':'Project'}</span><strong>{project.name}</strong><p>{scores.populated} of {scores.total} required elements</p></div><div className="dw-report-action">{!standalone&&<><button type="button" className="btn-secondary" onClick={()=>setAssetsOpen(true)}>Linked Assets</button><button type="button" className="btn-secondary" onClick={addToReport}>+ Add to Report</button></>}{diagram&&<button type="button" className="btn-secondary" onClick={()=>setPreviewOpen(true)}>Preview Diagram</button>}{notice&&<span>{notice}</span>}</div></div></header>
     <div className="dw-layout"><aside className="dw-nav"><span>DOCUMENT SECTIONS</span>{template.sections.map((section,index)=><button type="button" key={section.id||section.title} className={activeIndex===index?'active':''} onClick={()=>setActiveIndex(index)}><b>{String(index+1).padStart(2,'0')}</b><span>{section.title}</span><i>{sectionComplete(section)?'✓':''}</i></button>)}</aside><main className="dw-main"><header><div><span>SECTION {activeIndex+1} OF {template.sections.length}</span><h2>{current.title}</h2><p>{current.guidance}</p></div><em className={sectionComplete(current)?'complete':''}>{sectionComplete(current)?'✓ Section complete':'Required fields remaining'}</em></header><section className={`dw-section-grid cols-${Math.min(current.cols||1,2)}`}>{current.fields.map(field=><Field key={field.id} field={field} value={record.values[field.id]} onChange={value=>updateValue(field.id,value)} />)}</section><footer><button type="button" className="btn-secondary" disabled={activeIndex===0} onClick={()=>setActiveIndex(index=>index-1)}>&larr; Previous section</button><span>{activeIndex+1} of {template.sections.length}</span><button type="button" className="btn-primary" disabled={advanceState.atLast&&!advanceState.next} onClick={advance}>Next &rarr;</button></footer></main><aside className={`dw-guide ${guideOpen?'open':''}`}><button type="button" onClick={()=>setGuideOpen(open=>!open)} aria-label={guideOpen?'Collapse guidance':'Open guidance'}>{guideOpen?'×':'?'}</button>{guideOpen&&<><span>CONTEXT GUIDANCE</span><h3>{current.title}</h3><p>{current.guidance}</p><div><b>Quality check</b><p>{sectionComplete(current)?'Required information is present. Review clarity and evidence before approval.':'Complete every required element in this section.'}</p></div><div><b>Recommended next step</b><p>Validate this section with the accountable owner, then continue to the next {template.phase} artifact.</p></div></>}</aside></div></div>
-    {isCTQ&&<div ref={outputRef} className="dw-document-output"><div className="no-print"><button type="button" className="btn-secondary" onClick={()=>setPreviewOpen(true)}>Preview Diagram</button></div><CTQTreeDiagram branches={record.values.ctqTree} projectName={project.name}/></div>}
-    {previewOpen&&<div className="dw-output-preview" role="dialog" aria-modal="true" aria-label="CTQ Tree preview"><button className="dw-output-backdrop" onClick={()=>setPreviewOpen(false)} aria-label="Close preview"/><div><button className="btn-secondary no-print" onClick={()=>setPreviewOpen(false)}>Close</button><CTQTreeDiagram branches={record.values.ctqTree} projectName={project.name}/></div></div>}
+    {previewOpen&&diagram&&<div className="dw-output-preview" role="dialog" aria-modal="true" aria-label={`${diagram.label} preview`}><button className="dw-output-backdrop" onClick={()=>setPreviewOpen(false)} aria-label="Close preview"/><div><button className="btn-secondary no-print" onClick={()=>setPreviewOpen(false)}>Close</button>{diagram.render(record,project)}</div></div>}
     {assetsOpen&&<AssetReferences project={project} references={record.references} datasets={datasets} analyses={analysisResults} evidence={project.evidenceLibrary||[]} reports={reportItems} onChange={references=>setRecord(previous=>({...previous,references}))} onClose={()=>setAssetsOpen(false)} />}
     {progressionWarning&&<div className="dw-progression-modal" role="dialog" aria-modal="true" aria-labelledby="dw-progression-title"><button type="button" className="dw-progression-backdrop" onClick={()=>setProgressionWarning(false)} aria-label="Stay here"/><section><span>GUIDED PROGRESSION</span><h2 id="dw-progression-title">This document is incomplete.</h2><p><strong>{advanceState.completion}% complete</strong> · {advanceState.missing.length} required {advanceState.missing.length===1?'item remains':'items remain'}.</p><ul>{advanceState.missingDetails.slice(0,6).map(item=><li key={`${item.section}:${item.field}`}><strong>{item.section}:</strong> {item.field}</li>)}</ul>{advanceState.missingDetails.length>6&&<p>And {advanceState.missingDetails.length-6} more required items.</p>}<p>You can continue to {sequenceNext?.sequenceLabel} and return here later. This document will remain incomplete.</p><footer><button type="button" className="btn-secondary" onClick={()=>setProgressionWarning(false)}>Stay here</button><button type="button" className="btn-primary" onClick={async()=>{setProgressionWarning(false);await openSuccessor();}}>Continue anyway</button></footer></section></div>}
   </WorkspaceShell>;

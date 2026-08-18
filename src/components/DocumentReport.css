@@ -1,0 +1,22 @@
+.dr-report{max-width:900px;margin:0 auto;padding:20px;background:#fff;color:#172033;font-family:Arial,sans-serif}
+.dr-header{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;padding-bottom:14px;margin-bottom:18px;border-bottom:2px solid #1d68b0}
+.dr-header span{font-size:8pt;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#53657a}
+.dr-header h1{margin:4px 0;font-size:19pt;color:#172033}
+.dr-header p{margin:0;color:#4a5680;font-size:10.5pt}
+.dr-meta{text-align:right;font-size:8.5pt;color:#53657a;line-height:1.8}
+.dr-section{break-inside:avoid-page;page-break-inside:avoid;margin-bottom:18px}
+.dr-section h2{margin:0 0 10px;padding:5px 12px;background:#1a3a6b;color:#fff;font-size:9pt;font-weight:700;letter-spacing:.06em;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.dr-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 20px;padding:0 4px}
+.dr-field{break-inside:avoid-page;page-break-inside:avoid}
+.dr-field.wide{grid-column:1/-1}
+.dr-field h4{margin:0 0 4px;font-size:7.5pt;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#4a5680}
+.dr-field p{margin:0;font-size:10.5pt;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere}
+.dr-empty{margin:0;font-size:9.5pt;font-style:italic;color:#98a2b8}
+.dr-table-scroll{width:100%}
+.dr-table-scroll table{width:100%;border-collapse:collapse;table-layout:auto}
+.dr-table-scroll th{padding:6px 8px;background:#eef2f7;color:#4a5680;font-size:7.8pt;font-weight:700;text-transform:uppercase;text-align:left;border:1px solid #c8d2e0}
+.dr-table-scroll td{padding:6px 8px;font-size:9.5pt;border:1px solid #d5dce6;vertical-align:top;overflow-wrap:anywhere}
+.dr-flow{margin:0;padding-left:18px;font-size:9.5pt;line-height:1.6}
+.dr-diagram{margin-bottom:18px;break-inside:avoid-page;page-break-inside:avoid}
+.dr-footer{display:flex;justify-content:space-between;margin-top:12px;padding-top:8px;border-top:2px solid #1a3a6b;font-size:8pt;color:#6070a0}
+@media print{.dr-report{max-width:100%}.dr-section{break-inside:avoid-page}}

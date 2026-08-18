@@ -329,7 +329,11 @@ function ProjectDocumentEntry({template,project,updateProject}){
   },[project,record,template,updateProject]);
   if(error)return <div className="templates-not-found"><h1>Document could not be opened</h1><p>{error}</p></div>;
   if(!record)return <div className="templates-not-found"><h1>Opening {template.name}…</h1><p>Creating this document in {project.name}.</p></div>;
-  const workspaceProject={...project,documents:{...(project.documents||{}),[record.id]:record}};
+  // record only exists to bridge the gap before the freshly-created document round-trips back
+  // through project.documents; once it has, project.documents is the live copy (kept current by
+  // every DocumentWorkspace save) and must win, or this stale first snapshot would shadow every
+  // later edit for the lifetime of this mount.
+  const workspaceProject={...project,documents:{...(project.documents||{}),[record.id]:project.documents?.[record.id]||record}};
   return <DocumentWorkspace key={`${project.id}:${template.id}`} template={template} project={workspaceProject} updateProject={updateProject}/>;
 }
 

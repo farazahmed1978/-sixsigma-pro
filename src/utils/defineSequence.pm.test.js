@@ -6,11 +6,17 @@ const oeProject={id:'oe-project-1',methodology:'lean-six-sigma'};
 const template=id=>PMP_TEMPLATES.find(item=>item.id===id);
 const completeValues=artifact=>Object.fromEntries(artifact.sections.flatMap(section=>section.fields).filter(field=>field.required!==false).map(field=>[field.id,field.type==='table'?[{id:'row'}]:'complete value']));
 
-test('a PM project resolves a non-empty document sequence spanning all five PMBOK stages, distinct from the DMAIC sequence',()=>{
+test('a PM project resolves a non-empty document sequence spanning all five PMBOK stages plus the shared lead-in, distinct from the DMAIC sequence',()=>{
   const sequence=sequenceForProject(pmProject);
-  expect(sequence.length).toBe(PMP_TEMPLATES.length);
+  expect(sequence.length).toBe(PMP_TEMPLATES.length+3);
   expect(sequence.map(item=>item.pmpLifecycle).filter(Boolean)).toEqual(expect.arrayContaining(['Initiation','Planning','Execution','Monitoring & Controlling','Closing']));
   expect(sequence.some(item=>item.id==='data-collection-plan')).toBe(false);
+});
+
+test('Charter, Stakeholder Register, and Business Case lead PM\'s sequence, same as they lead OE\'s, ahead of the PMP_TEMPLATES catalog',()=>{
+  const sequence=sequenceForProject(pmProject);
+  expect(sequence.slice(0,3).map(item=>item.id)).toEqual(['charter','stakeholder-register','business-case']);
+  expect(sequence[3].id).toBe('benefits-management-plan');
 });
 
 test('without a project argument, the sequence functions default to the OE sequence (backward compatible)',()=>{
@@ -19,7 +25,18 @@ test('without a project argument, the sequence functions default to the OE seque
 });
 
 test('a PM document at the start of the sequence has no previous artifact',()=>{
-  expect(previousDmaicArtifact('benefits-management-plan',pmProject)).toBeNull();
+  expect(previousDmaicArtifact('charter',pmProject)).toBeNull();
+});
+
+test('opening Project Charter under a PM project advances into the shared lead-in, not OE\'s SIPOC',()=>{
+  expect(nextDmaicArtifact('charter',pmProject)).toEqual(expect.objectContaining({id:'stakeholder-register'}));
+  expect(nextDmaicArtifact('stakeholder-register',pmProject)).toEqual(expect.objectContaining({id:'business-case'}));
+  expect(nextDmaicArtifact('business-case',pmProject)).toEqual(expect.objectContaining({id:'benefits-management-plan',pmpLifecycle:'Initiation'}));
+  expect(previousDmaicArtifact('benefits-management-plan',pmProject)).toEqual(expect.objectContaining({id:'business-case'}));
+});
+
+test('opening Project Charter under an OE project is unaffected and still advances to SIPOC (regression)',()=>{
+  expect(nextDmaicArtifact('charter',oeProject)).toEqual(expect.objectContaining({id:'sipoc'}));
 });
 
 test('a PM document at the end of the sequence has no next artifact',()=>{

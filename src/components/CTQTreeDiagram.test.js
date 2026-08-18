@@ -3,6 +3,7 @@ import {renderToStaticMarkup} from 'react-dom/server';
 import fs from 'fs';
 import path from 'path';
 import CTQTreeDiagram,{buildCTQTree,CTQ_PRINT_LAYOUT} from './CTQTreeDiagram';
+import {renderReportDocument} from './DocumentReport';
 import {ReportPrintDocument} from '../pages/ReportPrintDocument';
 
 const branch=(id,need,driver,ctq,specification)=>({id,need,driver,ctq,specification,collapsed:false});
@@ -50,13 +51,17 @@ test('print layout declares four fitting hierarchy columns without a terminal tr
  expect(host.querySelectorAll('.ctq-leaf > .ctq-children')).toHaveLength(0);
 });
 
-test('print CSS removes the preceding workspace box from layout and prevents horizontal clipping',()=>{
- const workspaceCss=fs.readFileSync(path.join(__dirname,'DocumentWorkspace.css'),'utf8');
+test('print CSS avoids clipping and does not race the report document over @page',()=>{
  const diagramCss=fs.readFileSync(path.join(__dirname,'CTQTreeDiagram.css'),'utf8');
- expect(workspaceCss).toMatch(/\.dw-edit-output\{display:none!important\}/);
- expect(workspaceCss).not.toMatch(/workspace-shell-content>div:first-of-type/);
- expect(workspaceCss).toMatch(/min-height:0!important/);
- expect(diagramCss).toMatch(/@page\{size:A4 landscape/);
+ // Print/Export PDF no longer read anything from the live DocumentWorkspace DOM at all — they
+ // build an isolated report document (DocumentReport.renderReportDocument) that collects every
+ // loaded stylesheet's rules, CTQTreeDiagram.css included, and appends its own single @page rule.
+ // A second @page declared inside CTQTreeDiagram.css would get pulled into that same collected
+ // CSS and race the report's own @page for the whole isolated print job's size/margin — so this
+ // file must not declare one.
+ expect(diagramCss).not.toMatch(/@page\s*\{/);
+ const reportHtml=renderReportDocument({template:{id:'ctq-tree',name:'CTQ Tree',sections:[]},project:{name:'QA'},record:{values:{}},phase:'Define',diagram:null});
+ expect(reportHtml).toMatch(/@page\{margin:12mm\}/);
  expect(diagramCss).toMatch(/\.ctq-leaf\{[^}]*display:block/);
  expect(diagramCss).toMatch(/max-width:100%!important/);
  expect(diagramCss).toMatch(/overflow-wrap:anywhere/);

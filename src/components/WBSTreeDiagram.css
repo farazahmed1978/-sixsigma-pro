@@ -1,0 +1,21 @@
+.wbs-diagram{width:100%;max-width:100%;padding:24px;background:#fff;color:#172033;font-family:Inter,Arial,sans-serif;overflow:visible}
+.wbs-diagram>header{margin-bottom:20px;border-bottom:2px solid #1d68b0;padding-bottom:10px}
+.wbs-diagram>header span{color:#53657a;font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}
+.wbs-diagram>header h2{margin:4px 0;color:#172033}.wbs-diagram>header p{margin:0;color:#53657a}
+.wbs-tree,.wbs-children{display:grid;min-width:0;gap:14px}
+.wbs-group{position:relative;display:grid;grid-template-columns:minmax(0,1fr) clamp(14px,2.2vw,28px) minmax(0,3fr);min-width:0;align-items:center;break-inside:avoid-page;page-break-inside:avoid}
+.wbs-leaf{position:relative;display:block;min-width:0;break-inside:avoid-page;page-break-inside:avoid}
+.wbs-group>.wbs-children{grid-column:3}
+.wbs-group:after{content:'';grid-column:2;grid-row:1;position:absolute;left:0;right:0;top:50%;border-top:2px solid #91a3b8}
+.wbs-children{position:relative;padding:8px 0}.wbs-children:before{content:'';position:absolute;left:calc(clamp(14px,2.2vw,28px) / -2);top:32px;bottom:32px;border-left:2px solid #91a3b8}
+.wbs-node{position:relative;z-index:1;display:grid;gap:5px;width:100%;min-width:0;min-height:52px;padding:10px 12px;border:1px solid #aab7c6;border-left:4px solid #1d68b0;border-radius:7px;background:#fff;overflow-wrap:anywhere;white-space:normal}
+.wbs-node small{color:#53657a;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+.wbs-node strong{font-size:12px;line-height:1.35;overflow-wrap:anywhere;white-space:normal}
+.wbs-owner{font-size:10.5px;color:#4a5680;font-weight:600}
+.wbs-acceptance{margin:2px 0 0;font-size:10.5px;color:#374357;line-height:1.4;overflow-wrap:anywhere;white-space:normal}
+.wbs-diagram-empty{padding:30px;border:1px dashed #aab7c6;text-align:center;color:#53657a}
+@media(max-width:850px){.wbs-group{grid-template-columns:minmax(0,1fr) 14px minmax(0,3fr)}}
+/* No @page rule here: this diagram now prints as part of the unified DocumentReport flow, whose
+   single @page rule lives in DocumentWorkspace.css. A second @page declaration here would race
+   it for the whole print job's page size/margin depending on CSS bundle order. */
+@media print{.wbs-diagram{display:block!important;width:100%!important;max-width:100%!important;margin:0!important;padding:0!important;overflow:visible!important}.wbs-tree{width:100%;max-width:100%;gap:10px;overflow:visible}.wbs-group{grid-template-columns:minmax(0,1fr) 12px minmax(0,3fr);width:100%;min-width:0}.wbs-children:before{left:-6px}.wbs-node{min-width:0;min-height:44px;padding:8px}.wbs-node strong{overflow-wrap:anywhere;white-space:normal}.wbs-group,.wbs-leaf{break-inside:avoid-page;page-break-inside:avoid}}

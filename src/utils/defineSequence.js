@@ -19,6 +19,14 @@ export const dmaicSequence=()=>[...defineSequence(),...MEASURE_TEMPLATES,...ANAL
 // (unlike Define's hand-picked cadence), so each stage uses its full catalog in declared order.
 const PM_STAGE_TEMPLATES=PMP_TEMPLATES.reduce((map,template)=>{const label=template.pmpLifecycle;if(!label)return map;(map[label]=map[label]||[]).push(template);return map},{});
 
+// Charter, Stakeholder Register, and Business Case are shared documents (defined once in
+// DEFINE_TEMPLATES, surfaced under both suites in NAVIGATION) that lead OE's sequence via the
+// curated defineSequence() cadence above. PM has no OE-only SIPOC/VOC to interleave, so its lead-in
+// is just these three, in the same relative order they already have in DEFINE_SEQUENCE_IDS, ahead
+// of the PMP_TEMPLATES catalog.
+export const SHARED_LEAD_IN_IDS=['charter','stakeholder-register','business-case'];
+const sharedLeadIn=()=>SHARED_LEAD_IN_IDS.map(id=>DEFINE_TEMPLATES.find(template=>template.id===id)).filter(Boolean).map(withSequenceLabel);
+
 // Suite-agnostic entry point: the document sequence for whichever suite the given project
 // belongs to, driven by that suite's lifecycle stage list (lifecycleForProject(project).stages)
 // rather than a hardcoded DMAIC-only array. Falls back to the OE sequence when no project is
@@ -26,7 +34,7 @@ const PM_STAGE_TEMPLATES=PMP_TEMPLATES.reduce((map,template)=>{const label=templ
 export function sequenceForProject(project){
   const lifecycle=project?lifecycleForProject(project):OE_LIFECYCLE;
   if(lifecycle.id==='operational-excellence')return dmaicSequence();
-  if(lifecycle.id==='project-management')return lifecycle.stages.flatMap(stage=>(PM_STAGE_TEMPLATES[stage.label]||[]).map(withSequenceLabel));
+  if(lifecycle.id==='project-management')return [...sharedLeadIn(),...lifecycle.stages.flatMap(stage=>(PM_STAGE_TEMPLATES[stage.label]||[]).map(withSequenceLabel))];
   return [];
 }
 export function nextDmaicArtifact(templateId,project){const sequence=sequenceForProject(project),index=sequence.findIndex(item=>item.id===templateId);return index>=0?sequence[index+1]||null:null}

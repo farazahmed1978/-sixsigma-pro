@@ -1,5 +1,20 @@
-import {charterSaveStateLabel,mergeCharterSharedFields,projectCharterLinkTarget} from './ProjectCharter';
+import React from 'react';
+import {act} from 'react-dom/test-utils';
+import {createRoot} from 'react-dom/client';
+import {MemoryRouter,Route,Routes,useLocation} from 'react-router-dom';
+import ProjectCharter,{charterSaveStateLabel,mergeCharterSharedFields,projectCharterLinkTarget} from './ProjectCharter';
 import {readFileSync} from 'fs';
+
+jest.mock('../components/WorkspaceShell',()=>({children,breadcrumb,sequenceNextLabel,onSequenceNext,sequenceNextDisabled})=><div><div data-testid="breadcrumb">{breadcrumb}</div><button type="button" data-testid="sequence-next" disabled={sequenceNextDisabled} onClick={onSequenceNext}>{sequenceNextLabel}</button><div>{children}</div></div>);
+jest.mock('jspdf',()=>jest.fn());
+jest.mock('html2canvas',()=>jest.fn());
+jest.mock('../context/ReportContext',()=>({useReport:()=>({addReportItem:jest.fn()})}));
+let mockProject;
+// updateProject's jest.fn() must be constructed inline inside the factory, not referenced from an
+// externally-declared const — referencing an externally-constructed jest.fn() here silently loses
+// its implementation (a babel-plugin-jest-hoist quirk with "mock"-prefixed hoisted references),
+// while plain external variables (like mockProject below) work fine.
+jest.mock('../context/ProjectsContext',()=>({useProjects:()=>({getProject:()=>mockProject,updateProject:jest.fn(()=>Promise.resolve({}))})}));
 
 test('Project Charter Continue to SIPOC opens the project-scoped SIPOC workspace directly',()=>{
   expect(projectCharterLinkTarget('project-123','/templates')).toBe('/projects/project-123/documents/sipoc');
@@ -8,8 +23,6 @@ test('Project Charter Continue to SIPOC opens the project-scoped SIPOC workspace
 test('Project Charter has no duplicate in-body Continue to SIPOC CTA',()=>{
   const source=readFileSync(require.resolve('./ProjectCharter'),'utf8');
   expect(source).not.toContain('Continue to SIPOC');
-  expect(source).toContain('sequenceNextLabel="SIPOC"');
-  expect(source).toContain('onSequenceNext={requestSipoc}');
 });
 
 test('Project Charter exposes honest autosave states and distinct navigation semantics',()=>{
@@ -25,4 +38,38 @@ test('Project Charter exposes honest autosave states and distinct navigation sem
 
 test('Project Charter consumes canonical shared-field updates instead of retaining stale values',()=>{
   expect(mergeCharterSharedFields({businessCase:'Old case',problemStatement:'Keep this'},{businessCaseSummary:'Updated case'})).toEqual({businessCase:'Updated case',problemStatement:'Keep this'});
+});
+
+const Location=()=>{const location=useLocation();return <div data-testid="location">{location.pathname}</div>};
+const renderCharter=async project=>{
+  mockProject=project;
+  const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+  await act(async()=>root.render(<MemoryRouter initialEntries={[`/projects/${project.id}/charter`]}><Routes><Route path="/projects/:id/charter" element={<ProjectCharter/>}/><Route path="*" element={<Location/>}/></Routes></MemoryRouter>));
+  return{host,root};
+};
+const continueAnyway=async host=>{
+  await act(async()=>host.querySelector('[data-testid="sequence-next"]').click());
+  await act(async()=>{await [...host.querySelectorAll('button')].find(button=>button.textContent==='Continue anyway').click();await Promise.resolve()});
+};
+
+test('an OE project\'s Charter breadcrumb/badge reads Define, and Next still correctly leads to SIPOC (regression)',async()=>{
+  const{host,root}=await renderCharter({id:'oe-project-1',name:'OE Project',methodology:'lean-six-sigma',charter:{},documents:{},sharedFields:{}});
+  expect(host.querySelector('[data-testid="breadcrumb"]').textContent).toContain('Define');
+  expect(host.querySelector('.badge-define')).toBeTruthy();
+  expect(host.querySelector('[data-testid="sequence-next"]').textContent).toBe('SIPOC');
+  await continueAnyway(host);
+  expect(host.querySelector('[data-testid="location"]').textContent).toBe('/projects/oe-project-1/documents/sipoc');
+  await act(async()=>root.unmount());host.remove();
+});
+
+test('a PM project\'s Charter breadcrumb/badge reads Initiation, and Next correctly leads into the PM sequence, not SIPOC',async()=>{
+  const{host,root}=await renderCharter({id:'pm-project-1',name:'PM Project',methodology:'pmp',charter:{},documents:{},sharedFields:{}});
+  expect(host.querySelector('[data-testid="breadcrumb"]').textContent).toContain('Initiation');
+  expect(host.querySelector('[data-testid="breadcrumb"]').textContent).not.toContain('Define');
+  expect(host.querySelector('.badge-initiation')).toBeTruthy();
+  expect(host.querySelector('[data-testid="sequence-next"]').textContent).toBe('Stakeholder Register');
+  await continueAnyway(host);
+  expect(host.querySelector('[data-testid="location"]').textContent).toBe('/projects/pm-project-1/documents/stakeholder-register');
+  expect(host.querySelector('[data-testid="location"]').textContent).not.toContain('sipoc');
+  await act(async()=>root.unmount());host.remove();
 });

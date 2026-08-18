@@ -151,6 +151,11 @@ label {
 .badge-analyze { background: var(--orange-dim); color: var(--orange); }
 .badge-improve { background: var(--purple-dim); color: var(--purple); }
 .badge-control { background: var(--cyan-dim); color: var(--cyan); }
+.badge-initiation { background: rgba(245,158,11,0.12); color: var(--yellow); }
+.badge-planning { background: var(--cyan-dim); color: var(--cyan); }
+.badge-execution { background: var(--purple-dim); color: var(--purple); }
+.badge-monitoring-controlling { background: var(--orange-dim); color: var(--orange); }
+.badge-closing { background: var(--green-dim); color: var(--green); }
 
 /* ── STAT CARDS — Direction B: bolder, gradient bg ── */
 .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.75rem; margin: 1rem 0; }
