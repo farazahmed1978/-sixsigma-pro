@@ -7,6 +7,7 @@ import { useProjects } from "../context/ProjectsContext";
 import { documentRepository } from "../repositories/documentRepository";
 import { assembleReportModel } from "../foundation/reportAssembly";
 import { lifecycleForProject } from "../foundation/lifecycle";
+import { projectHubRoute, PROJECT_HUB_BACK_LABEL } from "../utils/projectResume";
 import HelpButton from "../components/HelpButton";
 import {
   allPrintArtifactIds,
@@ -350,7 +351,7 @@ export default function ReportBuilder() {
             Review the project in {reportModel.lifecycle.methodology} sequence,
             then print or generate a local PDF.
           </p>
-          {contextProjectId && <Link to={`/projects/${contextProjectId}`}>&larr; Back to Project Hub</Link>}
+          {contextProjectId && <Link to={projectHubRoute(contextProjectId)}>&larr; Back to {PROJECT_HUB_BACK_LABEL}</Link>}
         </div>
         <StandaloneArtifacts />
         {!scopedItems.length && (

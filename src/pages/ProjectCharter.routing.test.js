@@ -30,7 +30,7 @@ test('Project Charter exposes honest autosave states and distinct navigation sem
   expect(charterSaveStateLabel('saved')).toBe('Saved');
   expect(charterSaveStateLabel('unsaved')).toBe('Unsaved changes');
   const source=readFileSync(require.resolve('./ProjectCharter'),'utf8');
-  expect(source).toContain('backLabel="Project"');
+  expect(source).toContain('backLabel={PROJECT_HUB_BACK_LABEL}');
   expect(source).toContain('previousLabel="Previous"');
   expect(source).toContain('onPrevious={() => navigate(-1)}');
   expect(source).toContain('onClick={advanceSection}>Next');

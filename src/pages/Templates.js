@@ -21,6 +21,7 @@ import { navigationItems } from '../utils/navigationTools';
 import { resolveProjectSuiteId, lifecycleRegistry, OE_LIFECYCLE } from '../foundation/lifecycle';
 import { useEntitlements } from '../context/EntitlementContext';
 import HelpButton from '../components/HelpButton';
+import { projectHubRoute, PROJECT_HUB_BACK_LABEL } from '../utils/projectResume';
 import './Templates.css';
 
 // Per-document-card help. Rather than hand-authoring an entry for every one of the ~50 document
@@ -672,7 +673,7 @@ export default function Templates() {
         <h1>Document Library</h1>
         <label className="templates-project-select">Active project<select value={activeProjectId} onChange={event => setActiveProjectId(event.target.value)}><option value="">Select a project</option>{projects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
         <p>Search project-connected Lean Six Sigma and Project Management workspaces.</p>
-        {(projectId || searchParams.get('project')) && <Link to={`/projects/${projectId || searchParams.get('project')}`}>&larr; Back to Project Hub</Link>}
+        {(projectId || searchParams.get('project')) && <Link to={projectHubRoute(projectId || searchParams.get('project'))}>&larr; Back to {PROJECT_HUB_BACK_LABEL}</Link>}
       </div>
 
       {!selected ? (

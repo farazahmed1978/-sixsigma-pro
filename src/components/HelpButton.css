@@ -1,18 +1,24 @@
 .help-trigger { position: relative; display: inline-flex; }
 .help-trigger-btn {
-  width: 22px; height: 22px; border-radius: 999px; border: 1px solid var(--border, #2a3446);
-  background: var(--bg-3, #1a2230); color: var(--text-secondary, #93a0b5);
-  font-size: 0.75rem; font-weight: 700; line-height: 1; cursor: pointer;
-  display: inline-flex; align-items: center; justify-content: center; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center; gap: .35rem;
+  min-height: 30px; padding: .35rem .7rem; border: 1px solid var(--border, #2a3446);
+  border-radius: 7px; background: var(--bg-2, #131a26); color: var(--text-secondary, #93a0b5);
+  font: inherit; font-size: .72rem; font-weight: 700; cursor: pointer; white-space: nowrap;
+  transition: all .15s ease;
 }
-.help-trigger-btn:hover { background: var(--bg-4, #232d40); color: var(--text-primary, #e7ecf5); }
+.help-trigger-btn:hover { border-color: var(--border-active, #3a4658); color: var(--text-primary, #e7ecf5); background: var(--accent-dim, #16324f); }
+.help-trigger-btn span { font-weight: 600; }
+/* Guarantees the panel renders above every other surface on the page (modals, sticky headers,
+   overflow-scrolled containers), regardless of where the trigger is nested — see HelpButton.js's
+   header comment for why this can't be solved by z-index alone everywhere it's used. */
 .help-panel {
-  position: absolute; top: calc(100% + 6px); right: 0; z-index: 40;
-  width: min(320px, 80vw); background: var(--bg-2, #131a26); color: var(--text-primary, #e7ecf5);
-  border: 1px solid var(--border, #2a3446); border-radius: 10px; padding: 0.85rem 1rem;
-  box-shadow: 0 10px 28px rgba(0,0,0,0.35); text-align: left;
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 9999;
+  width: min(340px, 85vw); max-height: min(420px, 70vh); overflow-y: auto;
+  background: var(--bg-2, #131a26); color: var(--text-primary, #e7ecf5);
+  border: 1px solid var(--border, #2a3446); border-radius: 10px; padding: 0.9rem 1.05rem;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.4); text-align: left;
 }
-.help-panel h4 { margin: 0 0 0.4rem; font-size: 0.85rem; }
+.help-panel h4 { margin: 0 0 0.4rem; font-size: 0.88rem; }
 .help-panel > p { margin: 0 0 0.6rem; font-size: 0.8rem; color: var(--text-secondary, #93a0b5); line-height: 1.45; }
 .help-panel div { margin-top: 0.55rem; }
 .help-panel div b { display: block; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--accent, #0066ff); margin-bottom: 0.2rem; }

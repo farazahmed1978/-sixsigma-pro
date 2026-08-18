@@ -1654,23 +1654,29 @@ export default function ProjectDetail() {
             </span>
           </div>
         </div>
-        <nav>
-          {visibleTabs.map((item) => (
-            <button
-              key={item}
-              className={tab === item ? "active" : ""}
-              onClick={() => setTab(item)}
-            >
-              {item === "Project Home" ? "Dashboard" : item}
-              {item === "Evidence Library" && evidence.length > 0 ? (
-                <i>{evidence.length}</i>
-              ) : null}
-            </button>
-          ))}
+        <div className="ph-header-nav-row">
+          <nav>
+            {visibleTabs.map((item) => (
+              <button
+                key={item}
+                className={tab === item ? "active" : ""}
+                onClick={() => setTab(item)}
+              >
+                {item === "Project Home" ? "Dashboard" : item}
+                {item === "Evidence Library" && evidence.length > 0 ? (
+                  <i>{evidence.length}</i>
+                ) : null}
+              </button>
+            ))}
+          </nav>
+          {/* Deliberately a sibling of <nav>, not a child — <nav> scrolls horizontally
+              (overflow:auto) so a tab near its far right edge (e.g. Timeline) would clip this
+              button's popover if it were nested inside. Kept visually adjacent via
+              .ph-header-nav-row's flex layout instead. */}
           {activeTabId && (
             <HelpButton surfaceId={activeTabId} suiteId={suiteId} label={tab} />
           )}
-        </nav>
+        </div>
       </header>
       <main>
         <div className="ph-hub-actions">
