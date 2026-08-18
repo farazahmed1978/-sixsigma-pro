@@ -136,6 +136,13 @@
   .pw-project-actions { grid-template-columns: 1fr; }
 }
 
+.pw-project-notice {
+  margin: 0.6rem 0 0;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
 /* ── Project detail header ── */
 .pw-header-card {
   padding: 1.5rem;

@@ -19,4 +19,7 @@
 .dr-flow{margin:0;padding-left:18px;font-size:9.5pt;line-height:1.6}
 .dr-diagram{margin-bottom:18px;break-inside:avoid-page;page-break-inside:avoid}
 .dr-footer{display:flex;justify-content:space-between;margin-top:12px;padding-top:8px;border-top:2px solid #1a3a6b;font-size:8pt;color:#6070a0}
+.dr-cover{min-height:70vh;display:flex;flex-direction:column;justify-content:center}
+.dr-cover .dr-grid{grid-template-columns:1fr 1fr;margin-top:24px}
+.dr-page-break{break-before:page;page-break-before:always}
 @media print{.dr-report{max-width:100%}.dr-section{break-inside:avoid-page}}

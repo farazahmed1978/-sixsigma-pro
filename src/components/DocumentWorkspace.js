@@ -10,9 +10,8 @@ import { useWorksheet } from '../context/WorksheetContext';
 import { useAnalysis } from '../context/AnalysisContext';
 import WorkspaceShell from './WorkspaceShell';
 import ExpandableEditor from './ExpandableEditor';
-import CTQTreeDiagram from './CTQTreeDiagram';
-import WBSTreeDiagram from './WBSTreeDiagram';
 import DocumentReport, {collectDocumentCss} from './DocumentReport';
+import {DIAGRAM_TEMPLATES} from '../config/diagramTemplates';
 import { createDocument, documentIdFor, documentResumeIndex, documentScores, textValue } from '../utils/documentModel';
 import {artifactResume} from '../utils/projectResume';
 import {SHARED_LEAD_IN_IDS,defineAdvanceState,nextDmaicArtifact,previousDmaicArtifact,projectDocumentRoute} from '../utils/defineSequence';
@@ -92,15 +91,6 @@ function AssetReferences({ project, references, datasets, analyses, evidence, re
   const toggle=(key,id)=>onChange({...references,[key]:(references[key]||[]).includes(id)?references[key].filter(item=>item!==id):[...(references[key]||[]),id]});
   return <div className="dw-assets" role="dialog" aria-modal="true" aria-label="Linked project assets"><button type="button" className="dw-assets-backdrop" onClick={onClose} aria-label="Close linked assets" /><section><header><div><span>PROJECT CONTEXT</span><h2>Linked Assets</h2><p>References remain stable IDs so future automation and AI can retrieve the latest project asset.</p></div><button type="button" onClick={onClose}>&times;</button></header>{groups.map(group=><div key={group.key}><h3>{group.label}<small>{(references[group.key]||[]).length} linked</small></h3>{group.items.length?<div className="dw-asset-list">{group.items.map(item=><label key={item.id}><input type="checkbox" checked={(references[group.key]||[]).includes(item.id)} onChange={()=>toggle(group.key,item.id)} /><span>{item.name||item.title||item.datasetName||item.id}</span></label>)}</div>:<p>No compatible {group.label.toLowerCase()} are available for this project.</p>}</div>)}</section></div>;
 }
-
-// Templates whose data is better read as a rendered diagram than a raw data-entry grid. Each
-// entry's selector must match the root class the renderer outputs, since exportPdf/print target
-// that element instead of the whole editing workspace. Add future diagram-shaped documents here
-// rather than re-forking the isCTQ-only special case this replaced.
-const DIAGRAM_TEMPLATES={
-  'ctq-tree':{selector:'.ctq-diagram',label:'CTQ Tree',orientation:'l',pageWidth:277,pageHeight:190,render:(record,project)=><CTQTreeDiagram branches={record.values.ctqTree} projectName={project.name}/>},
-  wbs:{selector:'.wbs-diagram',label:'WBS',orientation:'l',pageWidth:277,pageHeight:190,render:(record,project)=><WBSTreeDiagram rows={record.values.wbsRows} projectName={project.name}/>},
-};
 
 export default function DocumentWorkspace({ template, project, updateProject, standalone=false }) {
   const navigate=useNavigate();
