@@ -1691,6 +1691,17 @@ export default function ProjectDetail() {
           </button>
           <Link to="/report" state={{ projectId: id }}>Build Report</Link>
         </div>
+        {/* Project Home is the Project Hub's own landing view, so every other tab (Project
+            Settings, Evidence Library, Documents, and so on — anywhere a quick action or nav
+            click can land) gets a consistent way back to it, matching the same "Back to Project
+            Hub" wording every page reached via real navigation (Worksheet, Templates,
+            AnalysisLauncher, ReportBuilder) uses. One conditional here covers every tab, rather
+            than adding this to each tab's own render branch individually. */}
+        {tab !== "Project Home" && (
+          <button type="button" className="ph-back-to-hub" onClick={() => setTab("Project Home")}>
+            &larr; Back to Project Hub
+          </button>
+        )}
         {renderTab()}
         {tab === "Project Home" && (
           <section className="ph-section">

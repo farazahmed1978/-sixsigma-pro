@@ -4,12 +4,11 @@ import './HelpButton.css';
 
 // The one reusable help affordance every surface uses (Project Hub tabs, Document Library cards,
 // Project Binder, Report Builder, Analysis Catalog, Evidence Library, Project Workspace home,
-// WorkspaceShell's sequence nav) — standardized on the same "? Help" labeled-button interaction
-// WorkspaceShell's own toolbar already established (see .workspace-shell-actions button in
-// WorkspaceShell.css, which DocumentWorkspace's Help button uses), not a tiny unlabeled dot: a
-// full button with visible text, sized and styled like every other button on the platform, so it
-// reads as "a clickable help button" at a glance rather than needing to be discovered. It never
-// carries its own help text: passing (surfaceId, suiteId) resolves content from
+// WorkspaceShell's sequence nav) — a full, visibly labeled "? Help" button styled with the
+// platform's actual .btn-secondary class (App.css) — the same class Open Project, Print All, and
+// every form's submit button use — not a bespoke approximation of it and not a tiny unlabeled dot.
+// It reads as an obviously standard, clickable platform button at a glance. It never carries its
+// own help text: passing (surfaceId, suiteId) resolves content from
 // config/helpContent.js's helpFor(), so content stays centrally editable and AI-readable instead of
 // being copy-pasted into each component. Per-document-card help (Document Library) is the one
 // surface whose content is naturally per-template data already living on the template object
@@ -33,7 +32,7 @@ export default function HelpButton({ surfaceId, suiteId, content: providedConten
     <span className="help-trigger" onClick={event => event.stopPropagation()}>
       <button
         type="button"
-        className="help-trigger-btn"
+        className="btn-secondary help-trigger-btn"
         onClick={event => { event.stopPropagation(); setOpen(value => !value); }}
         aria-expanded={open}
         aria-label={open ? `Collapse help: ${content.title}` : `Help: ${label || content.title}`}

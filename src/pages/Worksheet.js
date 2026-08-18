@@ -9,6 +9,7 @@ import { isMissing, profileColumn, typedColumn } from '../utils/dataWorkspace';
 import { applyIntakeCleanup, createIntakeReview, defaultCleanupOptions } from '../utils/intakeReview';
 import { addRecentTool as addSharedRecentTool, persistTools, readStoredTools, RECENT_TOOLS_KEY } from '../utils/navigationTools';
 import { projectHubRoute, PROJECT_HUB_BACK_LABEL } from '../utils/projectResume';
+import { projectDatasetInventory } from '../utils/projectHub';
 import {datasetHydrationSnapshot,reportDatasetHydration} from '../utils/datasetHydrationDiagnostics';
 import './Worksheet.css';
 
@@ -88,7 +89,13 @@ export default function Worksheet() {
   const [cleanupOptions,setCleanupOptions]=useState(null);
   const fileRef = useRef(null);
   const previousWorkspaceMode = useRef('normal');
-  const projectDatasets = useMemo(()=>datasets.filter(dataset => dataset.projectId === activeProjectId),[activeProjectId,datasets]);
+  // The single, central "which datasets belong to this project" query — the same
+  // projectDatasetInventory() ProjectDetail.js's own Datasets tab uses — rather than a
+  // second, independently-maintained inline filter here. A project only ever has one suite, so
+  // scoping strictly by projectId is already sufficient suite isolation: this is what guarantees a
+  // PM project's Active Dataset dropdown (and the explorer sidebar, and join/derive candidate
+  // lists below) can never surface another project's — OE or otherwise — datasets.
+  const projectDatasets = useMemo(()=>projectDatasetInventory(datasets,activeProjectId),[activeProjectId,datasets]);
   const activeProject = projects.find(project => project.id === activeProjectId);
   useEffect(()=>{if(process.env.NODE_ENV==='production')return;const previous=window.__AUREQIN_DATASET_HYDRATION__||{};reportDatasetHydration(datasetHydrationSnapshot({userId:previous.user||'',organizationId:previous.org||'',projectId:activeProjectId,rows:(previous.datasets||[]).map(item=>({id:item.id,title:item.title,project_id:item.project_id,organization_id:item.organization_id,created_by:item.created_by,status:item.status,content:{archivedAt:item.archivedAt}})),contextDatasets:datasets,renderedDatasets:projectDatasets}))},[activeProjectId,datasets,projectDatasets]);
   useEffect(()=>{const projectId=location.state?.projectId,datasetId=location.state?.datasetId;if(projectId)setActiveProjectId(projectId);if(location.state?.newDataset){switchDataset('');setActiveTab('Worksheet');setDialog(null);return}if(datasetId&&datasets.some(dataset=>dataset.id===datasetId&&(!projectId||dataset.projectId===projectId)))switchDataset(datasetId)},[datasets,location.state,switchDataset]);

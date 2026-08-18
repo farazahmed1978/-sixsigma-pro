@@ -18,6 +18,16 @@ test('the trigger button is labeled "Help", not a bare unlabeled glyph',()=>{
   act(()=>root.unmount());host.remove();
 });
 
+// Issue 3 regression guard: must use the platform's real secondary-button class (App.css), the
+// same one Open Project/Print All/every form submit button uses, not a bespoke look-alike that can
+// drift out of sync with the platform's actual design language.
+test('the trigger uses the platform\'s real .btn-secondary class',()=>{
+  const {host,root}=render(<HelpButton surfaceId="evidence-library" suiteId="operational-excellence"/>);
+  const button=host.querySelector('.help-trigger-btn');
+  expect(button.className).toContain('btn-secondary');
+  act(()=>root.unmount());host.remove();
+});
+
 test('clicking the trigger opens the help panel with the resolved content, and clicking again closes it',()=>{
   const {host,root}=render(<HelpButton surfaceId="evidence-library" suiteId="project-management"/>);
   const button=host.querySelector('.help-trigger-btn');

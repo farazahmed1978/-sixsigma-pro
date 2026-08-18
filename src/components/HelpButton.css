@@ -1,20 +1,17 @@
-.help-trigger { position: relative; display: inline-flex; }
-.help-trigger-btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: .35rem;
-  min-height: 30px; padding: .35rem .7rem; border: 1px solid var(--border, #2a3446);
-  border-radius: 7px; background: var(--bg-2, #131a26); color: var(--text-secondary, #93a0b5);
-  font: inherit; font-size: .72rem; font-weight: 700; cursor: pointer; white-space: nowrap;
-  transition: all .15s ease;
-}
-.help-trigger-btn:hover { border-color: var(--border-active, #3a4658); color: var(--text-primary, #e7ecf5); background: var(--accent-dim, #16324f); }
-.help-trigger-btn span { font-weight: 600; }
+.help-trigger { position: relative; display: inline-flex; vertical-align: middle; }
+/* The trigger uses the platform's real .btn-secondary class directly (App.css) — the same class
+   Open Project, Print All, and every form's submit button use — rather than a component-specific
+   approximation of it, so it's guaranteed to look and feel like a standard platform button and
+   stays in sync automatically if that class ever changes. This rule only adjusts sizing so it fits
+   comfortably inline next to headings and tab rows without wrapping. */
+.help-trigger-btn { padding: 0.5rem 1rem; font-size: 0.8rem; white-space: nowrap; }
 /* Guarantees the panel renders above every other surface on the page (modals, sticky headers,
    overflow-scrolled containers), regardless of where the trigger is nested — see HelpButton.js's
    header comment for why this can't be solved by z-index alone everywhere it's used. */
 .help-panel {
   position: absolute; top: calc(100% + 6px); right: 0; z-index: 9999;
   width: min(340px, 85vw); max-height: min(420px, 70vh); overflow-y: auto;
-  background: var(--bg-2, #131a26); color: var(--text-primary, #e7ecf5);
+  background: var(--bg-2, #131a26); color: var(--text-primary);
   border: 1px solid var(--border, #2a3446); border-radius: 10px; padding: 0.9rem 1.05rem;
   box-shadow: 0 12px 32px rgba(0,0,0,0.4); text-align: left;
 }
