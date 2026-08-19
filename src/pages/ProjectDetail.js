@@ -117,11 +117,16 @@ export default function ProjectDetail() {
   const [openResult, setOpenResult] = useState(null);
   const artifactInput = useRef(null);
   const project = getProject(id);
-  const lifecycle = lifecycleForProject(project || {}),
-    lifecycleStages = lifecycleStageLabels(lifecycle);
-  const suiteId = lifecycle.id;
-  const tabDefinitions = tabsForSuite(suiteId);
-  const visibleTabs = tabDefinitions.map((item) => item.label);
+  // While project is still loading (undefined), suite context must stay null rather than fall back
+  // to lifecycleForProject's own OE default — that default is correct for a loaded project that
+  // simply has no suite set, but wrong here: it would briefly treat a PM project as an OE project,
+  // which cascades into the wrong tab set below. Every derived value here is memoized off `project`
+  // (a referentially stable object once loaded) so they don't get new references on every render.
+  const lifecycle = useMemo(() => (project ? lifecycleForProject(project) : null), [project]);
+  const lifecycleStages = useMemo(() => (lifecycle ? lifecycleStageLabels(lifecycle) : []), [lifecycle]);
+  const suiteId = lifecycle?.id ?? null;
+  const tabDefinitions = useMemo(() => (suiteId ? tabsForSuite(suiteId) : []), [suiteId]);
+  const visibleTabs = useMemo(() => tabDefinitions.map((item) => item.label), [tabDefinitions]);
   const activeTabId = tabDefinitions.find((item) => item.label === tab)?.id;
   const [settings, setSettings] = useState(() => ({
     name: project?.name || "",
@@ -242,8 +247,12 @@ export default function ProjectDetail() {
   // never render that tab's content — TAB_DEFINITIONS' suites list is the single source of truth
   // for what's valid, not just what's clickable in the nav.
   useEffect(() => {
+    // Suite context isn't resolved until the project itself has loaded (suiteId null) — don't reset
+    // the tab while that's still in flight, or a valid tab picked before load (e.g. via returnTab)
+    // gets bounced back to Project Home the instant this effect runs on the loading render.
+    if (!suiteId) return;
     if (!visibleTabs.includes(tab)) setTab("Project Home");
-  }, [visibleTabs, tab]);
+  }, [visibleTabs, tab, suiteId]);
   useEffect(() => {
     if (project)
       setSettings({

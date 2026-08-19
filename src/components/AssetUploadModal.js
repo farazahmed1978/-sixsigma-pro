@@ -70,7 +70,6 @@ export default function AssetUploadModal({project, defaultLink, defaultStage = '
 
   const upload = async () => {
     if (uploadInFlightRef.current) return;
-    console.log('ASSET project object:', project);
     // Fail fast on a bad project.id before ever touching Storage — catching this here, not just
     // inside assetRepository, means a bad id can't leave an orphaned uploaded file behind when the
     // asset record insert would have failed anyway.
@@ -83,11 +82,9 @@ export default function AssetUploadModal({project, defaultLink, defaultStage = '
     try {
       let fileRef = {url: urlValue.trim(), storagePath: null, size: 0, mimeType: ''};
       if (mode === 'file') {
-        console.error('ASSET projectId debug:', project.id, typeof project.id);
         const {url, storagePath} = await assetRepository.uploadFile(project.id, file);
         fileRef = {url, storagePath, size: file.size, mimeType: file.type || ''};
       }
-      console.error('ASSET projectId debug:', project.id, typeof project.id);
       const created = await assetRepository.create(project.id, {
         organizationId: project.organizationId || profile?.default_organization_id,
         createdBy: user?.id,
