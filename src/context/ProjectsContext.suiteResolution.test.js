@@ -57,3 +57,23 @@ test('createProject with no suite/methodology data at all still defaults to oper
     expect(resolveProjectSuiteId(project)).toBe('operational-excellence');
   });
 });
+
+test('createProject persists targetDate and creationPath (Phase 5A: targetDate was previously dropped at the top level regardless of input)',async()=>{
+  await withHarness(async get=>{
+    let id;
+    await act(async()=>{id=get().createProject({name:'Guided Project',suiteId:'project-management',methodology:'pmp',targetDate:'2026-09-01',creationPath:'guided-project'})});
+    const project=get().getProject(id);
+    expect(project.targetDate).toBe('2026-09-01');
+    expect(project.creationPath).toBe('guided-project');
+  });
+});
+
+test('createProject with no targetDate/creationPath supplied still defaults sanely (regression)',async()=>{
+  await withHarness(async get=>{
+    let id;
+    await act(async()=>{id=get().createProject({name:'No Extras'})});
+    const project=get().getProject(id);
+    expect(project.targetDate).toBe('');
+    expect(project.creationPath).toBeNull();
+  });
+});

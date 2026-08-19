@@ -1687,6 +1687,7 @@ export default function ProjectDetail() {
           <Link to="/projects">Projects</Link>
           <span>/</span>
           <strong>{project.name}</strong>
+          <button type="button" className="ph-start-new-link" onClick={() => navigate('/projects', {state: {openEntry: true}})}>Start a new project</button>
         </div>
         <div className="ph-title">
           <div>

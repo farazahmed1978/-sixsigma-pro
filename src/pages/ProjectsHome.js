@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { useProjects } from '../context/ProjectsContext';
 import {lifecycleForProject,lifecycleStageLabels} from '../foundation/lifecycle';
 import { useInteractions } from '../context/InteractionContext';
@@ -7,6 +7,7 @@ import './ProjectWorkspace.css';
 import {projectResumeCta} from '../utils/projectResume';
 import {printProjectReport,exportProjectReportToFile} from '../utils/projectReport';
 import HelpButton from '../components/HelpButton';
+import NewProjectEntry from '../components/NewProjectEntry';
 
 function projectProgress(project) {
   const stages=lifecycleStageLabels(lifecycleForProject(project));
@@ -64,9 +65,15 @@ function ProjectCard({ project, resume, progress, phase, deletingProjectId, onDe
 export default function ProjectsHome() {
   const { projects, createProject, deleteProject, deletingProjectId } = useProjects();
   const {confirm,toast}=useInteractions();
+  const location = useLocation();
   const [showForm, setShowForm] = useState(false);
+  const [entryOpen, setEntryOpen] = useState(false);
   const emptyForm = { name: '', goal: '', owner: '', champion: '', suiteId: 'operational-excellence' };
   const [form, setForm] = useState(emptyForm);
+
+  // Supports the Project Hub's "Start a new project" link, which navigates here with
+  // state.openEntry rather than duplicating the entry-card's mount/lifecycle in ProjectDetail.js.
+  useEffect(() => { if (location.state?.openEntry) setEntryOpen(true); }, [location.state]);
 
   const handleCreate = () => {
     if (!form.name.trim()) return;
@@ -82,10 +89,17 @@ export default function ProjectsHome() {
           <h1>Project Workspace</h1>
           <p>Group project records through each suite's native lifecycle, all in one place.</p>
         </div>
-        <button className="btn-primary" onClick={() => setShowForm(s => !s)}>
+        <button className="btn-primary" onClick={() => (showForm ? setShowForm(false) : setEntryOpen(true))}>
           {showForm ? 'Cancel' : '+ New Project'}
         </button>
       </div>
+
+      {entryOpen && (
+        <NewProjectEntry
+          onClose={() => setEntryOpen(false)}
+          onAdvanced={() => { setEntryOpen(false); setShowForm(true); }}
+        />
+      )}
 
       {showForm && (
         <div className="card pw-new-form">

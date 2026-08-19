@@ -41,10 +41,11 @@ test('Project Charter consumes canonical shared-field updates instead of retaini
 });
 
 const Location=()=>{const location=useLocation();return <div data-testid="location">{location.pathname}</div>};
-const renderCharter=async project=>{
+const renderCharter=async(project,state)=>{
   mockProject=project;
   const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
-  await act(async()=>root.render(<MemoryRouter initialEntries={[`/projects/${project.id}/charter`]}><Routes><Route path="/projects/:id/charter" element={<ProjectCharter/>}/><Route path="*" element={<Location/>}/></Routes></MemoryRouter>));
+  const entry=state?{pathname:`/projects/${project.id}/charter`,state}:`/projects/${project.id}/charter`;
+  await act(async()=>root.render(<MemoryRouter initialEntries={[entry]}><Routes><Route path="/projects/:id/charter" element={<ProjectCharter/>}/><Route path="*" element={<Location/>}/></Routes></MemoryRouter>));
   return{host,root};
 };
 const continueAnyway=async host=>{
@@ -71,5 +72,37 @@ test('a PM project\'s Charter breadcrumb/badge reads Initiation, and Next correc
   await continueAnyway(host);
   expect(host.querySelector('[data-testid="location"]').textContent).toBe('/projects/pm-project-1/documents/stakeholder-register');
   expect(host.querySelector('[data-testid="location"]').textContent).not.toContain('sipoc');
+  await act(async()=>root.unmount());host.remove();
+});
+
+test('without guided router state, no guided-mode banner renders (non-guided Charter flow is unaffected)',async()=>{
+  const{host,root}=await renderCharter({id:'oe-project-2',name:'OE Project',methodology:'lean-six-sigma',charter:{},documents:{},sharedFields:{}});
+  expect(host.querySelector('.pc-guided-banner')).toBeNull();
+  await act(async()=>root.unmount());host.remove();
+});
+
+test('with guided router state and an incomplete charter, the "Step 1 of 3 mandatory documents" banner renders',async()=>{
+  const{host,root}=await renderCharter({id:'oe-project-3',name:'OE Project',methodology:'lean-six-sigma',charter:{},documents:{},sharedFields:{}},{guided:true});
+  const banner=host.querySelector('.pc-guided-banner');
+  expect(banner).toBeTruthy();
+  expect(banner.textContent).toContain('Step 1 of 3 mandatory documents — Project Charter');
+  expect(banner.classList.contains('pc-guided-complete')).toBe(false);
+  await act(async()=>root.unmount());host.remove();
+});
+
+test('with guided router state and a fully complete charter, the completion prompt renders and routes to the Project Hub',async()=>{
+  const fullCharter={
+    projectSummary:'Summary',targetDate:'2026-01-01',businessCase:'Case',problemStatement:'Problem',goalStatement:'Goal',
+    scopeIn:'In',scopeOut:'Out',team:[{id:'t1',name:'A',role:'Lead'}],stakeholders:[{id:'s1',name:'B'}],
+    timeline:[{id:'m1',date:'2026-02-01'}],financialImpact:'Impact',risks:[{id:'r1',risk:'Risk',mitigation:'Mitigate'}],
+    assumptions:'Assume',constraints:'Constrain',approvals:[{id:'a1',name:'C',status:'Approved'}],
+  };
+  const{host,root}=await renderCharter({id:'oe-project-4',name:'OE Project',methodology:'lean-six-sigma',charter:fullCharter,documents:{},sharedFields:{}},{guided:true});
+  const banner=host.querySelector('.pc-guided-banner');
+  expect(banner).toBeTruthy();
+  expect(banner.classList.contains('pc-guided-complete')).toBe(true);
+  expect(banner.textContent).toContain("Your project is started. Now let's set up your planning documents.");
+  await act(async()=>{[...banner.querySelectorAll('button')].find(button=>button.textContent==='Go to Project Hub').click()});
+  expect(host.querySelector('[data-testid="location"]').textContent).toBe('/projects/oe-project-4');
   await act(async()=>root.unmount());host.remove();
 });
