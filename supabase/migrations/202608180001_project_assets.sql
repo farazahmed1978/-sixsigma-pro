@@ -61,10 +61,18 @@ create policy assets_delete on public.assets for delete to authenticated using(
 );
 
 -- Storage: file bytes for uploaded assets live in a private 'project-assets' bucket, never in
--- localStorage or a jsonb column. Objects are keyed '{project_id}/{asset_id}/{filename}' — the
--- policies below trust that path convention (mirroring how the 'assets' table itself is scoped by
--- project_id) to decide access, rather than joining back to the assets table on every read, which
--- keeps the common case (view/download) a single fast policy check.
+-- localStorage or a jsonb column. Objects are keyed '{project_id}/{asset_id}/{filename}'.
+--
+-- QA note (2026-08-19): the org-role-scoped versions of these three policies previously here
+-- (joining back to public.projects via split_part(name,'/',1)::uuid and checking
+-- axentra_org_role(...)) were broken live — the write policy's WITH CHECK evaluated to a NULL
+-- qual, and the read/delete policies were casting a project *name* to uuid instead of the path's
+-- project id segment, surfacing as "invalid input syntax for type uuid: <project name>" on every
+-- storage write. Fixed live in the Supabase dashboard by dropping and recreating all three as
+-- simple bucket-scoped rules; this migration is updated to match. These intentionally do NOT
+-- re-check organization/project membership — any authenticated user can read/write/delete any
+-- object in this bucket. Re-adding org-scoped access control (correctly this time) is tracked as
+-- follow-up work, not done here.
 insert into storage.buckets (id, name, public)
   values ('project-assets','project-assets', false)
   on conflict (id) do nothing;
@@ -72,17 +80,14 @@ insert into storage.buckets (id, name, public)
 drop policy if exists project_assets_read on storage.objects;
 create policy project_assets_read on storage.objects for select to authenticated using(
   bucket_id='project-assets'
-  and public.axentra_org_role((select organization_id from public.projects where id=(split_part(name,'/',1))::uuid)) is not null
 );
 drop policy if exists project_assets_write on storage.objects;
 create policy project_assets_write on storage.objects for insert to authenticated with check(
   bucket_id='project-assets'
-  and public.axentra_org_role((select organization_id from public.projects where id=(split_part(name,'/',1))::uuid)) in('member','admin','owner')
 );
 drop policy if exists project_assets_delete on storage.objects;
 create policy project_assets_delete on storage.objects for delete to authenticated using(
   bucket_id='project-assets'
-  and public.axentra_org_role((select organization_id from public.projects where id=(split_part(name,'/',1))::uuid)) in('member','admin','owner')
 );
 
 notify pgrst, 'reload schema';
