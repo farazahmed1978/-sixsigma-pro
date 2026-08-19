@@ -133,8 +133,11 @@ test('confirming a file upload calls uploadFile then create with the assembled p
   const pdf = makeFile('Vendor Contract.pdf', 2048, 'application/pdf');
   await selectFile(host, pdf);
   await act(async () => { [...host.querySelectorAll('button')].find(button => button.textContent.includes('Next')).click(); });
-  const tagsInput = [...host.querySelectorAll('input')].find(input => input.closest('label')?.textContent.startsWith('Tags'));
-  await act(async () => { setInputValue(tagsInput, 'contract, vendor'); });
+  const predefinedTagSelect = host.querySelector('select[aria-label="Add predefined tag"]');
+  await act(async () => { predefinedTagSelect.value = 'contract'; predefinedTagSelect.dispatchEvent(new Event('change', {bubbles: true})); });
+  const customTagInput = host.querySelector('input[aria-label="Add custom tag"]');
+  await act(async () => { setInputValue(customTagInput, 'vendor'); });
+  await act(async () => { customTagInput.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true})); });
   await act(async () => { [...host.querySelectorAll('button')].find(button => button.textContent.includes('Next')).click(); });
   expect(host.querySelector('h2').textContent).toContain('Step 3 of 3');
   const uploadButton = [...host.querySelectorAll('button')].find(button => button.textContent === 'Upload');

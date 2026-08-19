@@ -1,0 +1,6 @@
+.tag-select{display:grid;gap:.4rem}
+.tag-select-chips{display:flex;flex-wrap:wrap;gap:.35rem;margin:0;padding:0;list-style:none}
+.tag-select-chips li{display:flex;align-items:center;gap:.3rem;padding:.25rem .5rem;border-radius:999px;background:var(--accent-dim);color:var(--accent-light);font-size:.68rem}
+.tag-select-chips button{border:0;background:transparent;color:inherit;cursor:pointer}
+.tag-select-controls{display:flex;flex-wrap:wrap;gap:.4rem}
+.tag-select-controls select,.tag-select-controls input{flex:1;min-width:120px;padding:.4rem .55rem;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text-primary);font-size:.72rem}

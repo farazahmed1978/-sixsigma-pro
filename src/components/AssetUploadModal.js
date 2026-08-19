@@ -4,6 +4,7 @@ import {useInteractions} from '../context/InteractionContext';
 import {assetRepository, isValidProjectId} from '../repositories/assetRepository';
 import {lifecycleForProject, lifecycleStageLabels} from '../foundation/lifecycle';
 import {ASSET_TYPES, ASSET_TYPE_LABELS, assetTagSuggestionsForSuite, detectAssetType, formatAssetSize, MAX_ASSET_FILE_SIZE_BYTES} from '../config/assetConfig';
+import TagSelect from './TagSelect';
 import './AssetUploadModal.css';
 
 const ARTIFACT_TYPE_LABELS = {document: 'Document', risk: 'Risk', action: 'Action', issue: 'Issue', decision: 'Decision', approval: 'Approval', report: 'Report', analysis: 'Analysis'};
@@ -37,13 +38,12 @@ export default function AssetUploadModal({project, defaultLink, defaultStage = '
   const [description, setDescription] = useState('');
   const [type, setType] = useState('other');
   const [stage, setStage] = useState(defaultStage);
-  const [tagsText, setTagsText] = useState(defaultTags);
+  const [tags, setTags] = useState(() => defaultTags.split(',').map(item => item.trim()).filter(Boolean));
   const [links, setLinks] = useState(defaultLink ? [defaultLink] : []);
   const [linkQuery, setLinkQuery] = useState('');
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
 
-  const tags = useMemo(() => tagsText.split(',').map(item => item.trim()).filter(Boolean), [tagsText]);
   const canAdvanceFromStep1 = mode === 'file' ? Boolean(file) : Boolean(urlValue.trim());
   const matchingArtifacts = useMemo(() => {
     const query = linkQuery.trim().toLowerCase();
@@ -150,12 +150,7 @@ export default function AssetUploadModal({project, defaultLink, defaultStage = '
             <label>Description (optional)<textarea rows="2" value={description} onChange={event => setDescription(event.target.value)} /></label>
             <label>Type<select value={type} onChange={event => setType(event.target.value)}>{ASSET_TYPES.map(item => <option key={item} value={item}>{ASSET_TYPE_LABELS[item]}</option>)}</select></label>
             <label>Stage<select value={stage} onChange={event => setStage(event.target.value)}><option value="">Not stage-specific</option>{stages.map(item => <option key={item} value={item}>{item}</option>)}</select></label>
-            <label>Tags (comma-separated)<input value={tagsText} onChange={event => setTagsText(event.target.value)} placeholder="e.g. contract, vendor" /></label>
-            {tagSuggestions.length > 0 && (
-              <div className="asset-upload-tag-suggestions">
-                {tagSuggestions.map(suggestion => <button type="button" key={suggestion} onClick={() => setTagsText(current => current ? `${current}, ${suggestion}` : suggestion)}>+ {suggestion}</button>)}
-              </div>
-            )}
+            <label>Tags<TagSelect value={tags} onChange={setTags} suggestions={tagSuggestions} /></label>
             <div className="asset-upload-links">
               <span>Link to artifact (optional — you can do this later)</span>
               {links.length > 0 && (

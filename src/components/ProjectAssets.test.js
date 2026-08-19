@@ -17,12 +17,17 @@ const asset = overrides => ({
   ...overrides,
 });
 
-const render = async (assets = []) => {
+const setInputValue = (input, value) => {
+  Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(input, value);
+  input.dispatchEvent(new Event('input', {bubbles: true}));
+};
+
+const render = async (assets = [], linkableArtifacts = []) => {
   assetRepository.list.mockResolvedValue(assets);
   const host = document.createElement('div');
   document.body.append(host);
   const root = createRoot(host);
-  await act(async () => root.render(<ProjectAssets project={project} />));
+  await act(async () => root.render(<ProjectAssets project={project} linkableArtifacts={linkableArtifacts} />));
   return {host, root};
 };
 
@@ -136,6 +141,72 @@ test('clicking an asset opens the detail panel pre-filled with its metadata', as
   expect(panel).toBeTruthy();
   const nameInput = panel.querySelector('input');
   expect(nameInput.value).toBe('Vendor Contract.pdf');
+  await act(async () => root.unmount());
+  host.remove();
+});
+
+test('adding a linked artifact in the detail panel and clicking Save Changes persists the full links array and updates the card link count', async () => {
+  const existingLink = {id: 'l1', artifactType: 'risk', artifactId: 'risk-1', artifactLabel: 'Vendor delay'};
+  const newLink = {artifactType: 'document', artifactId: 'doc-1', artifactLabel: 'Risk Register'};
+  assetRepository.update.mockResolvedValue(asset({id: 'a1', links: [existingLink, {...newLink, id: 'l2', linkedAt: '2026-08-19T00:00:00.000Z'}]}));
+  const {host, root} = await render([asset({id: 'a1', links: [existingLink]})], [newLink]);
+  await act(async () => { host.querySelector('.project-asset-card').click(); });
+  const panel = host.querySelector('.asset-detail-panel');
+  const addButton = [...panel.querySelectorAll('.asset-detail-link-results button')].find(button => button.textContent.includes('Risk Register'));
+  await act(async () => { addButton.click(); });
+  expect(panel.textContent).toContain('Risk Register');
+  const saveButton = [...panel.querySelectorAll('footer button')].find(button => button.textContent.startsWith('Save'));
+  await act(async () => { await saveButton.click(); });
+  expect(assetRepository.update).toHaveBeenCalledWith('a1', expect.objectContaining({
+    links: [existingLink, expect.objectContaining(newLink)],
+  }));
+  expect(assetRepository.removeLink).not.toHaveBeenCalled();
+  const card = host.querySelector('.project-asset-card');
+  expect(card.textContent).toContain('2 links');
+  await act(async () => root.unmount());
+  host.remove();
+});
+
+test('removing a linked artifact in the detail panel only persists after Save Changes is clicked', async () => {
+  const existingLink = {id: 'l1', artifactType: 'risk', artifactId: 'risk-1', artifactLabel: 'Vendor delay'};
+  assetRepository.update.mockResolvedValue(asset({id: 'a1', links: []}));
+  const {host, root} = await render([asset({id: 'a1', links: [existingLink]})]);
+  await act(async () => { host.querySelector('.project-asset-card').click(); });
+  const panel = host.querySelector('.asset-detail-panel');
+  const unlinkButton = panel.querySelector('button[aria-label="Unlink Vendor delay"]');
+  await act(async () => { unlinkButton.click(); });
+  expect(assetRepository.update).not.toHaveBeenCalled();
+  const saveButton = [...panel.querySelectorAll('footer button')].find(button => button.textContent.startsWith('Save'));
+  await act(async () => { await saveButton.click(); });
+  expect(assetRepository.update).toHaveBeenCalledWith('a1', expect.objectContaining({links: []}));
+  await act(async () => root.unmount());
+  host.remove();
+});
+
+test('the Tags field is a controlled dropdown of suite suggestions plus removable chips, not free text', async () => {
+  const {host, root} = await render([asset({id: 'a1', tags: ['contract']})]);
+  await act(async () => { host.querySelector('.project-asset-card').click(); });
+  const panel = host.querySelector('.asset-detail-panel');
+  expect(panel.querySelector('.tag-select-chips').textContent).toContain('contract');
+  const predefinedSelect = panel.querySelector('select[aria-label="Add predefined tag"]');
+  const options = [...predefinedSelect.querySelectorAll('option')].map(option => option.value).filter(Boolean);
+  expect(options).toEqual(expect.arrayContaining(['vendor', 'meeting minutes', 'sign-off']));
+  expect(options).not.toContain('contract');
+  await act(async () => root.unmount());
+  host.remove();
+});
+
+test('adding a custom tag and saving persists it alongside the predefined ones', async () => {
+  assetRepository.update.mockResolvedValue(asset({id: 'a1', tags: ['contract', 'urgent']}));
+  const {host, root} = await render([asset({id: 'a1', tags: ['contract']})]);
+  await act(async () => { host.querySelector('.project-asset-card').click(); });
+  const panel = host.querySelector('.asset-detail-panel');
+  const customTagInput = panel.querySelector('input[aria-label="Add custom tag"]');
+  await act(async () => { setInputValue(customTagInput, 'urgent'); });
+  await act(async () => { customTagInput.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true})); });
+  const saveButton = [...panel.querySelectorAll('footer button')].find(button => button.textContent.startsWith('Save'));
+  await act(async () => { await saveButton.click(); });
+  expect(assetRepository.update).toHaveBeenCalledWith('a1', expect.objectContaining({tags: ['contract', 'urgent']}));
   await act(async () => root.unmount());
   host.remove();
 });

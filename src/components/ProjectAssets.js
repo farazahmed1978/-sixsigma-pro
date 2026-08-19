@@ -3,12 +3,15 @@ import {useInteractions} from '../context/InteractionContext';
 import {assetRepository} from '../repositories/assetRepository';
 import {getProjectAssetContext} from '../foundation/assetContext';
 import {lifecycleForProject, lifecycleStageLabels} from '../foundation/lifecycle';
-import {ASSET_TYPES, ASSET_TYPE_LABELS, ASSET_TYPE_ICONS, formatAssetSize} from '../config/assetConfig';
+import {ASSET_TYPES, ASSET_TYPE_LABELS, ASSET_TYPE_ICONS, assetTagSuggestionsForSuite, formatAssetSize} from '../config/assetConfig';
 import AssetUploadModal from './AssetUploadModal';
+import TagSelect from './TagSelect';
 import './ProjectAssets.css';
 
 const ARTIFACT_TYPE_LABELS = {document: 'Document', risk: 'Risk', action: 'Action', issue: 'Issue', decision: 'Decision', approval: 'Approval', report: 'Report', analysis: 'Analysis'};
 const formatDate = value => (value ? new Date(value).toLocaleDateString() : '—');
+const sameArtifact = (a, b) => a.artifactType === b.artifactType && a.artifactId === b.artifactId;
+const newLinkId = () => `link-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
 // The Files and Assets tab on the Project Hub — a repository view over every asset
 // assetRepository.list(project.id) returns for this project. Filtering, search, and the artifact
@@ -19,6 +22,7 @@ export default function ProjectAssets({project, linkableArtifacts = []}) {
   const {confirm, toast} = useInteractions();
   const lifecycle = lifecycleForProject(project);
   const stages = lifecycleStageLabels(lifecycle);
+  const tagSuggestions = assetTagSuggestionsForSuite(lifecycle.id);
 
   const [assets, setAssets] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -32,6 +36,7 @@ export default function ProjectAssets({project, linkableArtifacts = []}) {
   const [selected, setSelected] = useState(null);
   const [editValues, setEditValues] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [linkQuery, setLinkQuery] = useState('');
 
   const load = () => {
     setLoading(true); setError('');
@@ -60,29 +65,39 @@ export default function ProjectAssets({project, linkableArtifacts = []}) {
     if (url) window.open(url, '_blank', 'noopener,noreferrer');
   };
 
-  const selectAsset = asset => { setSelected(asset); setEditValues({name: asset.name, description: asset.description, stage: asset.stage || '', tagsText: (asset.tags || []).join(', ')}); };
-  const closeDetail = () => { setSelected(null); setEditValues(null); };
+  const selectAsset = asset => {
+    setSelected(asset);
+    setEditValues({name: asset.name, description: asset.description, stage: asset.stage || '', tags: [...(asset.tags || [])], links: (asset.links || []).map(link => ({...link}))});
+    setLinkQuery('');
+  };
+  const closeDetail = () => { setSelected(null); setEditValues(null); setLinkQuery(''); };
 
+  const matchingArtifacts = useMemo(() => {
+    const query = linkQuery.trim().toLowerCase();
+    const linked = editValues?.links || [];
+    return linkableArtifacts.filter(item => !linked.some(link => sameArtifact(link, item)) && (!query || item.artifactLabel.toLowerCase().includes(query))).slice(0, 20);
+  }, [linkableArtifacts, linkQuery, editValues?.links]);
+
+  const addEditLink = candidate => setEditValues(current => (current.links.some(link => sameArtifact(link, candidate)) ? current : {...current, links: [...current.links, {id: newLinkId(), linkedAt: new Date().toISOString(), ...candidate}]}));
+  const removeEditLink = candidate => setEditValues(current => ({...current, links: current.links.filter(link => !sameArtifact(link, candidate))}));
+
+  // Save persists the full editValues.links array in one assetRepository.update() call — the
+  // linked-artifacts selector above only mutates local editValues state, so this is the single
+  // point where an added or removed link actually reaches the repository.
   const saveEdit = async () => {
     if (!selected) return;
     setSaving(true);
     try {
-      const updated = await assetRepository.update(selected.id, {name: editValues.name.trim(), description: editValues.description.trim(), stage: editValues.stage, tags: editValues.tagsText.split(',').map(item => item.trim()).filter(Boolean)});
+      const updated = await assetRepository.update(selected.id, {name: editValues.name.trim(), description: editValues.description.trim(), stage: editValues.stage, tags: editValues.tags, links: editValues.links});
       setAssets(current => current.map(item => (item.id === updated.id ? updated : item)));
       setSelected(updated);
+      setEditValues(current => ({...current, links: (updated.links || []).map(link => ({...link}))}));
       toast('Asset updated.');
     } catch (saveError) {
       setError(saveError.message || 'The asset could not be updated.');
     } finally {
       setSaving(false);
     }
-  };
-
-  const removeLink = async linkId => {
-    if (!selected) return;
-    const updated = await assetRepository.removeLink(selected.id, linkId);
-    setAssets(current => current.map(item => (item.id === updated.id ? updated : item)));
-    setSelected(updated);
   };
 
   const deleteAsset = async asset => {
@@ -189,12 +204,24 @@ export default function ProjectAssets({project, linkableArtifacts = []}) {
             <label>Name<input value={editValues.name} onChange={event => setEditValues(current => ({...current, name: event.target.value}))} /></label>
             <label>Description<textarea rows="3" value={editValues.description} onChange={event => setEditValues(current => ({...current, description: event.target.value}))} /></label>
             <label>Stage<select value={editValues.stage} onChange={event => setEditValues(current => ({...current, stage: event.target.value}))}><option value="">Not stage-specific</option>{stages.map(stage => <option key={stage} value={stage}>{stage}</option>)}</select></label>
-            <label>Tags<input value={editValues.tagsText} onChange={event => setEditValues(current => ({...current, tagsText: event.target.value}))} /></label>
+            <label>Tags<TagSelect value={editValues.tags} onChange={tags => setEditValues(current => ({...current, tags}))} suggestions={tagSuggestions} /></label>
             <div className="asset-detail-links">
               <span>Linked artifacts</span>
-              {(selected.links || []).length ? (
-                <ul>{(selected.links || []).map(link => <li key={link.id}>{ARTIFACT_TYPE_LABELS[link.artifactType] || link.artifactType}: {link.artifactLabel}<button type="button" onClick={() => removeLink(link.id)} aria-label={`Unlink ${link.artifactLabel}`}>×</button></li>)}</ul>
+              {editValues.links.length ? (
+                <ul>{editValues.links.map(link => <li key={link.id || `${link.artifactType}:${link.artifactId}`}>{ARTIFACT_TYPE_LABELS[link.artifactType] || link.artifactType}: {link.artifactLabel}<button type="button" onClick={() => removeEditLink(link)} aria-label={`Unlink ${link.artifactLabel}`}>×</button></li>)}</ul>
               ) : <p className="project-assets-no-matches">Not linked to anything yet.</p>}
+              {linkableArtifacts.length > 0 && (
+                <>
+                  <input type="search" value={linkQuery} onChange={event => setLinkQuery(event.target.value)} placeholder="Search documents, risks, actions, issues, decisions, approvals…" aria-label="Search artifacts to link" />
+                  <ul className="asset-detail-link-results">
+                    {matchingArtifacts.map(item => (
+                      <li key={`${item.artifactType}:${item.artifactId}`}>
+                        <button type="button" onClick={() => addEditLink(item)}>+ {ARTIFACT_TYPE_LABELS[item.artifactType] || item.artifactType}: {item.artifactLabel}</button>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
             </div>
             <footer>
               <button type="button" className="btn-secondary" onClick={() => openAssetFile(selected)}>{selected.type === 'url' ? 'Open' : 'Download'}</button>

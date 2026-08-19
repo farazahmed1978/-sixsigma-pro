@@ -36,9 +36,10 @@ export const MAX_ASSET_FILE_SIZE_BYTES = 25 * 1024 * 1024;
 
 export const ASSET_STORAGE_BUCKET = 'project-assets';
 
-// Suite-aware tag suggestions — shown as quick-add chips in AssetUploadModal's categorization step.
-// Free text is always allowed; these are suggestions, not a closed enum, so they live here as plain
-// arrays rather than a validated schema.
+// Suite-aware tag suggestions — the controlled, queryable vocabulary the Tags field's dropdown
+// (src/components/TagSelect.js, used by AssetUploadModal.js and ProjectAssets.js) is populated
+// from. This predefined list is the source of truth: free-text tags can't be filtered, searched, or
+// reasoned about by the AI layer, so a custom typed tag is the explicit exception, not the default.
 export const ASSET_TAG_SUGGESTIONS = {
   'project-management': ['approval', 'vendor', 'meeting minutes', 'sign-off', 'inspection', 'contract', 'reference'],
   'operational-excellence': ['data', 'evidence', 'analysis output', 'process map', 'control chart', 'baseline', 'measurement'],
