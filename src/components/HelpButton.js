@@ -62,6 +62,12 @@ export default function HelpButton({ surfaceId, suiteId, content: providedConten
               <p>{content.connectsTo}</p>
             </div>
           )}
+          {content.nextStep && (
+            <div>
+              <b>Recommended next step</b>
+              <p>{content.nextStep}</p>
+            </div>
+          )}
         </div>
       )}
     </span>

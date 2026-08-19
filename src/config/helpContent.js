@@ -217,6 +217,24 @@ export const HELP_CONTENT = {
       connectsTo: "Only documents with a saved record are included — a document that's never been opened won't appear as an empty placeholder.",
     },
   },
+  "project-charter": {
+    "project-management": {
+      title: "Project Charter",
+      summary: "The foundational authorization document that formally starts the project — it defines scope, authority, and executive accountability.",
+      whenToUse: "Complete this first, before any planning begins. Every other Planning document assumes the Charter is already in place.",
+      example: "A complete Charter has a clear problem statement, measurable goals, defined scope boundaries, a named sponsor, a realistic timeline, and financial impact.",
+      connectsTo: "The Charter feeds the Stakeholder Register, the Business Case, and every Planning document — each one traces back to what's decided here.",
+      nextStep: "Confirm sponsor sign-off before moving to Planning.",
+    },
+    "operational-excellence": {
+      title: "Project Charter",
+      summary: "The DMAIC project authorization document — it defines the problem, goal, scope, team, and business case for a Lean Six Sigma project.",
+      whenToUse: "Complete this as the first step in Define, before any data collection or analysis.",
+      example: "A complete OE Charter has a quantified problem statement (baseline sigma or DPMO), a SMART goal, defined process boundaries (start/stop), a named Champion and Black Belt, and a financial benefit estimate.",
+      connectsTo: "The Charter drives the SIPOC, Voice of Customer, and every Measure-phase document.",
+      nextStep: "Get Champion sign-off before proceeding to Measure.",
+    },
+  },
   "workspace-shell-sequence": {
     "operational-excellence": {
       title: "Sequence Navigation",
