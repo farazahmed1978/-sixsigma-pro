@@ -13,7 +13,6 @@
 .asset-upload-mode-toggle button{flex:1;padding:.55rem;border:1px solid var(--border);border-radius:8px;background:var(--bg-2);color:var(--text-secondary);font:600 .75rem var(--font-body);cursor:pointer}
 .asset-upload-mode-toggle button.active{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
 .asset-upload-dropzone{display:grid;place-items:center;gap:.4rem;padding:2rem 1rem;border:1px dashed var(--border);border-radius:12px;background:var(--bg-2);color:var(--text-secondary);text-align:center;font-size:.78rem;cursor:pointer}
-.asset-upload-dropzone input{display:none}
 .asset-upload-url-field input{margin-top:.2rem}
 .asset-upload-tag-suggestions{display:flex;flex-wrap:wrap;gap:.35rem}
 .asset-upload-tag-suggestions button{padding:.25rem .5rem;border:1px solid var(--border);border-radius:999px;background:var(--bg-2);color:var(--text-secondary);font:600 .65rem var(--font-body);cursor:pointer}

@@ -1,4 +1,4 @@
-import React, {useMemo, useState} from 'react';
+import React, {useMemo, useRef, useState} from 'react';
 import {useAuth} from '../context/AuthContext';
 import {useInteractions} from '../context/InteractionContext';
 import {assetRepository, isValidProjectId} from '../repositories/assetRepository';
@@ -23,6 +23,7 @@ export default function AssetUploadModal({project, defaultLink, defaultStage = '
   const stages = lifecycleStageLabels(lifecycle);
   const tagSuggestions = assetTagSuggestionsForSuite(lifecycle.id);
 
+  const fileInputRef = useRef(null);
   const [step, setStep] = useState(1);
   const [mode, setMode] = useState('file');
   const [file, setFile] = useState(null);
@@ -63,6 +64,7 @@ export default function AssetUploadModal({project, defaultLink, defaultStage = '
   const goToStep3 = () => { if (!name.trim()) { setError('Give this asset a name before continuing.'); return; } setError(''); setStep(3); };
 
   const upload = async () => {
+    console.log('ASSET project object:', project);
     // Fail fast on a bad project.id before ever touching Storage — catching this here, not just
     // inside assetRepository, means a bad id can't leave an orphaned uploaded file behind when the
     // asset record insert would have failed anyway.
@@ -74,9 +76,11 @@ export default function AssetUploadModal({project, defaultLink, defaultStage = '
     try {
       let fileRef = {url: urlValue.trim(), storagePath: null, size: 0, mimeType: ''};
       if (mode === 'file') {
+        console.error('ASSET projectId debug:', project.id, typeof project.id);
         const {url, storagePath} = await assetRepository.uploadFile(project.id, file);
         fileRef = {url, storagePath, size: file.size, mimeType: file.type || ''};
       }
+      console.error('ASSET projectId debug:', project.id, typeof project.id);
       const created = await assetRepository.create(project.id, {
         organizationId: project.organizationId || profile?.default_organization_id,
         createdBy: user?.id,
@@ -116,15 +120,18 @@ export default function AssetUploadModal({project, defaultLink, defaultStage = '
 
         {step === 1 && (
           <div className="asset-upload-step">
+            {/* Mounted unconditionally (not just while mode === 'file') so the "Upload a file" toggle
+                can open the native picker via fileInputRef on the same click that switches modes —
+                a ref into a conditionally-rendered input wouldn't exist yet on that first click. */}
+            <input ref={fileInputRef} type="file" hidden onChange={event => chooseFile(event.target.files?.[0])} />
             <div className="asset-upload-mode-toggle">
-              <button type="button" className={mode === 'file' ? 'active' : ''} onClick={() => setMode('file')}>Upload a file</button>
+              <button type="button" className={mode === 'file' ? 'active' : ''} onClick={() => { setMode('file'); fileInputRef.current?.click(); }}>Upload a file</button>
               <button type="button" className={mode === 'url' ? 'active' : ''} onClick={() => setMode('url')}>Link a URL</button>
             </div>
             {mode === 'file' ? (
-              <label className="asset-upload-dropzone" onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); chooseFile(event.dataTransfer.files?.[0]); }}>
-                <input type="file" onChange={event => chooseFile(event.target.files?.[0])} />
+              <div className="asset-upload-dropzone" role="button" tabIndex={0} onClick={() => fileInputRef.current?.click()} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') fileInputRef.current?.click(); }} onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); chooseFile(event.dataTransfer.files?.[0]); }}>
                 {file ? <p>{file.name} · {formatAssetSize(file.size)} · {ASSET_TYPE_LABELS[type]}</p> : <p>Drag and drop a file here, or click to browse. PDF, Word, Excel, PowerPoint, images, CSV, video, and more.</p>}
-              </label>
+              </div>
             ) : (
               <label className="asset-upload-url-field">External URL<input type="url" value={urlValue} placeholder="https://" onChange={event => chooseUrl(event.target.value)} /></label>
             )}

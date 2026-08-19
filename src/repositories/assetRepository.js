@@ -115,6 +115,7 @@ export const assetRepository = {
       metadata: assetData.metadata || {},
     });
     await assertOwnership(client, row);
+    console.error('ASSET projectId debug:', projectId, typeof projectId);
     const {data, error} = await client.from(TABLE).insert(row).select().single();
     if (error) throw error;
     return fromRow(data);
@@ -154,6 +155,7 @@ export const assetRepository = {
     if (file.size > MAX_ASSET_FILE_SIZE_BYTES) throw new Error(`asset-too-large: files must be 25MB or smaller (this file is ${(file.size / 1024 / 1024).toFixed(1)}MB)`);
     const client = requireCloud();
     const storagePath = `${projectId}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]+/g, '-')}`;
+    console.error('ASSET projectId debug:', projectId, typeof projectId);
     const {error} = await client.storage.from(ASSET_STORAGE_BUCKET).upload(storagePath, file, {cacheControl: '3600', upsert: false});
     if (error) throw error;
     const url = await assetRepository.getSignedUrl(storagePath);
