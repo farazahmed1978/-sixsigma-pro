@@ -64,6 +64,30 @@ describe('Schedule Health card', () => {
     expect(card.hasData).toBe(false);
     expect(card.status).toBe('Green');
   });
+
+  test('zero-state: hasMilestoneData is false and the summary says so, not "0 on track, 0 at risk, 0 delayed", when a Milestone Report exists with no rows', () => {
+    const proj = project(doc('milestone-report', {milestoneStatusRows: []}));
+    const card = computeProjectHealth(proj).cards.schedule;
+    expect(card.hasData).toBe(true);
+    expect(card.hasMilestoneData).toBe(false);
+    expect(card.summary).toBe('No milestone data yet — add milestones in Schedule Baseline.');
+    expect(card.summary).not.toContain('0 on track');
+  });
+
+  test('chart exposes onTrack/atRisk/delayed/notStarted counts, and hasMilestoneData is true once rows exist', () => {
+    const proj = project(doc('milestone-report', {milestoneStatusRows: [
+      {status: 'On Track'}, {status: 'Complete'}, {status: 'At Risk'}, {status: 'Delayed'}, {status: 'Not Started'},
+    ]}));
+    const card = computeProjectHealth(proj).cards.schedule;
+    expect(card.hasMilestoneData).toBe(true);
+    expect(card.chart).toEqual({onTrack: 2, atRisk: 1, delayed: 1, notStarted: 1});
+    expect(card.metrics.notStartedCount).toBe(1);
+  });
+
+  test('the links array includes both Milestone Report and Schedule Baseline', () => {
+    const links = computeProjectHealth(project()).cards.schedule.links.map(link => link.label);
+    expect(links).toEqual(['Milestone Report', 'Schedule Baseline']);
+  });
 });
 
 describe('Cost Health card', () => {
@@ -94,6 +118,16 @@ describe('Cost Health card', () => {
     const cost = computeProjectHealth(proj).cards.cost;
     expect(cost.metrics.budgetBurnedPercent).toBe(40);
     expect(cost.metrics.eacVsBacVariance).toBe(-100);
+  });
+
+  test('chart carries budgetBurnedPercent and cpi for the dashboard\'s burn bar and CPI gauge', () => {
+    const proj = project(doc('evm-dashboard', {CPI: '0.85', ac: '400', bac: '1000'}));
+    expect(computeProjectHealth(proj).cards.cost.chart).toEqual({budgetBurnedPercent: 40, cpi: 0.85});
+  });
+
+  test('chart.cpi is null when no CPI has been entered, the signal the chart uses for its empty state', () => {
+    const proj = project(doc('evm-dashboard', {}));
+    expect(computeProjectHealth(proj).cards.cost.chart.cpi).toBeNull();
   });
 });
 
@@ -132,6 +166,18 @@ describe('Risk Exposure card', () => {
     ]}));
     expect(computeProjectHealth(proj).cards.risk.metrics.topRisk).toMatchObject({risk: 'High one', exposure: 20, owner: 'B'});
   });
+
+  test('summary reads "No open risks recorded." (not "No open risks.") when there are none', () => {
+    const proj = project(doc('risk-register', {riskRows: []}));
+    expect(computeProjectHealth(proj).cards.risk.summary).toBe('No open risks recorded.');
+  });
+
+  test('chart mirrors metrics.counts by severity tier', () => {
+    const proj = project(doc('risk-register', {riskRows: [{status: 'Open', exposure: 20}, {status: 'Open', exposure: 12}]}));
+    const card = computeProjectHealth(proj).cards.risk;
+    expect(card.chart).toEqual(card.metrics.counts);
+    expect(card.chart).toEqual({Critical: 1, High: 1, Medium: 0, Low: 0});
+  });
 });
 
 describe('Actions and Issues card', () => {
@@ -165,6 +211,16 @@ describe('Actions and Issues card', () => {
     const card = computeProjectHealth(proj).cards.actionsIssues;
     expect(card.metrics.openActionsCount).toBe(0);
     expect(card.metrics.overdueActionsCount).toBe(0);
+  });
+
+  test('chart breaks actions and issues down by status for the two donuts, folding Closed issues into Resolved', () => {
+    const proj = project({
+      ...doc('action-item-log', {actionItemRows: [{status: 'Complete'}, {status: 'In Progress'}, {status: 'Blocked'}, {status: 'Not Started'}, {status: 'Not Started'}]}),
+      ...doc('issue-log', {issueRows: [{status: 'Open'}, {status: 'Escalated'}, {status: 'Resolved'}, {status: 'Closed'}]}),
+    });
+    const card = computeProjectHealth(proj).cards.actionsIssues;
+    expect(card.chart.actions).toEqual({complete: 1, inProgress: 1, blocked: 1, notStarted: 2});
+    expect(card.chart.issues).toEqual({open: 1, inProgress: 0, escalated: 1, resolved: 2});
   });
 });
 
@@ -203,6 +259,21 @@ describe('Approvals and Decisions card', () => {
     const proj = project(doc('executive-dashboard', {decisionsRequiredRows: [{decision: 'a'}, {decision: 'b'}]}));
     expect(computeProjectHealth(proj).cards.approvalsDecisions.metrics.decisionsNeededCount).toBe(2);
   });
+
+  test('chart breaks approvals down by pending/approved/rejected and counts pending approvals over 7 days old', () => {
+    const proj = project({}, {approvals: [
+      {status: 'Pending', created_at: daysAgo(10)},
+      {status: 'Pending', created_at: daysAgo(2)},
+      {status: 'Approved', created_at: daysAgo(30)},
+      {status: 'Rejected', created_at: daysAgo(5)},
+    ]});
+    const card = computeProjectHealth(proj).cards.approvalsDecisions;
+    expect(card.chart.pending).toBe(2);
+    expect(card.chart.approved).toBe(1);
+    expect(card.chart.rejected).toBe(1);
+    expect(card.chart.pendingOver7DaysCount).toBe(1);
+    expect(card.metrics.pendingOver7DaysCount).toBe(1);
+  });
 });
 
 describe('Secondary indicators', () => {
@@ -235,6 +306,27 @@ describe('Secondary indicators', () => {
     expect(secondary.documentCompletion.label).toBe('No data yet');
     expect(secondary.qualityAudit.label).toBe('No data yet');
   });
+
+  test('benefitsRealization.chart carries baseline/target/current per benefit', () => {
+    const proj = project(doc('benefits-tracking-register', {benefitRows: [{benefitDescription: 'Reduce onboarding time', baselineValue: 14, targetValue: 5, currentValue: 6, status: 'Tracking'}]}));
+    expect(computeProjectHealth(proj).secondary.benefitsRealization.chart).toEqual([{name: 'Reduce onboarding time', baseline: 14, target: 5, current: 6}]);
+  });
+
+  test('benefitsRealization.chart is an empty array when there are no benefit rows', () => {
+    expect(computeProjectHealth(project()).secondary.benefitsRealization.chart).toEqual([]);
+  });
+
+  test('documentCompletion.chart reports all 5 PM stages in order, each with a status and a document count', () => {
+    const proj = project({
+      'document-a': {id: 'document-a', phase: 'Initiation', completion: 100, values: {}},
+      'document-b': {id: 'document-b', phase: 'Planning', completion: 40, values: {}},
+    });
+    const chart = computeProjectHealth(proj).secondary.documentCompletion.chart;
+    expect(chart.map(stage => stage.stage)).toEqual(['Initiation', 'Planning', 'Execution', 'Monitoring and Controlling', 'Closing']);
+    expect(chart[0]).toMatchObject({status: 'complete', documentCount: 1, completionPercent: 100});
+    expect(chart[1]).toMatchObject({status: 'in-progress', documentCount: 1, completionPercent: 40});
+    expect(chart[2]).toMatchObject({status: 'not-started', documentCount: 0});
+  });
 });
 
 describe('Overall health score', () => {
@@ -245,9 +337,16 @@ describe('Overall health score', () => {
       ...doc('risk-register', {riskRows: [{status: 'Open', exposure: 20}]}), // risk Red
     });
     const overall = computeProjectHealth(proj).overall;
-    // (100 + 60 + 0) / 3 = 53.33 -> rounds to 53
+    // (100 + 60 + 0) / 3 = 53.33 -> rounds to 53, which is below the 60% Yellow threshold -> Red
     expect(overall.score).toBe(53);
-    expect(overall.label).toBe('Yellow');
+    expect(overall.label).toBe('Red');
+  });
+
+  test('a score of exactly 60 is Yellow and a score of exactly 80 is Green (the bar\'s own threshold bands)', () => {
+    const yellowProj = project(doc('evm-dashboard', {CPI: '0.95'})); // cost Yellow alone -> 60
+    expect(computeProjectHealth(yellowProj).overall).toMatchObject({score: 60, label: 'Yellow'});
+    const greenProj = project(doc('milestone-report', {milestoneStatusRows: [{status: 'On Track'}]})); // schedule Green alone -> 100
+    expect(computeProjectHealth(greenProj).overall).toMatchObject({score: 100, label: 'Green'});
   });
 
   test('cards with no data are excluded from the average, not counted as Red', () => {

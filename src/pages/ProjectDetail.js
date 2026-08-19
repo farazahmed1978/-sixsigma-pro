@@ -728,6 +728,7 @@ export default function ProjectDetail() {
           {suiteId === "project-management" ? (
             <ProjectHealthDashboard
               project={project}
+              suiteId={suiteId}
               onOpenTab={(tabId) => {
                 const target = tabDefinitions.find((item) => item.id === tabId);
                 if (target) setTab(target.label);

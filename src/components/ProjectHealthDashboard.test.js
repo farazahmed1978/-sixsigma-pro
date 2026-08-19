@@ -12,16 +12,36 @@ const render = async project => {
   document.body.append(host);
   const root = createRoot(host);
   const onOpenTab = jest.fn();
-  await act(async () => root.render(<MemoryRouter><ProjectHealthDashboard project={project} onOpenTab={onOpenTab} /></MemoryRouter>));
+  await act(async () => root.render(<MemoryRouter><ProjectHealthDashboard project={project} suiteId="project-management" onOpenTab={onOpenTab} /></MemoryRouter>));
   return {host, root, onOpenTab};
 };
 
-test('renders all five primary health cards plus the secondary indicators row', async () => {
+test('renders the health bar (not a ring), all five primary health cards, and the secondary indicators row', async () => {
   const {host, root} = await render(project());
+  expect(host.querySelector('.ph-health-ring')).toBeNull();
+  expect(host.querySelector('.ph-health-bar-wrap')).toBeTruthy();
+  expect(host.querySelector('.ph-health-bar-track')).toBeTruthy();
   const cards = [...host.querySelectorAll('.ph-health-card')];
   expect(cards).toHaveLength(5);
   expect(host.querySelector('.ph-health-secondary')).toBeTruthy();
-  expect(host.querySelector('.ph-health-ring')).toBeTruthy();
+  await act(async () => root.unmount());
+  host.remove();
+});
+
+test('the health bar shows two threshold tick marks at 60% and 80%', async () => {
+  const {host, root} = await render(project());
+  const ticks = [...host.querySelectorAll('.ph-health-bar-tick')];
+  expect(ticks).toHaveLength(2);
+  expect(ticks.map(tick => tick.style.left)).toEqual(['60%', '80%']);
+  await act(async () => root.unmount());
+  host.remove();
+});
+
+test('the standard HelpButton is rendered with suiteId passed from the project, not hardcoded', async () => {
+  const {host, root} = await render(project());
+  const helpButton = host.querySelector('.help-trigger-btn');
+  expect(helpButton).toBeTruthy();
+  expect(helpButton.className).toContain('btn-secondary');
   await act(async () => root.unmount());
   host.remove();
 });
@@ -35,7 +55,7 @@ test('a card with no source document shows a "No data yet" state with a link to 
   host.remove();
 });
 
-test('a Red risk card shows the Red status label and a sparkline when there is more than one exposure value', async () => {
+test('a Red risk card shows the Red status label and its severity chart', async () => {
   const proj = project(doc('risk-register', {riskRows: [
     {status: 'Open', risk: 'A', exposure: 20, owner: 'X'},
     {status: 'Open', risk: 'B', exposure: 8, owner: 'Y'},
@@ -44,7 +64,7 @@ test('a Red risk card shows the Red status label and a sparkline when there is m
   const riskCard = [...host.querySelectorAll('.ph-health-card')].find(card => card.textContent.includes('Risk Exposure'));
   expect(riskCard.className).toContain('status-red');
   expect(riskCard.textContent).toContain('At risk');
-  expect(riskCard.querySelector('.ph-health-sparkline')).toBeTruthy();
+  expect(riskCard.querySelector('.ph-health-chart')).toBeTruthy();
   await act(async () => root.unmount());
   host.remove();
 });
@@ -69,9 +89,19 @@ test('the Decision Log link is a real route, not a tab switch', async () => {
   host.remove();
 });
 
-test('the overall ring shows "No data yet" when nothing has been entered anywhere', async () => {
+test('the health bar shows "No data yet" when nothing has been entered anywhere', async () => {
   const {host, root} = await render(project());
-  expect(host.querySelector('.ph-health-ring').textContent).toContain('No data yet');
+  expect(host.querySelector('.ph-health-bar-headline').textContent).toContain('No data yet');
+  await act(async () => root.unmount());
+  host.remove();
+});
+
+test('Schedule Health shows the zero-state message, not "0 on track, 0 at risk, 0 delayed", when a Milestone Report exists with no rows', async () => {
+  const proj = project(doc('milestone-report', {milestoneStatusRows: []}));
+  const {host, root} = await render(proj);
+  const scheduleCard = [...host.querySelectorAll('.ph-health-card')].find(card => card.textContent.includes('Schedule Health'));
+  expect(scheduleCard.textContent).toContain('No milestone data yet');
+  expect(scheduleCard.textContent).not.toContain('0 on track');
   await act(async () => root.unmount());
   host.remove();
 });
