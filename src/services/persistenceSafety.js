@@ -1,5 +1,5 @@
 export const HYDRATION = Object.freeze({ HYDRATING: 'HYDRATING', READY: 'READY', ERROR: 'ERROR' });
-export const PROJECT_OWNED_TABLES = new Set(['documents','datasets','dataset_versions','analyses','evidence','artifacts','reports','tasks','risks','issues','decisions','approvals','activities','findings','object_links','product_requirements','product_ctqs','product_verifications','product_record_revisions','lean_records','lean_record_revisions']);
+export const PROJECT_OWNED_TABLES = new Set(['documents','datasets','dataset_versions','analyses','evidence','artifacts','reports','tasks','risks','issues','decisions','approvals','activities','findings','object_links','product_requirements','product_ctqs','product_verifications','product_record_revisions','lean_records','lean_record_revisions','assets']);
 
 // Tables in PROJECT_OWNED_TABLES that also support a project_id-less (standalone) row, owned by
 // its creator rather than shared org-wide. Keep this list narrow and explicit rather than

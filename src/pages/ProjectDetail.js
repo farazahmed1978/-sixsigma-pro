@@ -25,6 +25,8 @@ import {
 } from "../foundation/lifecycle";
 import HelpButton from "../components/HelpButton";
 import ProjectHealthDashboard from "../components/ProjectHealthDashboard";
+import ProjectAssets from "../components/ProjectAssets";
+import AssetUploadModal from "../components/AssetUploadModal";
 import "./ProjectDetail.css";
 
 // Central, queryable tab membership: which suite(s) a Project Hub tab applies to. Analyses and
@@ -45,6 +47,7 @@ export const TAB_DEFINITIONS = [
   { id: "decisions", label: "Decisions", suites: ["project-management"] },
   { id: "approvals", label: "Approvals", suites: ["project-management"] },
   { id: "evidence-library", label: "Evidence Library", suites: ["operational-excellence", "project-management"] },
+  { id: "files-assets", label: "Files and Assets", suites: ["operational-excellence", "project-management"] },
   { id: "artifacts", label: "Artifacts", suites: ["operational-excellence", "project-management"] },
   { id: "project-binder", label: "Project Binder", suites: ["operational-excellence", "project-management"] },
   { id: "reports", label: "Reports", suites: ["operational-excellence", "project-management"] },
@@ -55,7 +58,7 @@ export const TAB_DEFINITIONS = [
 // Documents and pushes Datasets — an OE-oriented, rarely-used-on-PM-projects surface — to the end.
 // A suite without an entry here falls back to TAB_DEFINITIONS' own declaration order (OE's order).
 export const TAB_ORDER = {
-  "project-management": ["project-home", "project-settings", "documents", "risks", "issues", "actions", "decisions", "approvals", "evidence-library", "artifacts", "project-binder", "reports", "team", "timeline", "datasets"],
+  "project-management": ["project-home", "project-settings", "documents", "risks", "issues", "actions", "decisions", "approvals", "evidence-library", "files-assets", "artifacts", "project-binder", "reports", "team", "timeline", "datasets"],
 };
 export const tabsForSuite = (suiteId) => {
   const order = TAB_ORDER[suiteId] || TAB_DEFINITIONS.map((item) => item.id);
@@ -110,6 +113,7 @@ export default function ProjectDetail() {
   const [analysisSort, setAnalysisSort] = useState("Newest");
   const [expandedDataset, setExpandedDataset] = useState("");
   const [evidenceFilter, setEvidenceFilter] = useState("All");
+  const [evidenceUploadOpen, setEvidenceUploadOpen] = useState(false);
   const [openResult, setOpenResult] = useState(null);
   const artifactInput = useRef(null);
   const project = getProject(id);
@@ -709,6 +713,16 @@ export default function ProjectDetail() {
             />
           )}
         </div>
+      );
+    if (tab === "Files and Assets")
+      return (
+        <ProjectAssets
+          project={project}
+          linkableArtifacts={[
+            ...(project.charter ? [{ artifactType: "document", artifactId: "charter", artifactLabel: "Project Charter" }] : []),
+            ...documents.map((document) => ({ artifactType: "document", artifactId: document.templateId, artifactLabel: document.title })),
+          ]}
+        />
       );
     if (tab === "Project Binder")
       return (
@@ -1537,7 +1551,9 @@ export default function ProjectDetail() {
           )}
         </div>
       );
-    return evidence.length ? (
+    return (
+      <>
+      {evidence.length ? (
       <div className="ph-manager">
         <header>
           <div>
@@ -1555,6 +1571,13 @@ export default function ProjectDetail() {
               ),
             )}
           </select>
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={() => setEvidenceUploadOpen(true)}
+          >
+            + Add Evidence
+          </button>
         </header>
         <div className="ph-grid">
           {evidence
@@ -1621,7 +1644,7 @@ export default function ProjectDetail() {
             ))}
         </div>
       </div>
-    ) : (
+      ) : (
       <Empty
         title="Evidence Library is ready"
         body={
@@ -1629,7 +1652,22 @@ export default function ProjectDetail() {
             ? "Save approval records, vendor documents, meeting minutes, sign-offs, inspection reports, and other supporting data here. Evidence stores references to existing records rather than duplicating them."
             : "Save completed histograms, control charts, capability studies, hypothesis tests, ANOVA, regression, DOE, FMEA, and other analysis outputs here. Evidence stores references to existing assets rather than duplicating calculations."
         }
+        action={
+          <button type="button" className="btn-primary" onClick={() => setEvidenceUploadOpen(true)}>
+            + Add Evidence
+          </button>
+        }
       />
+      )}
+      {evidenceUploadOpen && (
+        <AssetUploadModal
+          project={project}
+          defaultTags="evidence"
+          onClose={() => setEvidenceUploadOpen(false)}
+          onUploaded={() => setEvidenceUploadOpen(false)}
+        />
+      )}
+      </>
     );
   };
 
