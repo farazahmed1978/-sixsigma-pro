@@ -1,9 +1,9 @@
 import React from 'react';
-import {Link} from 'react-router-dom';
 import {computeProjectHealth} from '../foundation/projectHealth';
 import HelpButton from './HelpButton';
 import {
   HealthBar,
+  HealthLink,
   MilestoneStatusChart,
   CostBurnChart,
   RiskSeverityChart,
@@ -16,27 +16,24 @@ import './ProjectHealthDashboard.css';
 
 const STATUS_LABEL = {Green: 'On track', Yellow: 'Needs attention', Red: 'At risk'};
 
-function CardLink({link, onOpenTab}) {
-  if (link.to.startsWith('tab:')) return <button type="button" className="ph-health-link" onClick={() => onOpenTab?.(link.to.slice(4))}>{link.label} →</button>;
-  return <Link className="ph-health-link" to={link.to}>{link.label} →</Link>;
-}
-
 // Renders the one chart each card is specified to carry, reading only card.chart / card.metrics —
 // never project.documents or any other data source. Which sub-component runs is chosen by
-// card.id, which is stable data from computeProjectHealth(), not a UI concern.
-function CardChart({card}) {
+// card.id, which is stable data from computeProjectHealth(), not a UI concern. onOpenTab is
+// threaded through so a chart's own empty state can offer a working tab-switch link (e.g.
+// Approvals) via the same HealthLink every other link on the dashboard uses.
+function CardChart({card, onOpenTab}) {
   const emptyLink = card.links[0];
   switch (card.id) {
     case 'schedule':
-      return <MilestoneStatusChart chart={card.chart} hasMilestoneData={card.hasMilestoneData} emptyLink={card.links.find(link => link.label === 'Schedule Baseline') || emptyLink} />;
+      return <MilestoneStatusChart chart={card.chart} hasMilestoneData={card.hasMilestoneData} emptyLink={card.links.find(link => link.label === 'Schedule Baseline') || emptyLink} onOpenTab={onOpenTab} />;
     case 'cost':
-      return <CostBurnChart chart={card.chart} emptyLink={emptyLink} />;
+      return <CostBurnChart chart={card.chart} costStatus={card.status} emptyLink={emptyLink} onOpenTab={onOpenTab} />;
     case 'risk':
-      return <RiskSeverityChart counts={card.metrics.counts} emptyLink={emptyLink} />;
+      return <RiskSeverityChart counts={card.metrics.counts} emptyLink={emptyLink} onOpenTab={onOpenTab} />;
     case 'actionsIssues':
-      return <ActionsIssuesDonuts actions={card.chart.actions} issues={card.chart.issues} emptyLink={emptyLink} />;
+      return <ActionsIssuesDonuts actions={card.chart.actions} issues={card.chart.issues} emptyLink={emptyLink} onOpenTab={onOpenTab} />;
     case 'approvalsDecisions':
-      return <ApprovalsChart chart={card.chart} emptyLink={card.links.find(link => link.label === 'Approvals') || emptyLink} />;
+      return <ApprovalsChart chart={card.chart} emptyLink={card.links.find(link => link.label === 'Approvals') || emptyLink} onOpenTab={onOpenTab} />;
     default:
       return null;
   }
@@ -47,14 +44,22 @@ function HealthCard({card, onOpenTab}) {
     return <article className="ph-health-card no-data">
       <header><h3>{card.title}</h3><span className="ph-health-status status-none">No data yet</span></header>
       <p className="ph-health-summary">Open {card.links[0].label} to start tracking this.</p>
-      <footer>{card.links.map(link => <CardLink key={link.label} link={link} onOpenTab={onOpenTab} />)}</footer>
+      <footer>{card.links.map(link => <HealthLink key={link.label} link={link} onOpenTab={onOpenTab} />)}</footer>
     </article>;
   }
+  // Schedule's zero-state (a Milestone Report exists but has no rows) is fully explained by
+  // card.summary above and linked from the footer below, both of which already render for every
+  // card — showing the chart's own empty state on top of that repeated the same sentence and the
+  // same Schedule Baseline link a second time (QA Fix 1). Every other card's populated/empty chart
+  // states stay chart-specific enough (different wording, or an actual chart once there is data)
+  // that they don't hit this same duplication, so the skip is scoped to this one case rather than
+  // applied blanket-wide.
+  const skipChart = card.id === 'schedule' && !card.hasMilestoneData;
   return <article className={`ph-health-card status-${card.status.toLowerCase()}`}>
     <header><h3>{card.title}</h3><span className={`ph-health-status status-${card.status.toLowerCase()}`}><i /> {STATUS_LABEL[card.status]}</span></header>
     <p className="ph-health-summary">{card.summary}</p>
-    <div className="ph-health-chart"><CardChart card={card} /></div>
-    <footer>{card.links.map(link => <CardLink key={link.label} link={link} onOpenTab={onOpenTab} />)}</footer>
+    {!skipChart && <div className="ph-health-chart"><CardChart card={card} onOpenTab={onOpenTab} /></div>}
+    <footer>{card.links.map(link => <HealthLink key={link.label} link={link} onOpenTab={onOpenTab} />)}</footer>
   </article>;
 }
 

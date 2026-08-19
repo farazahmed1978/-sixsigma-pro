@@ -78,6 +78,18 @@ const scheduleHealth = project => {
 // placeholder: hasData reflects whether the EVM Dashboard or Cost Baseline has ever been opened,
 // while status (and the chart's own empty state, gated on cpi === null rather than hasData) can
 // still be Red/empty on a project whose EVM Dashboard exists but has no CPI entered yet.
+// Budget-burn thresholds (distinct from the CPI thresholds above — burn rate and cost performance
+// index answer different questions) named and centralized here, not in the chart component, per
+// the architecture requirement that color logic be driven by threshold values computed in
+// computeProjectHealth(). Green: burned < 70%. Yellow: 70-90%. Red: burned > 90%.
+const BUDGET_BURN_THRESHOLDS = {green: 70, yellow: 90};
+const budgetBurnStatus = percent => {
+  if (percent === null) return null;
+  if (percent < BUDGET_BURN_THRESHOLDS.green) return 'Green';
+  if (percent <= BUDGET_BURN_THRESHOLDS.yellow) return 'Yellow';
+  return 'Red';
+};
+
 const costHealth = project => {
   const evm = docValues(project, 'evm-dashboard');
   const costBaseline = docValues(project, 'cost-baseline');
@@ -99,7 +111,7 @@ const costHealth = project => {
     id: 'cost', title: 'Cost Health', hasData, status,
     metrics: {cpi, budgetBurnedPercent, eac, bac, eacVsBacVariance, phaseCount: (costBaseline?.costByPhaseRows || []).length},
     summary: cpi !== null ? `CPI ${cpi}${budgetBurnedPercent !== null ? `, ${budgetBurnedPercent}% of budget burned` : ''}${eacVsBacVariance !== null ? `, EAC vs BAC ${eacVsBacVariance >= 0 ? '+' : ''}${eacVsBacVariance}` : ''}.` : 'No EVM data entered yet.',
-    chart: {budgetBurnedPercent, cpi},
+    chart: {budgetBurnedPercent, cpi, budgetBurnStatus: budgetBurnStatus(budgetBurnedPercent)},
     links: [{label: 'EVM Dashboard', to: projectDocumentRoute(project.id, 'evm-dashboard')}],
   };
 };
@@ -242,20 +254,23 @@ const approvalsAndDecisionsHealth = project => {
 // (pmpTemplates.js's lifecycle group names — see DocumentWorkspace.js's persist(), which stores
 // `phase: template.phase`); `label` is the human-readable form the task asked for ("Monitoring and
 // Controlling", not the internal "Monitoring & Controlling").
+// shortLabel is a fixed, deliberate abbreviation (not a CSS-truncated fragment of `label`) sized
+// to always fit the dashboard's stage pills — see DocumentCompletionByStageBar in
+// ProjectHealthCharts.js, which renders shortLabel and keeps `label` only for the hover tooltip.
 const PM_STAGES = [
-  {key: 'Initiation', label: 'Initiation'},
-  {key: 'Planning', label: 'Planning'},
-  {key: 'Execution', label: 'Execution'},
-  {key: 'Monitoring & Controlling', label: 'Monitoring and Controlling'},
-  {key: 'Closing', label: 'Closing'},
+  {key: 'Initiation', label: 'Initiation', shortLabel: 'Init'},
+  {key: 'Planning', label: 'Planning', shortLabel: 'Plan'},
+  {key: 'Execution', label: 'Execution', shortLabel: 'Exec'},
+  {key: 'Monitoring & Controlling', label: 'Monitoring and Controlling', shortLabel: 'M&C'},
+  {key: 'Closing', label: 'Closing', shortLabel: 'Close'},
 ];
 
-const documentCompletionByStage = documents => PM_STAGES.map(({key, label}) => {
+const documentCompletionByStage = documents => PM_STAGES.map(({key, label, shortLabel}) => {
   const inStage = documents.filter(document => document.phase === key);
   const documentCount = inStage.length;
   const completionPercent = documentCount ? round(inStage.reduce((total, document) => total + (Number(document.completion) || 0), 0) / documentCount) : null;
   const status = documentCount === 0 ? 'not-started' : inStage.every(document => Number(document.completion) === 100) ? 'complete' : 'in-progress';
-  return {stage: label, status, completionPercent, documentCount};
+  return {stage: label, shortLabel, status, completionPercent, documentCount};
 });
 
 const secondaryIndicators = project => {
@@ -318,3 +333,4 @@ export const computeProjectHealth = project => {
 
 export const RISK_SEVERITY_THRESHOLDS_FOR_TESTING = RISK_SEVERITY_THRESHOLDS;
 export const PM_STAGES_FOR_TESTING = PM_STAGES;
+export const BUDGET_BURN_THRESHOLDS_FOR_TESTING = BUDGET_BURN_THRESHOLDS;

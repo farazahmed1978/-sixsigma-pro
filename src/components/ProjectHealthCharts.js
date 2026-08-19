@@ -8,7 +8,7 @@ import './ProjectHealthCharts.css';
 // (ProjectHealthDashboard.js) is the only place that reads foundation/projectHealth.js's output;
 // these components exist purely to draw it, which is what keeps them individually testable with
 // plain prop fixtures and keeps the data an AI reads identical to what a user sees rendered.
-const COLOR = {green: '#10b981', yellow: '#f59e0b', red: '#ef4444', orange: '#f97316', gray: '#94a3b8', accent: '#6366f1'};
+export const COLOR = {green: '#10b981', yellow: '#f59e0b', red: '#ef4444', orange: '#f97316', gray: '#94a3b8', accent: '#6366f1'};
 
 // ── Overall health bar (Change 1) ───────────────────────────────────────────────────────────────
 // Green 80-100, Yellow 60-79, Red 0-59 — exported so the color decision is independently testable
@@ -39,21 +39,32 @@ export function HealthBar({percent, label}) {
   );
 }
 
+// ── Shared link renderer ────────────────────────────────────────────────────────────────────────
+// The single place a card/chart link is turned into markup — a real route becomes a react-router
+// <Link>, a 'tab:' sentinel (pointing at a Project Hub tab rather than a document, e.g. Approvals)
+// becomes a button that calls onOpenTab. Both render "Label →" identically. This used to be
+// duplicated between ProjectHealthDashboard.js's footer links and EmptyChartState below, and the
+// two copies had drifted — EmptyChartState's tab-link branch rendered inert, arrow-less text
+// instead of a working button (QA Fix 3). One shared component means there is only one place left
+// for that kind of drift to happen.
+export function HealthLink({link, onOpenTab}) {
+  if (link.to.startsWith('tab:')) return <button type="button" className="ph-health-link" onClick={() => onOpenTab?.(link.to.slice(4))}>{link.label} →</button>;
+  return <Link className="ph-health-link" to={link.to}>{link.label} →</Link>;
+}
+
 // ── Shared empty state ──────────────────────────────────────────────────────────────────────────
-export function EmptyChartState({message, link}) {
+export function EmptyChartState({message, link, onOpenTab}) {
   return (
     <div className="ph-chart-empty">
       <p>{message}</p>
-      {link && (link.to.startsWith('tab:')
-        ? <span className="ph-chart-empty-hint">{link.label}</span>
-        : <Link className="ph-health-link" to={link.to}>{link.label} →</Link>)}
+      {link && <HealthLink link={link} onOpenTab={onOpenTab} />}
     </div>
   );
 }
 
 // ── Schedule Health: milestone status stacked bar ───────────────────────────────────────────────
-export function MilestoneStatusChart({chart, hasMilestoneData, emptyLink}) {
-  if (!hasMilestoneData) return <EmptyChartState message="No milestone data yet — add milestones in Schedule Baseline." link={emptyLink} />;
+export function MilestoneStatusChart({chart, hasMilestoneData, emptyLink, onOpenTab}) {
+  if (!hasMilestoneData) return <EmptyChartState message="No milestone data yet — add milestones in Schedule Baseline." link={emptyLink} onOpenTab={onOpenTab} />;
   const data = [{name: 'Milestones', onTrack: chart.onTrack, atRisk: chart.atRisk, delayed: chart.delayed, notStarted: chart.notStarted}];
   return (
     <ResponsiveContainer width="100%" height={64}>
@@ -71,9 +82,17 @@ export function MilestoneStatusChart({chart, hasMilestoneData, emptyLink}) {
 }
 
 // ── Cost Health: budget burn bar + CPI gauge ────────────────────────────────────────────────────
-export function CostBurnChart({chart, emptyLink}) {
-  const {budgetBurnedPercent, cpi} = chart || {};
-  if (cpi === null || cpi === undefined) return <EmptyChartState message="No EVM data yet — open EVM Dashboard to enter values." link={emptyLink} />;
+// Both bars are colored by a status string ('Green'/'Yellow'/'Red') rather than by re-deriving
+// thresholds here: the CPI gauge reuses costStatus, which is the exact status foundation/
+// projectHealth.js's costHealth() already computed for the card header; the budget-burn bar reuses
+// chart.budgetBurnStatus, which that same function computes from BUDGET_BURN_THRESHOLDS. Neither
+// bar hardcodes a threshold number — this component only maps an already-decided status to a color.
+// Exported so the status->color mapping is independently testable (and independently readable by
+// an AI layer) without rendering an SVG chart and inspecting its fill attributes.
+export const STATUS_FILL = {Green: COLOR.green, Yellow: COLOR.yellow, Red: COLOR.red};
+export function CostBurnChart({chart, emptyLink, costStatus, onOpenTab}) {
+  const {budgetBurnedPercent, cpi, budgetBurnStatus} = chart || {};
+  if (cpi === null || cpi === undefined) return <EmptyChartState message="No EVM data yet — open EVM Dashboard to enter values." link={emptyLink} onOpenTab={onOpenTab} />;
   const burnDomainMax = Math.max(120, (budgetBurnedPercent || 0) + 10);
   return (
     <div className="ph-cost-chart">
@@ -85,7 +104,7 @@ export function CostBurnChart({chart, emptyLink}) {
               <XAxis type="number" domain={[0, burnDomainMax]} hide />
               <YAxis type="category" dataKey="name" hide />
               <ReferenceLine x={100} stroke={COLOR.gray} strokeDasharray="3 3" />
-              <Bar dataKey="value" fill={budgetBurnedPercent > 100 ? COLOR.red : COLOR.accent} radius={[4, 4, 4, 4]} />
+              <Bar dataKey="value" fill={STATUS_FILL[budgetBurnStatus] || COLOR.gray} radius={[4, 4, 4, 4]} />
             </BarChart>
           </ResponsiveContainer>
         )}
@@ -97,7 +116,7 @@ export function CostBurnChart({chart, emptyLink}) {
             <XAxis type="number" domain={[0, 1.5]} hide />
             <YAxis type="category" dataKey="name" hide />
             <ReferenceLine x={1} stroke={COLOR.gray} strokeDasharray="3 3" />
-            <Bar dataKey="value" fill={cpi >= 1 ? COLOR.green : cpi >= 0.9 ? COLOR.yellow : COLOR.red} radius={[4, 4, 4, 4]} />
+            <Bar dataKey="value" fill={STATUS_FILL[costStatus] || COLOR.gray} radius={[4, 4, 4, 4]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -106,9 +125,9 @@ export function CostBurnChart({chart, emptyLink}) {
 }
 
 // ── Risk Exposure: severity bar chart ───────────────────────────────────────────────────────────
-export function RiskSeverityChart({counts, emptyLink}) {
+export function RiskSeverityChart({counts, emptyLink, onOpenTab}) {
   const total = Object.values(counts || {}).reduce((sum, value) => sum + (value || 0), 0);
-  if (!total) return <EmptyChartState message="No open risks recorded." link={emptyLink} />;
+  if (!total) return <EmptyChartState message="No open risks recorded." link={emptyLink} onOpenTab={onOpenTab} />;
   const data = [
     {name: 'Critical', value: counts.Critical || 0, color: COLOR.red},
     {name: 'High', value: counts.High || 0, color: COLOR.orange},
@@ -130,10 +149,10 @@ export function RiskSeverityChart({counts, emptyLink}) {
 }
 
 // ── Actions and Issues: two side-by-side donuts ─────────────────────────────────────────────────
-export function ActionsIssuesDonuts({actions, issues, emptyLink}) {
+export function ActionsIssuesDonuts({actions, issues, emptyLink, onOpenTab}) {
   const actionsTotal = Object.values(actions || {}).reduce((sum, value) => sum + (value || 0), 0);
   const issuesTotal = Object.values(issues || {}).reduce((sum, value) => sum + (value || 0), 0);
-  if (!actionsTotal && !issuesTotal) return <EmptyChartState message="No actions or issues recorded." link={emptyLink} />;
+  if (!actionsTotal && !issuesTotal) return <EmptyChartState message="No actions or issues recorded." link={emptyLink} onOpenTab={onOpenTab} />;
   const actionsData = [
     {name: 'Complete', value: actions?.complete || 0, color: COLOR.green},
     {name: 'In Progress', value: actions?.inProgress || 0, color: COLOR.accent},
@@ -179,10 +198,10 @@ export function ActionsIssuesDonuts({actions, issues, emptyLink}) {
 }
 
 // ── Approvals and Decisions: pending/approved/rejected bar + decisions-needed note ────────────────
-export function ApprovalsChart({chart, emptyLink}) {
+export function ApprovalsChart({chart, emptyLink, onOpenTab}) {
   const {pending = 0, approved = 0, rejected = 0, decisionsNeededCount = 0, pendingOver7DaysCount = 0} = chart || {};
   const total = pending + approved + rejected;
-  if (!total && !decisionsNeededCount) return <EmptyChartState message="No approvals or decisions recorded." link={emptyLink} />;
+  if (!total && !decisionsNeededCount) return <EmptyChartState message="No approvals or decisions recorded." link={emptyLink} onOpenTab={onOpenTab} />;
   const data = [
     {name: 'Pending', value: pending, color: COLOR.yellow},
     {name: 'Approved', value: approved, color: COLOR.green},
@@ -234,6 +253,10 @@ export function BenefitsRealizationBars({benefits}) {
 }
 
 // ── Secondary: Document Completion by PM stage — segmented step bar ───────────────────────────────
+// Pills render stage.shortLabel (a fixed, always-fits abbreviation computed alongside the full
+// label in foundation/projectHealth.js's PM_STAGES — not truncated here with CSS ellipsis, which
+// was cutting "Monitoring and Controlling" down to unreadable fragments like "MONITO"). The full
+// label is still available in the title tooltip.
 export function DocumentCompletionByStageBar({stages}) {
   if (!stages || !stages.some(stage => stage.documentCount > 0)) return <p className="ph-chart-empty-inline">No data yet</p>;
   return (
@@ -244,7 +267,7 @@ export function DocumentCompletionByStageBar({stages}) {
           className={`ph-stage-segment status-${stage.status}`}
           title={`${stage.stage}: ${stage.status === 'not-started' ? 'Not started' : stage.status === 'complete' ? 'Complete' : 'In progress'}${stage.documentCount ? ` (${stage.completionPercent}% avg, ${stage.documentCount} document${stage.documentCount === 1 ? '' : 's'})` : ''}`}
         >
-          <span>{stage.stage}</span>
+          <span>{stage.shortLabel || stage.stage}</span>
         </div>
       ))}
     </div>

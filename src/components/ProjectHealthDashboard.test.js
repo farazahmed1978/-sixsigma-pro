@@ -105,3 +105,45 @@ test('Schedule Health shows the zero-state message, not "0 on track, 0 at risk, 
   await act(async () => root.unmount());
   host.remove();
 });
+
+test('QA Fix 1: the "No milestone data yet" message and the Schedule Baseline link each appear exactly once, not twice', async () => {
+  const proj = project(doc('milestone-report', {milestoneStatusRows: []}));
+  const {host, root} = await render(proj);
+  const scheduleCard = [...host.querySelectorAll('.ph-health-card')].find(card => card.textContent.includes('Schedule Health'));
+  const occurrences = (scheduleCard.textContent.match(/No milestone data yet — add milestones in Schedule Baseline\./g) || []).length;
+  expect(occurrences).toBe(1);
+  const scheduleBaselineLinks = [...scheduleCard.querySelectorAll('a,button')].filter(node => node.textContent.includes('Schedule Baseline'));
+  expect(scheduleBaselineLinks).toHaveLength(1);
+  // The chart area is skipped entirely for this zero-state (the summary above already says it) —
+  // there is no empty chart frame left behind either.
+  expect(scheduleCard.querySelector('.ph-health-chart')).toBeNull();
+  await act(async () => root.unmount());
+  host.remove();
+});
+
+test('QA Fix 1: once milestone data exists, the chart renders normally (this fix is scoped to the zero-state only)', async () => {
+  const proj = project(doc('milestone-report', {milestoneStatusRows: [{status: 'On Track'}]}));
+  const {host, root} = await render(proj);
+  const scheduleCard = [...host.querySelectorAll('.ph-health-card')].find(card => card.textContent.includes('Schedule Health'));
+  expect(scheduleCard.querySelector('.ph-health-chart')).toBeTruthy();
+  await act(async () => root.unmount());
+  host.remove();
+});
+
+test('QA Fix 3: the Approvals and Decisions card\'s "Approvals" link reads "Approvals →" and works, even in the chart\'s own empty state', async () => {
+  // decision-log existing (but empty) gives the card hasData:true so it renders summary + chart +
+  // footer, while there are still zero approvals/decisions to chart — exactly the state where the
+  // chart's own EmptyChartState (not just the always-present footer link) is exercised.
+  const proj = project(doc('decision-log', {decisionRows: []}));
+  const {host, root, onOpenTab} = await render(proj);
+  const approvalsCard = [...host.querySelectorAll('.ph-health-card')].find(card => card.textContent.includes('Approvals and Decisions'));
+  const approvalsControls = [...approvalsCard.querySelectorAll('a,button')].filter(node => node.textContent.includes('Approvals'));
+  // One in the chart's own empty state, one in the footer — both must be real, working, arrow-suffixed links.
+  expect(approvalsControls.length).toBeGreaterThanOrEqual(1);
+  approvalsControls.forEach(node => expect(node.textContent).toBe('Approvals →'));
+  expect(approvalsCard.querySelector('.ph-chart-empty-hint')).toBeNull();
+  await act(async () => { approvalsControls[0].click(); });
+  expect(onOpenTab).toHaveBeenCalledWith('approvals');
+  await act(async () => root.unmount());
+  host.remove();
+});

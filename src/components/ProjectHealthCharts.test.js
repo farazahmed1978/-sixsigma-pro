@@ -5,6 +5,8 @@ import {MemoryRouter} from 'react-router-dom';
 import {
   healthBarColor,
   HealthBar,
+  HealthLink,
+  EmptyChartState,
   MilestoneStatusChart,
   CostBurnChart,
   RiskSeverityChart,
@@ -12,6 +14,8 @@ import {
   ApprovalsChart,
   BenefitsRealizationBars,
   DocumentCompletionByStageBar,
+  COLOR,
+  STATUS_FILL,
 } from './ProjectHealthCharts';
 
 const mount = async element => {
@@ -68,6 +72,44 @@ describe('HealthBar', () => {
 });
 
 const link = {label: 'Open It', to: '/projects/p1/documents/some-doc'};
+
+describe('QA Fix 4: STATUS_FILL — cost chart color logic is a central status->color mapping, not hardcoded per bar', () => {
+  test('maps Green/Yellow/Red to the same hex values as the shared COLOR palette', () => {
+    expect(STATUS_FILL).toEqual({Green: COLOR.green, Yellow: COLOR.yellow, Red: COLOR.red});
+  });
+});
+
+describe('QA Fix 3: HealthLink — the one shared link renderer for both real routes and Project Hub tabs', () => {
+  test('a real document route renders as "Label →" via react-router Link', async () => {
+    const {host, unmount} = await mount(<HealthLink link={{label: 'Approvals', to: '/projects/p1/documents/decision-log'}} />);
+    const anchor = host.querySelector('a');
+    expect(anchor.textContent).toBe('Approvals →');
+    expect(anchor.getAttribute('href')).toBe('/projects/p1/documents/decision-log');
+    await unmount();
+  });
+
+  test('a tab: link renders as a clickable "Label →" button, not inert text, and calls onOpenTab with the tab id', async () => {
+    const onOpenTab = jest.fn();
+    const {host, unmount} = await mount(<HealthLink link={{label: 'Approvals', to: 'tab:approvals'}} onOpenTab={onOpenTab} />);
+    const button = host.querySelector('button');
+    expect(button).toBeTruthy();
+    expect(button.textContent).toBe('Approvals →');
+    await act(async () => { button.click(); });
+    expect(onOpenTab).toHaveBeenCalledWith('approvals');
+    await unmount();
+  });
+
+  test('EmptyChartState renders a tab: link through HealthLink, not a plain unclickable span', async () => {
+    const onOpenTab = jest.fn();
+    const {host, unmount} = await mount(<EmptyChartState message="Nothing here yet." link={{label: 'Approvals', to: 'tab:approvals'}} onOpenTab={onOpenTab} />);
+    expect(host.querySelector('.ph-chart-empty-hint')).toBeNull();
+    const button = host.querySelector('button');
+    expect(button.textContent).toBe('Approvals →');
+    await act(async () => { button.click(); });
+    expect(onOpenTab).toHaveBeenCalledWith('approvals');
+    await unmount();
+  });
+});
 
 describe('MilestoneStatusChart empty state', () => {
   test('shows the Schedule Health zero-state message and a link when hasMilestoneData is false', async () => {
@@ -164,7 +206,13 @@ describe('BenefitsRealizationBars', () => {
 
 describe('DocumentCompletionByStageBar', () => {
   test('shows "No data yet" when no stage has any document', async () => {
-    const stages = ['Initiation', 'Planning', 'Execution', 'Monitoring and Controlling', 'Closing'].map(stage => ({stage, status: 'not-started', completionPercent: null, documentCount: 0}));
+    const stages = [
+      {stage: 'Initiation', shortLabel: 'Init', status: 'not-started', completionPercent: null, documentCount: 0},
+      {stage: 'Planning', shortLabel: 'Plan', status: 'not-started', completionPercent: null, documentCount: 0},
+      {stage: 'Execution', shortLabel: 'Exec', status: 'not-started', completionPercent: null, documentCount: 0},
+      {stage: 'Monitoring and Controlling', shortLabel: 'M&C', status: 'not-started', completionPercent: null, documentCount: 0},
+      {stage: 'Closing', shortLabel: 'Close', status: 'not-started', completionPercent: null, documentCount: 0},
+    ];
     const {host, unmount} = await mount(<DocumentCompletionByStageBar stages={stages} />);
     expect(host.textContent).toContain('No data yet');
     await unmount();
@@ -172,11 +220,11 @@ describe('DocumentCompletionByStageBar', () => {
 
   test('renders a segment per stage once at least one stage has documents', async () => {
     const stages = [
-      {stage: 'Initiation', status: 'complete', completionPercent: 100, documentCount: 1},
-      {stage: 'Planning', status: 'in-progress', completionPercent: 40, documentCount: 2},
-      {stage: 'Execution', status: 'not-started', completionPercent: null, documentCount: 0},
-      {stage: 'Monitoring and Controlling', status: 'not-started', completionPercent: null, documentCount: 0},
-      {stage: 'Closing', status: 'not-started', completionPercent: null, documentCount: 0},
+      {stage: 'Initiation', shortLabel: 'Init', status: 'complete', completionPercent: 100, documentCount: 1},
+      {stage: 'Planning', shortLabel: 'Plan', status: 'in-progress', completionPercent: 40, documentCount: 2},
+      {stage: 'Execution', shortLabel: 'Exec', status: 'not-started', completionPercent: null, documentCount: 0},
+      {stage: 'Monitoring and Controlling', shortLabel: 'M&C', status: 'not-started', completionPercent: null, documentCount: 0},
+      {stage: 'Closing', shortLabel: 'Close', status: 'not-started', completionPercent: null, documentCount: 0},
     ];
     const {host, unmount} = await mount(<DocumentCompletionByStageBar stages={stages} />);
     const segments = [...host.querySelectorAll('.ph-stage-segment')];
@@ -184,6 +232,23 @@ describe('DocumentCompletionByStageBar', () => {
     expect(segments[0].className).toContain('status-complete');
     expect(segments[1].className).toContain('status-in-progress');
     expect(segments[2].className).toContain('status-not-started');
+    await unmount();
+  });
+
+  test('QA Fix 2: renders the short abbreviation, not a CSS-truncated fragment of the full stage label', async () => {
+    const stages = [
+      {stage: 'Initiation', shortLabel: 'Init', status: 'complete', completionPercent: 100, documentCount: 1},
+      {stage: 'Planning', shortLabel: 'Plan', status: 'complete', completionPercent: 100, documentCount: 1},
+      {stage: 'Execution', shortLabel: 'Exec', status: 'complete', completionPercent: 100, documentCount: 1},
+      {stage: 'Monitoring and Controlling', shortLabel: 'M&C', status: 'complete', completionPercent: 100, documentCount: 1},
+      {stage: 'Closing', shortLabel: 'Close', status: 'complete', completionPercent: 100, documentCount: 1},
+    ];
+    const {host, unmount} = await mount(<DocumentCompletionByStageBar stages={stages} />);
+    const labels = [...host.querySelectorAll('.ph-stage-segment span')].map(span => span.textContent);
+    expect(labels).toEqual(['Init', 'Plan', 'Exec', 'M&C', 'Close']);
+    // The full label is still available for anyone hovering, just not the thing that has to fit
+    // in the pill.
+    expect(host.querySelector('.ph-stage-segment').getAttribute('title')).toContain('Initiation');
     await unmount();
   });
 });

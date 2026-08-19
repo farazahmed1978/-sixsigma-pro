@@ -120,14 +120,33 @@ describe('Cost Health card', () => {
     expect(cost.metrics.eacVsBacVariance).toBe(-100);
   });
 
-  test('chart carries budgetBurnedPercent and cpi for the dashboard\'s burn bar and CPI gauge', () => {
+  test('chart carries budgetBurnedPercent, cpi, and budgetBurnStatus for the dashboard\'s burn bar and CPI gauge', () => {
     const proj = project(doc('evm-dashboard', {CPI: '0.85', ac: '400', bac: '1000'}));
-    expect(computeProjectHealth(proj).cards.cost.chart).toEqual({budgetBurnedPercent: 40, cpi: 0.85});
+    expect(computeProjectHealth(proj).cards.cost.chart).toEqual({budgetBurnedPercent: 40, cpi: 0.85, budgetBurnStatus: 'Green'});
   });
 
   test('chart.cpi is null when no CPI has been entered, the signal the chart uses for its empty state', () => {
     const proj = project(doc('evm-dashboard', {}));
     expect(computeProjectHealth(proj).cards.cost.chart.cpi).toBeNull();
+  });
+
+  describe('QA Fix 4: chart.budgetBurnStatus — the central, testable source for the budget-burn bar\'s color', () => {
+    test.each([
+      [50, 'Green'], [69.9, 'Green'],
+      [70, 'Yellow'], [90, 'Yellow'], [80, 'Yellow'],
+      [90.1, 'Red'], [150, 'Red'],
+    ])('%s%% burned -> %s', (percent, expected) => {
+      // ac/bac chosen so ac/bac*100 equals the percent under test.
+      const proj = project(doc('evm-dashboard', {CPI: '1', ac: String(percent), bac: '100'}));
+      expect(computeProjectHealth(proj).cards.cost.chart.budgetBurnStatus).toBe(expected);
+    });
+
+    test('is null when budgetBurnedPercent cannot be computed (no ac/bac)', () => {
+      const proj = project(doc('evm-dashboard', {CPI: '1'}));
+      const chart = computeProjectHealth(proj).cards.cost.chart;
+      expect(chart.budgetBurnedPercent).toBeNull();
+      expect(chart.budgetBurnStatus).toBeNull();
+    });
   });
 });
 
@@ -326,6 +345,11 @@ describe('Secondary indicators', () => {
     expect(chart[0]).toMatchObject({status: 'complete', documentCount: 1, completionPercent: 100});
     expect(chart[1]).toMatchObject({status: 'in-progress', documentCount: 1, completionPercent: 40});
     expect(chart[2]).toMatchObject({status: 'not-started', documentCount: 0});
+  });
+
+  test('QA Fix 2: each stage also carries a fixed shortLabel abbreviation, computed centrally rather than truncated by the component', () => {
+    const chart = computeProjectHealth(project()).secondary.documentCompletion.chart;
+    expect(chart.map(stage => stage.shortLabel)).toEqual(['Init', 'Plan', 'Exec', 'M&C', 'Close']);
   });
 });
 

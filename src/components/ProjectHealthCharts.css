@@ -38,7 +38,14 @@
 .ph-benefit-mark.baseline{background:var(--text-muted)}
 
 .ph-stage-bar{display:flex;gap:.3rem}
-.ph-stage-segment{flex:1;padding:.4rem .3rem;border-radius:6px;text-align:center;font-size:.62rem;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ph-stage-segment{flex:1;padding:.4rem .3rem;border-radius:6px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Higher specificity than .ph-health-secondary span (ProjectHealthDashboard.css), which otherwise
+   leaks its uppercase/muted-color/block styling meant for the secondary-indicator labels into
+   these pill labels regardless of stylesheet load order — that leak, combined with CSS ellipsis
+   truncation, is what produced fragments like "MONITO" for "Monitoring and Controlling". Pills now
+   render a short, always-fitting label (see DocumentCompletionByStageBar), and this rule makes
+   sure that label keeps the pill's own color/size/casing no matter what. */
+.ph-stage-bar .ph-stage-segment span{display:inline;color:#fff;font-size:.62rem;font-weight:700;text-transform:none}
 .ph-stage-segment.status-complete{background:var(--green,#10b981)}
 .ph-stage-segment.status-in-progress{background:var(--yellow,#f59e0b)}
 .ph-stage-segment.status-not-started{background:var(--border);color:var(--text-muted)}
