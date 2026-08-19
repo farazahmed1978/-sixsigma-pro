@@ -18,6 +18,23 @@ import {MAX_ASSET_FILE_SIZE_BYTES, ASSET_STORAGE_BUCKET} from '../config/assetCo
 const TABLE = 'assets';
 const requireCloud = () => { if (!supabase) throw new Error('cloud-not-configured'); return supabase; };
 
+// project_id, organization_id, created_by, and uploaded_by are all `uuid` columns (see
+// supabase/migrations/202608180001_project_assets.sql) — Postgres rejects anything else with an
+// opaque "invalid input syntax for type uuid" error that gives no hint which value or caller was
+// at fault. Every entry point that accepts a projectId validates it here instead, failing with a
+// message that names the actual bad value and points straight at the fix: pass project.id (the
+// UUID), never project.name or any other display string. Every caller in this codebase (
+// AssetUploadModal.js, ProjectAssets.js, LinkedAssetsList.js) already passes project.id — this
+// guard exists so a future regression is caught immediately at the repository boundary, in this
+// one place, rather than surfacing as a cryptic Postgres error deep in a Step 3 upload.
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const isValidProjectId = projectId => typeof projectId === 'string' && UUID_PATTERN.test(projectId);
+const assertProjectId = projectId => {
+  if (!isValidProjectId(projectId)) {
+    throw new Error(`asset-invalid-project-id: expected project.id (a UUID) but received ${JSON.stringify(projectId)} — pass project.id, not project.name or any other display value.`);
+  }
+};
+
 const toRow = asset => ({
   ...(asset.id !== undefined ? {id: asset.id} : {}),
   ...(asset.projectId !== undefined ? {project_id: asset.projectId} : {}),
@@ -75,6 +92,7 @@ const newLinkId = () => `link-${Date.now()}-${Math.random().toString(36).slice(2
 
 export const assetRepository = {
   async list(projectId, filters = {}) {
+    assertProjectId(projectId);
     const rows = await cloudRepository.list(TABLE, {project_id: projectId, ...filters});
     return rows.map(fromRow);
   },
@@ -85,6 +103,7 @@ export const assetRepository = {
   // context — see AssetUploadModal.js), matching how ProjectApprovals.js and the other PM tabs
   // supply the same fields to pmRepository rather than having the repository infer them.
   async create(projectId, assetData) {
+    assertProjectId(projectId);
     const client = requireCloud();
     const row = toRow({
       ...assetData,
@@ -102,6 +121,7 @@ export const assetRepository = {
   },
   async update(id, changes) {
     if (!id) throw new Error('asset-update-requires-id: updates must target an existing asset');
+    if (changes.projectId !== undefined) assertProjectId(changes.projectId);
     const client = requireCloud();
     const existingRow = await cloudRepository.get(TABLE, id);
     const changedRow = toRow(changes);
@@ -130,6 +150,7 @@ export const assetRepository = {
   // 'project-assets' Supabase Storage bucket, keyed by project so the storage policies in
   // 202608180001_project_assets.sql can scope access the same way the table's RLS policies do.
   async uploadFile(projectId, file) {
+    assertProjectId(projectId);
     if (file.size > MAX_ASSET_FILE_SIZE_BYTES) throw new Error(`asset-too-large: files must be 25MB or smaller (this file is ${(file.size / 1024 / 1024).toFixed(1)}MB)`);
     const client = requireCloud();
     const storagePath = `${projectId}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]+/g, '-')}`;

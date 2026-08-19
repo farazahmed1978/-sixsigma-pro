@@ -3,7 +3,7 @@ jest.mock('../lib/supabase', () => ({supabase: {auth: {getUser: jest.fn()}, from
 
 import {cloudRepository} from './cloudRepository';
 import {supabase} from '../lib/supabase';
-import {assetRepository} from './assetRepository';
+import {assetRepository, isValidProjectId} from './assetRepository';
 import {MAX_ASSET_FILE_SIZE_BYTES} from '../config/assetConfig';
 
 const mockAuthGetUser = supabase.auth.getUser;
@@ -40,6 +40,34 @@ beforeEach(() => {
   projectsChain.maybeSingle.mockResolvedValue({data: {id: scope.project_id, organization_id: scope.organization_id}, error: null});
 });
 
+describe('QA regression: projectId must be project.id (a UUID), never project.name or another display string', () => {
+  test('isValidProjectId accepts a real UUID and rejects a display name like a project title', () => {
+    expect(isValidProjectId(scope.project_id)).toBe(true);
+    expect(isValidProjectId('PM QA')).toBe(false);
+    expect(isValidProjectId('')).toBe(false);
+    expect(isValidProjectId(undefined)).toBe(false);
+    expect(isValidProjectId(null)).toBe(false);
+  });
+
+  test('list rejects a non-UUID projectId with a clear, actionable error instead of reaching the network', async () => {
+    await expect(assetRepository.list('PM QA')).rejects.toThrow('asset-invalid-project-id');
+    await expect(assetRepository.list('PM QA')).rejects.toThrow(/pass project\.id, not project\.name/);
+    expect(cloudRepository.list).not.toHaveBeenCalled();
+  });
+
+  test('create rejects a non-UUID projectId before ever asserting ownership or writing', async () => {
+    await expect(assetRepository.create('PM QA', {organizationId: scope.organization_id, createdBy: scope.created_by, name: 'x'})).rejects.toThrow('asset-invalid-project-id');
+    expect(mockAuthGetUser).not.toHaveBeenCalled();
+    expect(opChain.insert).not.toHaveBeenCalled();
+  });
+
+  test('uploadFile rejects a non-UUID projectId before ever touching Storage', async () => {
+    const file = {name: 'Vendor Contract.pdf', size: 1024, type: 'application/pdf'};
+    await expect(assetRepository.uploadFile('PM QA', file)).rejects.toThrow('asset-invalid-project-id');
+    expect(mockStorageFrom).not.toHaveBeenCalled();
+  });
+});
+
 describe('list', () => {
   test('scopes reads to the given project and normalizes every row to the camelCase asset shape', async () => {
     cloudRepository.list.mockResolvedValue([row()]);
@@ -56,8 +84,9 @@ describe('list', () => {
 
   test('never returns another project\'s assets — scoping is by project_id, not suite or org alone', async () => {
     cloudRepository.list.mockResolvedValue([]);
-    await assetRepository.list('some-other-project');
-    expect(cloudRepository.list).toHaveBeenCalledWith('assets', {project_id: 'some-other-project'});
+    const otherProjectId = '99999999-9999-9999-9999-999999999999';
+    await assetRepository.list(otherProjectId);
+    expect(cloudRepository.list).toHaveBeenCalledWith('assets', {project_id: otherProjectId});
   });
 });
 

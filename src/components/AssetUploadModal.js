@@ -1,7 +1,7 @@
 import React, {useMemo, useState} from 'react';
 import {useAuth} from '../context/AuthContext';
 import {useInteractions} from '../context/InteractionContext';
-import {assetRepository} from '../repositories/assetRepository';
+import {assetRepository, isValidProjectId} from '../repositories/assetRepository';
 import {lifecycleForProject, lifecycleStageLabels} from '../foundation/lifecycle';
 import {ASSET_TYPES, ASSET_TYPE_LABELS, assetTagSuggestionsForSuite, detectAssetType, formatAssetSize, MAX_ASSET_FILE_SIZE_BYTES} from '../config/assetConfig';
 import './AssetUploadModal.css';
@@ -63,6 +63,13 @@ export default function AssetUploadModal({project, defaultLink, defaultStage = '
   const goToStep3 = () => { if (!name.trim()) { setError('Give this asset a name before continuing.'); return; } setError(''); setStep(3); };
 
   const upload = async () => {
+    // Fail fast on a bad project.id before ever touching Storage — catching this here, not just
+    // inside assetRepository, means a bad id can't leave an orphaned uploaded file behind when the
+    // asset record insert would have failed anyway.
+    if (!isValidProjectId(project?.id)) {
+      setError(`This project is missing a valid id (got ${JSON.stringify(project?.id)}). Reload the project and try again.`);
+      return;
+    }
     setUploading(true); setError('');
     try {
       let fileRef = {url: urlValue.trim(), storagePath: null, size: 0, mimeType: ''};

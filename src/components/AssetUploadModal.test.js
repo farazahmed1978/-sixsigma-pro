@@ -5,11 +5,14 @@ import AssetUploadModal from './AssetUploadModal';
 
 jest.mock('../context/AuthContext', () => ({useAuth: () => ({user: {id: 'user-1'}, profile: {default_organization_id: 'org-1'}})}));
 jest.mock('../context/InteractionContext', () => ({useInteractions: () => ({toast: jest.fn()})}));
-jest.mock('../repositories/assetRepository', () => ({assetRepository: {uploadFile: jest.fn(), create: jest.fn()}}));
+jest.mock('../repositories/assetRepository', () => ({
+  ...jest.requireActual('../repositories/assetRepository'),
+  assetRepository: {uploadFile: jest.fn(), create: jest.fn()},
+}));
 
 import {assetRepository} from '../repositories/assetRepository';
 
-const project = {id: 'p1', suiteId: 'project-management', name: 'PM Project'};
+const project = {id: '11111111-1111-1111-1111-111111111111', suiteId: 'project-management', name: 'PM Project'};
 
 const render = async props => {
   const host = document.createElement('div');
@@ -136,8 +139,8 @@ test('confirming a file upload calls uploadFile then create with the assembled p
   expect(host.querySelector('h2').textContent).toContain('Step 3 of 3');
   const uploadButton = [...host.querySelectorAll('button')].find(button => button.textContent === 'Upload');
   await act(async () => { await uploadButton.click(); });
-  expect(assetRepository.uploadFile).toHaveBeenCalledWith('p1', pdf);
-  expect(assetRepository.create).toHaveBeenCalledWith('p1', expect.objectContaining({
+  expect(assetRepository.uploadFile).toHaveBeenCalledWith(project.id, pdf);
+  expect(assetRepository.create).toHaveBeenCalledWith(project.id, expect.objectContaining({
     name: 'Vendor Contract', type: 'document', tags: ['contract', 'vendor'], url: 'https://signed.example/x', storagePath: 'p1/x.pdf',
     links: [expect.objectContaining({artifactType: 'document', artifactId: 'doc-1', artifactLabel: 'Risk Register'})],
   }));
@@ -157,6 +160,24 @@ test('a failed upload shows the error and does not close the modal', async () =>
   const uploadButton = [...host.querySelectorAll('button')].find(button => button.textContent === 'Upload');
   await act(async () => { await uploadButton.click(); });
   expect(host.textContent).toContain('asset-too-large');
+  expect(onClose).not.toHaveBeenCalled();
+  await act(async () => root.unmount());
+  host.remove();
+});
+
+test('QA regression: a project whose id is a display name (not a UUID) fails fast with a clear message, never calling uploadFile or create', async () => {
+  const badProject = {id: 'PM QA', suiteId: 'project-management', name: 'PM QA'};
+  const {host, root, onClose} = await render({project: badProject});
+  const pdf = makeFile('Vendor Contract.pdf', 2048, 'application/pdf');
+  await selectFile(host, pdf);
+  await act(async () => { [...host.querySelectorAll('button')].find(button => button.textContent.includes('Next')).click(); });
+  await act(async () => { [...host.querySelectorAll('button')].find(button => button.textContent.includes('Next')).click(); });
+  expect(host.querySelector('h2').textContent).toContain('Step 3 of 3');
+  const uploadButton = [...host.querySelectorAll('button')].find(button => button.textContent === 'Upload');
+  await act(async () => { await uploadButton.click(); });
+  expect(host.textContent).toContain('missing a valid id');
+  expect(assetRepository.uploadFile).not.toHaveBeenCalled();
+  expect(assetRepository.create).not.toHaveBeenCalled();
   expect(onClose).not.toHaveBeenCalled();
   await act(async () => root.unmount());
   host.remove();
