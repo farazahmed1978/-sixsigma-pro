@@ -24,6 +24,11 @@ export default function AssetUploadModal({project, defaultLink, defaultStage = '
   const tagSuggestions = assetTagSuggestionsForSuite(lifecycle.id);
 
   const fileInputRef = useRef(null);
+  // Synchronous re-entrancy guard for upload(): the "Upload" button's disabled={uploading} only
+  // takes effect once React commits the setUploading(true) update, which leaves a gap where a second
+  // click dispatched in the same tick (e.g. a fast double-click) would start a second upload before
+  // that commit happens. This ref closes that gap immediately, with no render round-trip.
+  const uploadInFlightRef = useRef(false);
   const [step, setStep] = useState(1);
   const [mode, setMode] = useState('file');
   const [file, setFile] = useState(null);
@@ -64,6 +69,7 @@ export default function AssetUploadModal({project, defaultLink, defaultStage = '
   const goToStep3 = () => { if (!name.trim()) { setError('Give this asset a name before continuing.'); return; } setError(''); setStep(3); };
 
   const upload = async () => {
+    if (uploadInFlightRef.current) return;
     console.log('ASSET project object:', project);
     // Fail fast on a bad project.id before ever touching Storage — catching this here, not just
     // inside assetRepository, means a bad id can't leave an orphaned uploaded file behind when the
@@ -72,6 +78,7 @@ export default function AssetUploadModal({project, defaultLink, defaultStage = '
       setError(`This project is missing a valid id (got ${JSON.stringify(project?.id)}). Reload the project and try again.`);
       return;
     }
+    uploadInFlightRef.current = true;
     setUploading(true); setError('');
     try {
       let fileRef = {url: urlValue.trim(), storagePath: null, size: 0, mimeType: ''};
@@ -102,6 +109,7 @@ export default function AssetUploadModal({project, defaultLink, defaultStage = '
     } catch (uploadError) {
       setError(uploadError.message || 'The asset could not be saved.');
     } finally {
+      uploadInFlightRef.current = false;
       setUploading(false);
     }
   };
