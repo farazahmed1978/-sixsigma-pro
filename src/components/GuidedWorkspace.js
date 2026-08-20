@@ -108,8 +108,8 @@ export default function GuidedWorkspace({project}) {
         </div>
         <div className="gw-content" data-phase={transitionPhase}>
           {displayedDoc.id === 'charter'
-            ? <ProjectCharter onGuidedState={setSectionState} />
-            : template && <DocumentWorkspace template={template} project={project} updateProject={updateProject} onGuidedState={setSectionState} />}
+            ? <ProjectCharter key={displayedDoc.id} onGuidedState={setSectionState} />
+            : template && <DocumentWorkspace key={displayedDoc.id} template={template} project={project} updateProject={updateProject} onGuidedState={setSectionState} />}
         </div>
       </div>
       {sectionInfo && (
