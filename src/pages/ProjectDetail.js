@@ -8,6 +8,8 @@ import { useProjectPlacement } from "../context/ProjectPlacementContext";
 import ProjectBinder from "../components/ProjectBinder";
 import ProjectRisks from "../components/ProjectRisks";
 import ProjectActions from "../components/ProjectActions";
+import ProjectCorrectiveActions from "../components/ProjectCorrectiveActions";
+import { correctiveActionRepository } from "../repositories/correctiveActionRepository";
 import ProjectIssues from "../components/ProjectIssues";
 import ProjectDecisions from "../components/ProjectDecisions";
 import ProjectApprovals from "../components/ProjectApprovals";
@@ -46,6 +48,7 @@ export const TAB_DEFINITIONS = [
   { id: "datasets", label: "Datasets", suites: ["operational-excellence", "project-management"] },
   { id: "analyses", label: "Analyses", suites: ["operational-excellence"] },
   { id: "placements", label: "Placements", suites: ["operational-excellence"] },
+  { id: "corrective-actions", label: "Corrective Actions", suites: ["operational-excellence"] },
   { id: "risks", label: "Risks", suites: ["project-management"] },
   { id: "issues", label: "Issues", suites: ["project-management"] },
   { id: "actions", label: "Actions", suites: ["project-management"] },
@@ -111,7 +114,7 @@ export default function ProjectDetail() {
   const placement = useProjectPlacement();
   const { confirm, requestForm, toast } = useInteractions();
   const [tab, setTab] = useState(
-    () => location.state?.returnTab || "Project Home",
+    () => location.state?.returnTab || (new URLSearchParams(location.search).get("tab") === "corrective-actions" ? "Corrective Actions" : "Project Home"),
   );
   const [analysisQuery, setAnalysisQuery] = useState("");
   const [analysisFilter, setAnalysisFilter] = useState("All");
@@ -120,6 +123,7 @@ export default function ProjectDetail() {
   const [evidenceFilter, setEvidenceFilter] = useState("All");
   const [evidenceUploadOpen, setEvidenceUploadOpen] = useState(false);
   const [openResult, setOpenResult] = useState(null);
+  const [correctiveActions, setCorrectiveActions] = useState([]);
   const artifactInput = useRef(null);
   const project = getProject(id);
   // While project is still loading (undefined), suite context must stay null rather than fall back
@@ -153,6 +157,12 @@ export default function ProjectDetail() {
   );
   const evidence = useMemo(() => project?.evidenceLibrary || [], [project]);
   const artifacts = project?.artifacts || [];
+  useEffect(() => {
+    let active = true;
+    if (!project || lifecycleForProject(project).id !== "operational-excellence") return () => { active = false; };
+    correctiveActionRepository.list(project.id).then((rows) => { if (active) setCorrectiveActions(rows); }).catch(() => { if (active) setCorrectiveActions([]); });
+    return () => { active = false; };
+  }, [project]);
   const recentActivity = useMemo(
     () =>
       [
@@ -517,6 +527,7 @@ export default function ProjectDetail() {
   const renderTab = () => {
     if (tab === "Risks") return <ProjectRisks project={project} />;
     if (tab === "Actions") return <ProjectActions project={project} />;
+    if (tab === "Corrective Actions") return <ProjectCorrectiveActions project={project} documents={documents} analyses={projectAnalyses} records={correctiveActions} onRecordsChange={setCorrectiveActions} requestedId={new URLSearchParams(location.search).get("correctiveAction") || ""} />;
     if (tab === "Issues") return <ProjectIssues project={project} />;
     if (tab === "Decisions") return <ProjectDecisions project={project} />;
     if (tab === "Approvals") return <ProjectApprovals project={project} />;
@@ -759,6 +770,7 @@ export default function ProjectDetail() {
           evidence={evidence}
           artifacts={artifacts}
           datasets={projectDatasets}
+          correctiveActions={correctiveActions}
           updateProject={updateProject}
         />
       );

@@ -110,7 +110,9 @@ export const routeFor = (projectId, item) =>
         (item.toolId === "lean-enterprise" ||
           item.sourceWorkflow === "lean-enterprise")
       ? `/tool/lean-enterprise?openLean=${encodeURIComponent(item.sourceId || item.id)}`
-      : "";
+      : item.kind === "corrective-action"
+        ? `/projects/${projectId}?tab=corrective-actions&correctiveAction=${encodeURIComponent(item.sourceId)}`
+        : "";
 export const reportItemForAnalysis = (analysis) => ({
   toolId: analysis.toolId || analysis.toolType || "analysis",
   phase:
@@ -147,7 +149,9 @@ export const placementDraftForAnalysis = (
 });
 export const analysesWithProjectPlacements=(analyses,placements,projectId)=>analyses.map((analysis)=>{const canonicalPlacement=placements.find((item)=>item.artifactId===analysis.id&&item.projectId===projectId&&item.isPrimary);return canonicalPlacement?{...analysis,phase:canonicalPlacement.phase||analysis.phase,workflowCluster:canonicalPlacement.workflowCluster||analysis.workflowCluster}:analysis});
 const itemStage = (item) =>
-  item.kind === "document"
+  item.kind === "corrective-action"
+    ? "Decisions / Actions"
+    : item.kind === "document"
     ? "Documents"
     : item.kind === "analysis"
       ? "Analyses"
@@ -222,6 +226,7 @@ export function buildProjectReviewModel(
     evidence = [],
     artifacts = [],
     datasets = [],
+    correctiveActions = [],
   } = {},
 ) {
   const lifecycle = lifecycleForProject(project),
@@ -272,6 +277,17 @@ export function buildProjectReviewModel(
     ),
     ...evidence.map((item) => decorate(item, "evidence")),
     ...artifacts.map((item) => decorate(item, "artifact")),
+    ...correctiveActions.map((item) => decorate({
+      ...item,
+      ...item.content,
+      title: item.title,
+      phase: item.lifecycle_phase || item.content?.lifecyclePhase || "Improve",
+      values: {
+        problemStatement: item.content?.problemStatement,
+        action: item.content?.actionDescription,
+        effectiveness: item.content?.effectivenessResult,
+      },
+    }, "corrective-action")),
   ];
   const phaseItems = (phase) => items.filter((item) => item.phase === phase);
   const oeSummaries = {
@@ -655,6 +671,7 @@ export default function ProjectBinder({
   evidence,
   artifacts,
   datasets,
+  correctiveActions = [],
   updateProject,
 }) {
   const placement = useProjectPlacement(),
@@ -701,8 +718,9 @@ export default function ProjectBinder({
           ),
         ],
         datasets,
+        correctiveActions,
       }),
-    [project, documents, placedAnalyses, evidence, artifacts, datasets, placedLean],
+    [project, documents, placedAnalyses, evidence, artifacts, datasets, correctiveActions, placedLean],
   );
   const configuredStages = lifecycleStageLabels(model.lifecycle);
   const PHASES = [
