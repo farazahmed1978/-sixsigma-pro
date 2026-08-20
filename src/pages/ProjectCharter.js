@@ -10,6 +10,7 @@ import LinkedAssetsList from '../components/LinkedAssetsList';
 import {artifactResume,documentRoute,projectHubRoute,PROJECT_HUB_BACK_LABEL} from '../utils/projectResume';
 import {lifecycleForProject} from '../foundation/lifecycle';
 import {nextDmaicArtifact} from '../utils/defineSequence';
+import '../components/GuidedWorkspace.css';
 import {PROJECT_CHARTER_SCHEMA_VERSION,PROJECT_CHARTER_EMPTY,CHARTER_TABLE_COLUMNS} from '../config/charterTemplate';
 import './ProjectCharter.css';
 
@@ -77,7 +78,7 @@ function Preview({ project, charter, completion, quality, onClose, previewRef, p
   return <div className="pc-modal" role="dialog" aria-modal="true" aria-label="Charter preview"><button className="pc-modal-backdrop" onClick={onClose} aria-label="Close preview" /><div className="pc-preview-shell"><div className="pc-preview-actions"><strong>Executive preview</strong><button type="button" onClick={onClose}>×</button></div><article ref={previewRef} className="pc-preview"><header><span>PROJECT CHARTER · {(phaseLabel||'DEFINE').toUpperCase()}</span><h1>{project.name}</h1><p>{renderText(charter.projectSummary)}</p><div><b>{completion}% complete</b><b>{quality}/100 quality</b><b>Sponsor: {project.champion || 'Not assigned'}</b><b>Target: {charter.targetDate || 'Not set'}</b></div></header><section><h2>Business Need</h2><p>{renderText(charter.businessCase)}</p><h3>Problem Statement</h3><p>{renderText(charter.problemStatement)}</p></section><section><h2>Goal</h2><p>{renderText(charter.goalStatement)}</p></section><section className="pc-preview-grid"><div><h2>In Scope</h2><p>{renderText(charter.scopeIn)}</p></div><div><h2>Out of Scope</h2><p>{renderText(charter.scopeOut)}</p></div></section><section><h2>Financial Impact</h2><p>{renderText(charter.financialImpact)}</p></section><footer>Aureqin · Project Charter</footer></article></div></div>;
 }
 
-export default function ProjectCharter() {
+export default function ProjectCharter({onGuidedState} = {}) {
   const navigate = useNavigate();
   const { id } = useParams();
   const location = useLocation();
@@ -124,6 +125,28 @@ export default function ProjectCharter() {
   const advanceSection=async()=>{if(await saveNow())setActiveIndex(index=>Math.min(index+1,SECTIONS.length-1));};
   const continueToNextDocument=async()=>{if(!nextDoc||!await saveNow())return;await updateProject(id,{resumeTarget:artifactResume({projectId:id,artifactId:nextDoc.id,artifactName:nextDoc.name,sectionId:project.documents?.[`document-${nextDoc.id}`]?.sectionState?.activeSectionId||''})});navigate(documentRoute(id,nextDoc.id))};
   const requestNextDocument=()=>{if(missingRequiredCount){setProgressionWarning(true);return;}continueToNextDocument()};
+  // Guided mode: GuidedWorkspace.js is the single source of truth for section navigation, the CTA
+  // footer, and when the Continue-to-next-document button appears — no navigation/button-rendering
+  // decisions live here. This just reports the live state GuidedWorkspace needs (current section
+  // index, whether it's the last one, whether every required field across the WHOLE document is
+  // filled) plus callable handles (goToPrevious/goToNext/save) so GuidedWorkspace's own footer
+  // buttons can drive this component's existing, unchanged navigation/persistence functions rather
+  // than reimplementing them. Runs every render (not narrowly deps-restricted) so the reported
+  // handles always close over the current state.
+  useEffect(() => {
+    if (!guided || !onGuidedState) return;
+    onGuidedState({
+      sectionIndex: activeIndex,
+      totalSections: SECTIONS.length,
+      completedSections,
+      isLastSection: activeIndex === SECTIONS.length - 1,
+      allRequiredFieldsFilled: completion === 100,
+      goToPrevious: () => setActiveIndex(i => Math.max(0, i - 1)),
+      goToNext: advanceSection,
+      save: saveNow,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  });
   const exportPdf = async () => { setPreviewOpen(true); setExporting(true); await new Promise(resolve => window.setTimeout(resolve, 200)); try { const canvas = await html2canvas(previewRef.current, { scale: 2, backgroundColor: '#ffffff' }); const pdf = new jsPDF('p', 'mm', 'a4'); const width = 190; const height = canvas.height * width / canvas.width; pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 10, 10, width, Math.min(height, 277)); pdf.save(`${project.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-charter.pdf`); } finally { setExporting(false); } };
   const addCharterToReport = async () => { await addReportItem({ toolId: 'document-charter', title: `Project Charter — ${project.name}`, timestamp: new Date().toISOString(), projectId: project.id, phase:currentStageLabel, assetType:'document', documentId: 'project-charter', statsSummary: { Completion: `${completion}%`, Quality: `${quality}/100` }, interpretation: `Project Charter for ${project.name}. ${completedSections} of ${SECTIONS.length} sections are complete.`, documentSnapshot: { schemaVersion: PROJECT_CHARTER_SCHEMA_VERSION, templateId: 'charter', values: charter } }); setReportNotice('Added to Report Builder'); };
 
@@ -149,8 +172,22 @@ export default function ProjectCharter() {
     }
   };
 
+  // Phase 5C — guided mode completely replaces this component's output: no WorkspaceShell, no
+  // score/quality header, no section sidebar, no Save Draft/Export/Print/+Add to Report, no
+  // sequence-nav bar. Just the current section's fields (renderActiveSection(), reused verbatim —
+  // zero duplicated business logic). Everything else guided-mode-specific — the progress tracker,
+  // the explanation panel, section-nav/Continue buttons — is rendered by GuidedWorkspace.js, which
+  // is the single source of truth for that chrome (see the onGuidedState effect above).
+  if (guided) {
+    return (
+      <div className="gw-section-only">
+        <div className="gw-section-header"><div><span>SECTION {current.icon} OF {SECTIONS.length}</span><h2>{current.label}</h2><p>{current.tip}</p></div></div>
+        <div className="pc-section-content" data-active-section={current.id}>{renderActiveSection()}</div>
+      </div>
+    );
+  }
+
   return <WorkspaceShell className="project-charter-shell" mode={workspaceMode} backTo={projectHubRoute(id)} backLabel={PROJECT_HUB_BACK_LABEL} breadcrumb={<><Link to={`/projects/${id}`}>Project Home</Link><span> / {currentStageLabel} / Project Charter</span></>} previousLabel="Previous" previousDisabled={false} onPrevious={() => navigate(-1)} sequencePreviousLabel="Previous item" sequencePreviousDisabled sequenceNextLabel={nextDoc?.sequenceLabel} sequenceNextDisabled={!nextDoc} onSequencePrevious={()=>{}} onSequenceNext={requestNextDocument} onMinimize={() => setWorkspaceMode('minimized')} onMaximize={() => setWorkspaceMode('maximized')} onRestore={() => setWorkspaceMode('normal')} onSave={saveNow} saving={saveState==='saving'} onExport={exportPdf} onPrint={() => window.print()} suiteId={lifecycle.id}><div className="pc-page">
-    {guided && (completion < 100 ? <div className="pc-guided-banner"><span>Step 1 of 3 mandatory documents — Project Charter</span></div> : <div className="pc-guided-banner pc-guided-complete"><p>Your project is started. Now let's set up your planning documents.</p><button type="button" className="btn-primary" onClick={() => navigate(projectHubRoute(id))}>Go to Project Hub</button></div>)}
     <header className="pc-executive"><div className="pc-crumb"><Link to="/projects">Projects</Link><span>/</span><strong>Project Charter</strong></div><div className="pc-title-row"><div><span className={`badge badge-${currentStageId}`}>{currentStageLabel} phase</span><h1>{project.name}</h1><p>Project charter · Executive alignment workspace</p></div><div className={`pc-save ${saveState}`}><i />{charterSaveStateLabel(saveState)}</div></div><div className="pc-summary-grid"><div><span>Completion</span><strong>{completion}%</strong><div className="pc-mini-bar"><i style={{ width: `${completion}%` }} /></div></div><div><span>Charter quality</span><strong>{quality}<small>/100</small></strong><p>{quality >= 80 ? 'Review ready' : 'Needs development'}</p></div><div><span>Sponsor</span><strong className="pc-summary-text">{project.champion || 'Not assigned'}</strong><p>Executive accountability</p></div><div><span>Target completion</span><strong className="pc-summary-text">{charter.targetDate || 'Not set'}</strong><p>{completedSections} of {SECTIONS.length} sections complete</p></div></div><div className="pc-actionbar"><button className="btn-secondary" type="button" onClick={saveNow}>Save Draft</button><button className="btn-secondary" type="button" onClick={() => setPreviewOpen(true)}>Preview</button><button className="btn-secondary" type="button" onClick={exportPdf} disabled={exporting}>{exporting ? 'Exporting…' : 'Export PDF'}</button><button className="btn-secondary" type="button" onClick={addCharterToReport}>+ Add to Report</button><HelpButton surfaceId="project-charter" suiteId={lifecycle.id} />{reportNotice && <span>{reportNotice}</span>}</div><div className="pc-overall"><span>Overall progress</span><div role="progressbar" aria-valuenow={completion} aria-valuemin="0" aria-valuemax="100"><i style={{ width: `${completion}%` }} /></div><strong>{completedSections}/{SECTIONS.length} complete</strong></div></header>
     <div className={`pc-workspace ${guideOpen ? '' : 'guide-closed'}`}><aside className="pc-nav"><span>Charter sections</span>{SECTIONS.map((section, index) => <button type="button" key={section.id} className={index === activeIndex ? 'active' : ''} onClick={() => setActiveIndex(index)}><b>{section.icon}</b><span>{section.label}</span><i className={section.fields.every(complete) ? 'done' : ''}>{section.fields.every(complete) ? '✓' : ''}</i></button>)}</aside><main className="pc-main"><div className="pc-section-header"><div><span>SECTION {current.icon} OF {SECTIONS.length}</span><h2>{current.label}</h2><p>{current.tip}</p></div><div className={current.fields.every(complete) ? 'pc-complete done' : 'pc-complete'}>{current.fields.every(complete) ? '✓ Section complete' : 'Required fields remaining'}</div></div><div className="pc-section-content" data-active-section={current.id}>{renderActiveSection()}</div><LinkedAssetsList project={project} artifactType="document" artifactId="charter" /><footer className="pc-footer"><button type="button" className="btn-secondary" disabled={activeIndex === 0} onClick={() => setActiveIndex(i => i - 1)}>← Previous section</button><span>{activeIndex + 1} of {SECTIONS.length}</span><button type="button" className="btn-primary" disabled={activeIndex === SECTIONS.length - 1} onClick={advanceSection}>Next →</button></footer></main><aside className={`pc-guide ${guideOpen ? 'open' : ''}`}><button type="button" className="pc-guide-toggle" onClick={() => setGuideOpen(value => !value)} aria-label={guideOpen ? 'Collapse guidance' : 'Open guidance'}>{guideOpen ? '×' : '?'}</button>{guideOpen && <><span>SECTION GUIDANCE</span><h3>{current.label}</h3><p>{current.tip}</p><div><b>Recommended next step</b><p>{current.next}</p></div><div><b>Quality signal</b><p>{current.fields.every(complete) ? 'This section meets completion requirements.' : 'Complete every required element before gate review.'}</p></div></>}</aside></div>
     {previewOpen && <Preview project={project} charter={charter} completion={completion} quality={quality} onClose={() => setPreviewOpen(false)} previewRef={previewRef} phaseLabel={currentStageLabel} />}

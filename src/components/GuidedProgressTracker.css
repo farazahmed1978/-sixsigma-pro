@@ -1,0 +1,46 @@
+.guided-progress-tracker{display:grid;gap:.4rem;padding:.7rem clamp(1.25rem,3vw,3rem) .9rem;background:var(--surface);border-bottom:1px solid var(--border)}
+.gpt-top{display:flex;align-items:baseline;justify-content:space-between;gap:1rem}
+.gpt-heading{font-size:14px;font-weight:700;color:var(--text-primary)}
+.gpt-exit{border:0;background:transparent;color:var(--text-muted);font-size:12px;text-decoration:underline;cursor:pointer}
+.gpt-step-label{margin:0;color:var(--text-muted);font-size:12px}
+
+.gpt-track{display:flex;align-items:flex-start;margin-top:.5rem}
+.gpt-line{flex:1;height:2px;min-width:24px;background:var(--border);margin:15px 4px 0}
+.gpt-line.done{background:var(--fill-success)}
+
+.gpt-node-wrap{display:flex;flex-direction:column;align-items:center;gap:.35rem;flex:0 0 auto}
+.gpt-node{position:relative;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:transparent;border:2px solid var(--border-strong);color:var(--text-muted);font-size:.72rem;font-weight:700}
+.gpt-node.done{background:var(--fill-success);border-color:var(--fill-success);color:#fff}
+.gpt-node.current{background:var(--fill-accent);border-color:var(--fill-accent);color:#fff}
+.gpt-check{width:16px;height:16px}
+.gpt-check polyline{fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.gpt-node-number{line-height:1}
+.gpt-node-label{font-size:12px;color:var(--text-muted);text-align:center;max-width:88px}
+.gpt-node-label.current{color:var(--fill-accent);font-weight:600}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Node completion: fills green with a scale pulse (0-200ms), holds, then — after the 500ms
+     delay the spec calls out — shrinks to 90%/opacity .8 to visually recede into history. */
+  .gpt-node.done{animation:gptNodeFill 200ms ease-out forwards,gptNodeRecede 200ms ease-out 500ms forwards}
+  /* Connecting line fill: a plain width transition (0 -> 100%, 300ms) on the green overlay reads
+     identically to an explicit keyframe here, since it's a single continuous value change. */
+  .gpt-line{position:relative}
+  .gpt-line::after{content:'';position:absolute;inset:0;width:0;background:var(--fill-success)}
+  .gpt-line.done::after{width:100%;transition:width 300ms ease-out}
+  /* Next node pulse: a ring expands outward from the node and fades, repeating every 2s. */
+  .gpt-node.current::after{content:'';position:absolute;inset:0;border-radius:50%;border:2px solid var(--fill-accent);animation:gptRingPulse 2s ease-out infinite}
+}
+
+@keyframes gptNodeFill{
+  0%{background:var(--border-strong);transform:scale(1)}
+  50%{background:var(--fill-success);transform:scale(1.15)}
+  100%{background:var(--fill-success);transform:scale(1)}
+}
+@keyframes gptNodeRecede{
+  from{transform:scale(1);opacity:1}
+  to{transform:scale(.9);opacity:.8}
+}
+@keyframes gptRingPulse{
+  0%{transform:scale(1);opacity:.4}
+  100%{transform:scale(1.6);opacity:0}
+}

@@ -18,6 +18,10 @@
   --purple-dim: rgba(124, 92, 232, 0.12);
   --red: #ef4444;
   --yellow: #f59e0b;
+  /* Phase 5C QA — semantic aliases for the guided-flow progress tracker wireframe, tracking the
+     underlying tokens (so light/dark theme overrides of --accent still apply automatically). */
+  --fill-success: var(--green);
+  --fill-accent: var(--accent);
   --font-display: 'Space Grotesk', sans-serif;
   --font-body: 'Inter', sans-serif;
   --font-mono: 'IBM Plex Mono', monospace;
@@ -37,6 +41,7 @@
   --surface-grad: linear-gradient(135deg, #0f1e38, #132348);
   --border: rgba(255,255,255,0.07);
   --border-active: rgba(0,102,255,0.4);
+  --border-strong: rgba(255,255,255,0.22);
   --text-primary: #edf2ff;
   --text-secondary: #a8b9d3;
   --text-muted: #8195b5;
@@ -55,6 +60,7 @@
   --surface-grad: linear-gradient(135deg, #ffffff, #f2f6ff);
   --border: rgba(0,0,0,0.09);
   --border-active: rgba(0,102,255,0.4);
+  --border-strong: rgba(0,0,0,0.24);
   --text-primary: #0f1c35;
   --text-secondary: #405575;
   --text-muted: #607493;

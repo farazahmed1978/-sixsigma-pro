@@ -99,6 +99,9 @@ export default function ProjectHealthDashboard({project, suiteId, onOpenTab}) {
       </div>
       <div><span>Change Activity</span><strong>{secondary.changeActivity.label}</strong></div>
       <div><span>Quality Audit</span><strong>{secondary.qualityAudit.label}</strong></div>
+      {health.guidedProgress && (
+        <div><span>Guided Setup</span><strong>{health.guidedProgress.isComplete ? 'Complete' : `${health.guidedProgress.completed}/${health.guidedProgress.total} mandatory docs`}</strong></div>
+      )}
     </div>
   </section>;
 }

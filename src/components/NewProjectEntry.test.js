@@ -5,8 +5,10 @@ import {MemoryRouter, Route, Routes, useLocation} from 'react-router-dom';
 import NewProjectEntry from './NewProjectEntry';
 
 const mockCreateProject = jest.fn(() => 'new-project-id');
+let mockCanAccess;
 jest.mock('../context/ProjectsContext', () => ({useProjects: () => ({createProject: mockCreateProject})}));
 jest.mock('../context/AuthContext', () => ({useAuth: () => ({user: {id: 'user-1'}, profile: {default_organization_id: 'org-1', full_name: 'Jamie Rivera'}})}));
+jest.mock('../context/EntitlementContext', () => ({useEntitlements: () => ({canAccess: (...args) => mockCanAccess(...args)})}));
 jest.mock('../repositories/documentRepository', () => ({documentRepository: {createStandalone: jest.fn()}}));
 
 import {documentRepository} from '../repositories/documentRepository';
@@ -38,7 +40,7 @@ const change = (control, value) => act(() => Simulate.change(control, {target: {
 // CRA's Jest config runs with resetMocks:true, which wipes a mock's implementation (not just its
 // call history) before every test — so jest.fn(() => 'new-project-id')'s initial implementation at
 // module scope does not survive past the first test. Re-establish it here every time.
-beforeEach(() => { mockCreateProject.mockImplementation(() => 'new-project-id'); });
+beforeEach(() => { mockCreateProject.mockImplementation(() => 'new-project-id'); mockCanAccess = () => true; });
 
 test('the landing screen greets the user by first name and shows all three path cards', async () => {
   const {host, root} = await render();
@@ -53,7 +55,7 @@ test('the landing screen greets the user by first name and shows all three path 
   host.remove();
 });
 
-test('Full Project: suite selection sets suiteId/methodology, and confirming creates the project then opens the Charter with guided state', async () => {
+test('Full Project: suite selection sets suiteId/methodology, and confirming creates the project then opens the guided hub', async () => {
   const {host, root} = await render();
   await act(async () => [...host.querySelectorAll('.npe-path-card')].find(card => card.textContent.includes('Full Project')).click());
 
@@ -69,10 +71,10 @@ test('Full Project: suite selection sets suiteId/methodology, and confirming cre
   await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent === 'Create Project').click());
   expect(mockCreateProject).toHaveBeenCalledWith(expect.objectContaining({
     name: 'Reduce Cycle Time', suiteId: 'project-management', methodology: 'pmp', creationPath: 'guided-project',
+    guidedFlowState: expect.objectContaining({isGuided: true, mandatoryComplete: false, completedMandatoryDocs: []}),
   }));
   const location = host.querySelector('[data-testid="location"]').textContent;
-  expect(location).toContain('/projects/new-project-id/charter');
-  expect(location).toContain('"guided":true');
+  expect(location).toBe('/projects/new-project-id|{"guided":true}');
   await act(async () => root.unmount());
   host.remove();
 });
@@ -113,6 +115,24 @@ test('Analysis or Test navigates directly to the Analysis Catalog with creationP
   const location = host.querySelector('[data-testid="location"]').textContent;
   expect(location).toContain('/analysis');
   expect(location).toContain('"creationPath":"analysis"');
+  await act(async () => root.unmount());
+  host.remove();
+});
+
+test('a PM-only user (no OE entitlement) sees only Full Project and Standalone Document — no Analysis or Test path', async () => {
+  mockCanAccess = suiteId => suiteId === 'project-management';
+  const {host, root} = await render();
+  const titles = [...host.querySelectorAll('.npe-path-card strong')].map(node => node.textContent);
+  expect(titles).toEqual(['Full Project', 'Standalone Document']);
+  await act(async () => root.unmount());
+  host.remove();
+});
+
+test('a user with OE access sees all three paths, including Analysis or Test', async () => {
+  mockCanAccess = suiteId => suiteId === 'operational-excellence';
+  const {host, root} = await render();
+  const titles = [...host.querySelectorAll('.npe-path-card strong')].map(node => node.textContent);
+  expect(titles).toEqual(['Full Project', 'Standalone Document', 'Analysis or Test']);
   await act(async () => root.unmount());
   host.remove();
 });

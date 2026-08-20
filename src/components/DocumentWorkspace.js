@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {createRoot} from 'react-dom/client';
 import {flushSync} from 'react-dom';
 import {syncService} from '../services/syncService';
-import { Link,useNavigate } from 'react-router-dom';
+import { Link,useLocation,useNavigate } from 'react-router-dom';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { useReport } from '../context/ReportContext';
@@ -21,6 +21,7 @@ import {lifecycleForProject} from '../foundation/lifecycle';
 import AssetUploadModal from './AssetUploadModal';
 import LinkedAssetsList from './LinkedAssetsList';
 import './DocumentWorkspace.css';
+import './GuidedWorkspace.css';
 
 const rowId = prefix => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 // Upgrades a template section's existing static guidance into the "what good looks like" line the
@@ -145,8 +146,9 @@ function AssetReferences({ project, references, datasets, analyses, evidence, re
   return <div className="dw-assets" role="dialog" aria-modal="true" aria-label="Linked project assets"><button type="button" className="dw-assets-backdrop" onClick={onClose} aria-label="Close linked assets" /><section><header><div><span>PROJECT CONTEXT</span><h2>Linked Assets</h2><p>References remain stable IDs so future automation and AI can retrieve the latest project asset.</p></div><button type="button" onClick={onClose}>&times;</button></header>{groups.map(group=><div key={group.key}><h3>{group.label}<small>{(references[group.key]||[]).length} linked</small></h3>{group.items.length?<div className="dw-asset-list">{group.items.map(item=><label key={item.id}><input type="checkbox" checked={(references[group.key]||[]).includes(item.id)} onChange={()=>toggle(group.key,item.id)} /><span>{item.name||item.title||item.datasetName||item.id}</span></label>)}</div>:<p>No compatible {group.label.toLowerCase()} are available for this project.</p>}</div>)}</section></div>;
 }
 
-export default function DocumentWorkspace({ template, project, updateProject, standalone=false }) {
+export default function DocumentWorkspace({ template, project, updateProject, standalone=false, onGuidedState }) {
   const navigate=useNavigate();
+  const location=useLocation();
   const { addReportItem, items:reportItems } = useReport();
   const { datasets } = useWorksheet();
   const { analysisResults } = useAnalysis();
@@ -220,7 +222,29 @@ export default function DocumentWorkspace({ template, project, updateProject, st
   const openSequenceArtifact=async artifact=>{if(!artifact||!project.id)return;const saved=await saveNow();if(saved)navigate(artifact.id==='charter'?`/projects/${project.id}/charter`:projectDocumentRoute(project.id,artifact.id));};
   const openSuccessor=async()=>{if(!project.id){setNotice('A valid project is required before opening the next document.');return;}await openSequenceArtifact(sequenceNext);};
   const requestSequenceNext=()=>{if(!sequenceNext)return;if(advanceState.missing.length){setProgressionWarning(true);return;}openSuccessor();};
+  const guided=Boolean(location.state?.guided);
   const advance=async()=>{if(!advanceState.atLast){const saved=await saveNow();if(saved){setActiveIndex(index=>index+1);setNotice('Section saved · continue to the next section');}return;}if(advanceState.next){if(advanceState.missing.length){setProgressionWarning(true);return;}await openSuccessor();return;}setNotice(`${template.name} completes the configured DMAIC sequence. Return to Project Binder when ready.`);};
+  const advanceGuidedSection=async()=>{if(await saveNow())setActiveIndex(index=>Math.min(index+1,template.sections.length-1));};
+  // Guided mode: GuidedWorkspace.js is the single source of truth for section navigation, the CTA
+  // footer, and when the Continue-to-next-document button appears — no navigation/button-rendering
+  // decisions live here (this mirrors ProjectCharter.js's guided branch exactly). This just reports
+  // the live state GuidedWorkspace needs plus callable handles, so GuidedWorkspace's own footer
+  // buttons drive this component's existing, unchanged navigation/persistence functions rather than
+  // reimplementing them. Runs every render so the reported handles always close over current state.
+  useEffect(() => {
+    if (!guided || !onGuidedState) return;
+    onGuidedState({
+      sectionIndex: activeIndex,
+      totalSections: template.sections.length,
+      completedSections: template.sections.filter(sectionComplete).length,
+      isLastSection: activeIndex === template.sections.length - 1,
+      allRequiredFieldsFilled: scores.completion === 100,
+      goToPrevious: () => setActiveIndex(i => Math.max(0, i - 1)),
+      goToNext: advanceGuidedSection,
+      save: saveNow,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  });
   const diagram=DIAGRAM_TEMPLATES[template.id]||null;
   const reportElement=()=><DocumentReport template={template} project={project} record={record} phase={displayPhase} diagram={diagram?diagram.render(record,project):null}/>;
   // Both Print and Export PDF render the full multi-section report (every section, and the
@@ -274,6 +298,21 @@ export default function DocumentWorkspace({ template, project, updateProject, st
     }finally{exportRoot.unmount();document.body.removeChild(container);}
   };
   const addToReport=async()=>{await addReportItem({toolId:`document-${template.id}`,title:`${template.name} — ${project.name}`,timestamp:new Date().toISOString(),projectId:project.id,phase:displayPhase,assetType:'document',documentId:record.id,statsSummary:{Completion:`${scores.completion}%`,Quality:`${scores.quality}/100`},interpretation:`${template.name} project document. ${scores.populated} of ${scores.total} required elements are complete.`,documentSnapshot:{schemaVersion:record.schemaVersion,templateId:record.templateId,values:record.values}});setNotice('Added to Report Builder');};
+
+  // Phase 5C — guided mode completely replaces this component's output: no WorkspaceShell, no
+  // score/quality header, no section sidebar, no Attach File/+Add to Report/Preview Diagram, no
+  // sequence-nav bar. Just the current section's fields (the same Field mapping the standard
+  // dw-section-grid uses, reused verbatim — zero duplicated business logic). Everything else
+  // guided-mode-specific — the progress tracker, the explanation panel, section-nav/Continue
+  // buttons — is rendered by GuidedWorkspace.js (see the onGuidedState effect above).
+  if (guided) {
+    return (
+      <div className="gw-section-only">
+        <div className="gw-section-header"><div><span>SECTION {activeIndex+1} OF {template.sections.length}</span><h2>{current.title}</h2><p>{current.guidance}</p></div></div>
+        <section className={`dw-section-grid cols-${Math.min(current.cols||1,2)}`}>{current.fields.map(field=><Field key={field.id} field={field} value={record.values[field.id]} onChange={value=>updateValue(field.id,value)} connectionProvenance={record.connectionProvenance} />)}</section>
+      </div>
+    );
+  }
 
   return <WorkspaceShell className={`document-workspace ${guideOpen?'':'guidance-closed'}`} mode={mode} backTo={standalone?'/templates':projectHubRoute(project.id)} backLabel={standalone?'Templates':PROJECT_HUB_BACK_LABEL} breadcrumb={standalone?<span>Standalone / {displayPhase} / {template.name}</span>:<><Link to={`/projects/${project.id}`}>Project Home</Link><span> / </span><span>{displayPhase} / {template.name}</span></>} previousLabel="Previous" previousDisabled={false} onPrevious={()=>navigate(-1)} sequencePreviousLabel={sequencePrevious?.sequenceLabel} sequenceNextLabel={sequenceNext?.sequenceLabel} sequencePreviousDisabled={!sequencePrevious} sequenceNextDisabled={!sequenceNext} onSequencePrevious={standalone?undefined:()=>openSequenceArtifact(sequencePrevious)} onSequenceNext={standalone?undefined:requestSequenceNext} onMinimize={()=>setMode('minimized')} onMaximize={()=>setMode('maximized')} onRestore={()=>setMode('normal')} onSave={saveNow} saving={saveState==='saving'} onExport={exportPdf} onPrint={print} onHelp={()=>setGuideOpen(true)} suiteId={lifecycle.id}>
     <div ref={workspaceRef}>{staleConnections.length>0&&<div className="dw-connection-stale-notice" role="status"><span>{staleConnections.length} value{staleConnections.length>1?'s':''} pulled in from {[...new Set(staleConnections.map(item=>item.sourceDocName))].join(', ')} may be out of date — the source document has changed since.</span><button type="button" className="btn-secondary" onClick={resyncStaleConnections}>Re-sync</button></div>}<header className="dw-executive"><div><span className={`badge badge-${displayPhase.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'')}`}>{standalone?'Standalone':displayPhase} workspace</span><h1>{template.name}</h1><p>{project.name} &middot; {template.desc}</p></div><div className={`dw-autosave ${saveState}`}><i />{documentSaveStateLabel(saveState)}</div><div className="dw-score"><div><span>Completion</span><strong>{scores.completion}%</strong><i><b style={{width:`${scores.completion}%`}} /></i></div><div><span>Quality score</span><strong>{scores.quality}<small>/100</small></strong><p>{scores.quality>=80?'Review ready':'Needs development'}</p></div><div><span>{standalone?'Context':'Project'}</span><strong>{project.name}</strong><p>{scores.populated} of {scores.total} required elements</p></div><div className="dw-report-action">{!standalone&&<><button type="button" className="btn-secondary" onClick={()=>setAssetsOpen(true)}>Linked Assets</button><button type="button" className="btn-secondary" onClick={()=>setAssetUploadOpen(true)}>Attach File</button><button type="button" className="btn-secondary" onClick={addToReport}>+ Add to Report</button></>}{diagram&&<button type="button" className="btn-secondary" onClick={()=>setPreviewOpen(true)}>Preview Diagram</button>}{notice&&<span>{notice}</span>}</div></div></header>

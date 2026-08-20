@@ -2,12 +2,14 @@ import React, {useMemo, useState} from 'react';
 import {useNavigate} from 'react-router-dom';
 import {useAuth} from '../context/AuthContext';
 import {useProjects} from '../context/ProjectsContext';
+import {useEntitlements} from '../context/EntitlementContext';
 import {TEMPLATES} from '../pages/Templates';
 import {NAVIGATION} from '../config/navigation';
 import {navigationItems} from '../utils/navigationTools';
 import {artifactContextDecision} from '../config/artifactContext';
 import {createDocument} from '../utils/documentModel';
 import {documentRepository} from '../repositories/documentRepository';
+import {createGuidedFlowState} from '../config/guidedFlow';
 import './NewProjectEntry.css';
 
 const SUITE_LABELS = {'operational-excellence': 'Operational Excellence', 'project-management': 'Project Management'};
@@ -52,6 +54,8 @@ export default function NewProjectEntry({onClose, onAdvanced}) {
   const navigate = useNavigate();
   const {user, profile} = useAuth();
   const {createProject} = useProjects();
+  const {canAccess} = useEntitlements() || {};
+  const hasOEAccess = Boolean(canAccess?.('operational-excellence'));
   const [step, setStep] = useState('landing');
   const [form, setForm] = useState({name: '', description: '', targetDate: '', suiteId: 'operational-excellence'});
   const [creating, setCreating] = useState(false);
@@ -72,8 +76,9 @@ export default function NewProjectEntry({onClose, onAdvanced}) {
       methodology: methodologyForSuite(form.suiteId),
       targetDate: form.targetDate,
       creationPath: 'guided-project',
+      guidedFlowState: createGuidedFlowState(),
     });
-    navigate(`/projects/${id}/charter`, {state: {guided: true, mandatoryStep: 1, mandatoryTotal: 3}});
+    navigate(`/projects/${id}`, {state: {guided: true}});
   };
 
   const chooseStandaloneDocument = async template => {
@@ -122,7 +127,7 @@ export default function NewProjectEntry({onClose, onAdvanced}) {
             <div className="npe-path-grid">
               <PathCard icon="📋" title="Full Project" description="Start a structured project with a complete lifecycle, documentation, and tracking." onClick={() => setStep('full-step1')} />
               <PathCard icon="📄" title="Standalone Document" description="Create a single document or report without a full project." onClick={() => setStep('standalone-picker')} />
-              <PathCard icon="📊" title="Analysis or Test" description="Run a statistical analysis, hypothesis test, or data exploration." onClick={chooseAnalysis} />
+              {hasOEAccess && <PathCard icon="📊" title="Analysis or Test" description="Run a statistical analysis, hypothesis test, or data exploration." onClick={chooseAnalysis} />}
             </div>
             <button type="button" className="npe-advanced-link" onClick={onAdvanced}>Switch to advanced setup</button>
           </div>

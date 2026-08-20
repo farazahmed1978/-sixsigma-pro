@@ -1,7 +1,4 @@
 .pc-page { min-height: calc(100vh - 60px); background: var(--bg); }
-.pc-guided-banner { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .7rem clamp(1.25rem,3vw,3rem); background: var(--accent-dim); color: var(--accent-light); font-size: .8rem; font-weight: 600; }
-.pc-guided-banner.pc-guided-complete { flex-wrap: wrap; }
-.pc-guided-banner p { margin: 0; }
 .pc-executive { padding: 1.2rem clamp(1.25rem,3vw,3rem) 1rem; background: var(--surface); border-bottom: 1px solid var(--border); }
 .pc-crumb { display: flex; gap: .55rem; color: var(--text-muted); font-size: .72rem; margin-bottom: .9rem; }
 .pc-crumb a:hover { color: var(--accent); }

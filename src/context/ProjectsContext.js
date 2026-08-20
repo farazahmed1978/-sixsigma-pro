@@ -76,7 +76,7 @@ export function ProjectsProvider({ children }) {
       champion: data.champion || '',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),organizationId:profile?.default_organization_id||'',createdBy:user?.id||'',methodology:data.methodology||'hybrid',
-      suiteId:data.suiteId||'operational-excellence',creationPath:data.creationPath||null,phases: initializeLifecycleStages(lifecycle),
+      suiteId:data.suiteId||'operational-excellence',creationPath:data.creationPath||null,guidedFlowState:data.guidedFlowState||null,phases: initializeLifecycleStages(lifecycle),
       documents: {},
       evidenceLibrary: [],
       artifacts: [],

@@ -1,0 +1,44 @@
+.guided-document-selection{min-height:100vh;background:var(--bg);display:flex;flex-direction:column}
+.gds-shell{flex:1;width:min(920px,100%);margin:0 auto;padding:2.5rem clamp(1.25rem,3vw,2.5rem) 6rem;display:grid;gap:2rem}
+.gds-header{display:grid;gap:.5rem;text-align:center;max-width:640px;margin:0 auto}
+.gds-header h1{margin:0;font-family:var(--font-display);font-size:clamp(1.4rem,3vw,1.9rem);letter-spacing:-.02em}
+.gds-header p{margin:0;color:var(--text-secondary);font-size:.85rem;line-height:1.5}
+
+.gds-section{display:grid;gap:.8rem}
+.gds-section h2{margin:0;font-size:.95rem}
+.gds-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:.75rem}
+
+.gds-card{position:relative;display:block;padding:.9rem 1rem;border:1px solid var(--border);border-radius:12px;background:var(--surface);cursor:pointer;opacity:0}
+.gds-card input{position:absolute;opacity:0;pointer-events:none}
+.gds-card-body{display:flex;align-items:flex-start;gap:.7rem}
+.gds-card-check{flex:0 0 auto;width:20px;height:20px;margin-top:.1rem;border:1.5px solid var(--border);border-radius:5px;display:grid;place-items:center;color:#fff}
+.gds-card-check svg{width:13px;height:13px}
+.gds-card-check svg polyline{fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:17;stroke-dashoffset:17}
+.gds-card-title{display:flex;align-items:center;gap:.45rem;flex-wrap:wrap}
+.gds-card-title strong{font-size:.85rem}
+.gds-card p{margin:.25rem 0 0;color:var(--text-secondary);font-size:.75rem;line-height:1.4}
+.gds-badge-required,.gds-badge-optional{padding:.1rem .45rem;border-radius:999px;font:700 .58rem var(--font-body);font-style:normal;letter-spacing:.05em;text-transform:uppercase}
+.gds-badge-required{background:var(--accent-dim);color:var(--accent-light)}
+.gds-badge-optional{background:var(--bg-2);color:var(--text-muted)}
+
+.gds-card.locked{cursor:default}
+.gds-card.selected{border-color:var(--accent);background:var(--accent-dim)}
+.gds-card.selected .gds-card-check{border-color:var(--accent);background:var(--accent)}
+.gds-card.selected .gds-card-check svg polyline{stroke-dashoffset:0}
+
+.gds-cta-footer{position:sticky;bottom:0;display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.9rem clamp(1.25rem,3vw,2.5rem);border-top:1px solid var(--border);background:var(--surface)}
+.gds-cta-count{color:var(--text-muted);font-size:.78rem;font-weight:600}
+
+@media (prefers-reduced-motion: no-preference) {
+  .gds-card{animation:gdsCardIn 300ms ease-out both}
+  .gds-card-check{transition:border-color 200ms,background 200ms}
+  .gds-card-check svg polyline{transition:stroke-dashoffset 250ms ease-out}
+  .gds-card{transition:border-color 200ms,background 200ms,transform 200ms}
+  .gds-card.selected{animation:gdsCardSelectPulse 200ms ease-out}
+}
+@media (prefers-reduced-motion: reduce) {
+  .gds-card{opacity:1}
+}
+
+@keyframes gdsCardIn{from{transform:translateY(12px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes gdsCardSelectPulse{0%{transform:scale(1)}50%{transform:scale(1.02)}100%{transform:scale(1)}}

@@ -75,5 +75,16 @@ test('createProject with no targetDate/creationPath supplied still defaults sane
     const project=get().getProject(id);
     expect(project.targetDate).toBe('');
     expect(project.creationPath).toBeNull();
+    expect(project.guidedFlowState).toBeNull();
+  });
+});
+
+test('createProject persists guidedFlowState when supplied (Phase 5B)',async()=>{
+  await withHarness(async get=>{
+    let id;
+    const guidedFlowState={isGuided:true,mandatoryComplete:false,completedMandatoryDocs:[],currentMandatoryStep:0,enteredAt:'2026-08-19T00:00:00.000Z'};
+    await act(async()=>{id=get().createProject({name:'Guided Project',suiteId:'operational-excellence',creationPath:'guided-project',guidedFlowState})});
+    const project=get().getProject(id);
+    expect(project.guidedFlowState).toEqual(guidedFlowState);
   });
 });

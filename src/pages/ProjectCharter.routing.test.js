@@ -10,11 +10,12 @@ jest.mock('jspdf',()=>jest.fn());
 jest.mock('html2canvas',()=>jest.fn());
 jest.mock('../context/ReportContext',()=>({useReport:()=>({addReportItem:jest.fn()})}));
 let mockProject;
-// updateProject's jest.fn() must be constructed inline inside the factory, not referenced from an
-// externally-declared const — referencing an externally-constructed jest.fn() here silently loses
-// its implementation (a babel-plugin-jest-hoist quirk with "mock"-prefixed hoisted references),
-// while plain external variables (like mockProject below) work fine.
-jest.mock('../context/ProjectsContext',()=>({useProjects:()=>({getProject:()=>mockProject,updateProject:jest.fn(()=>Promise.resolve({}))})}));
+// mockUpdateProject is a single stable reference (not a fresh jest.fn() constructed inline inside
+// the factory on every useProjects() call) so guided-mode tests can assert on what it was called
+// with. CRA's resetMocks:true wipes any jest.fn() implementation before every test (not just the
+// first) — harmless here since these tests only assert on call args, not the resolved value.
+const mockUpdateProject=jest.fn(()=>Promise.resolve({}));
+jest.mock('../context/ProjectsContext',()=>({useProjects:()=>({getProject:()=>mockProject,updateProject:(...args)=>mockUpdateProject(...args)})}));
 
 test('Project Charter Continue to SIPOC opens the project-scoped SIPOC workspace directly',()=>{
   expect(projectCharterLinkTarget('project-123','/templates')).toBe('/projects/project-123/documents/sipoc');
@@ -40,12 +41,16 @@ test('Project Charter consumes canonical shared-field updates instead of retaini
   expect(mergeCharterSharedFields({businessCase:'Old case',problemStatement:'Keep this'},{businessCaseSummary:'Updated case'})).toEqual({businessCase:'Updated case',problemStatement:'Keep this'});
 });
 
+// CRA's Jest config runs with resetMocks:true, which wipes a mock's implementation (not just its
+// call history) before every test — re-establish it here every time.
+beforeEach(()=>{mockUpdateProject.mockReset().mockImplementation(()=>Promise.resolve({}))});
+
 const Location=()=>{const location=useLocation();return <div data-testid="location">{location.pathname}</div>};
-const renderCharter=async(project,state)=>{
+const renderCharter=async(project,state,onGuidedState)=>{
   mockProject=project;
   const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
   const entry=state?{pathname:`/projects/${project.id}/charter`,state}:`/projects/${project.id}/charter`;
-  await act(async()=>root.render(<MemoryRouter initialEntries={[entry]}><Routes><Route path="/projects/:id/charter" element={<ProjectCharter/>}/><Route path="*" element={<Location/>}/></Routes></MemoryRouter>));
+  await act(async()=>root.render(<MemoryRouter initialEntries={[entry]}><Routes><Route path="/projects/:id/charter" element={<ProjectCharter onGuidedState={onGuidedState}/>}/><Route path="*" element={<Location/>}/></Routes></MemoryRouter>));
   return{host,root};
 };
 const continueAnyway=async host=>{
@@ -75,34 +80,65 @@ test('a PM project\'s Charter breadcrumb/badge reads Initiation, and Next correc
   await act(async()=>root.unmount());host.remove();
 });
 
-test('without guided router state, no guided-mode banner renders (non-guided Charter flow is unaffected)',async()=>{
+test('without guided router state, the chrome-stripped guided view never renders (non-guided Charter flow is unaffected)',async()=>{
   const{host,root}=await renderCharter({id:'oe-project-2',name:'OE Project',methodology:'lean-six-sigma',charter:{},documents:{},sharedFields:{}});
-  expect(host.querySelector('.pc-guided-banner')).toBeNull();
+  expect(host.querySelector('.gw-section-only')).toBeNull();
+  expect(host.querySelector('[data-testid="breadcrumb"]')).toBeTruthy();
   await act(async()=>root.unmount());host.remove();
 });
 
-test('with guided router state and an incomplete charter, the "Step 1 of 3 mandatory documents" banner renders',async()=>{
-  const{host,root}=await renderCharter({id:'oe-project-3',name:'OE Project',methodology:'lean-six-sigma',charter:{},documents:{},sharedFields:{}},{guided:true});
-  const banner=host.querySelector('.pc-guided-banner');
-  expect(banner).toBeTruthy();
-  expect(banner.textContent).toContain('Step 1 of 3 mandatory documents — Project Charter');
-  expect(banner.classList.contains('pc-guided-complete')).toBe(false);
+// QA pass (post-5C): GuidedWorkspace.js is now the single source of truth for the explanation
+// panel, section-nav/Continue buttons, and the CTA footer (architecture note) — ProjectCharter.js's
+// guided branch renders only the current section's fields and reports live state up via the
+// onGuidedState callback prop, so these tests assert against that contract instead of markup that
+// no longer lives here.
+test('with guided router state, ProjectCharter renders only the current section (no chrome, no CTA) and reports live state via onGuidedState',async()=>{
+  const onGuidedState=jest.fn();
+  const{host,root}=await renderCharter({id:'oe-project-3',name:'OE Project',methodology:'lean-six-sigma',charter:{},documents:{},sharedFields:{}},{guided:true},onGuidedState);
+  expect(host.querySelector('[data-testid="breadcrumb"]')).toBeNull();
+  const section=host.querySelector('.gw-section-only');
+  expect(section).toBeTruthy();
+  expect(section.textContent).toContain('SECTION 01 OF 12');
+  expect(section.textContent).toContain('Project Overview');
+  expect(host.querySelector('.gw-cta-actions')).toBeNull();
+  expect(host.querySelector('.gw-cta-hint')).toBeNull();
+  const latest=()=>onGuidedState.mock.calls[onGuidedState.mock.calls.length-1][0];
+  expect(latest().sectionIndex).toBe(0);
+  expect(latest().totalSections).toBe(12);
+  expect(latest().completedSections).toBe(0);
+  expect(latest().isLastSection).toBe(false);
+  expect(latest().allRequiredFieldsFilled).toBe(false);
+  await act(async()=>{await latest().goToNext();});
+  expect(host.querySelector('.gw-section-only').textContent).toContain('Business Need');
+  expect(latest().sectionIndex).toBe(1);
   await act(async()=>root.unmount());host.remove();
 });
 
-test('with guided router state and a fully complete charter, the completion prompt renders and routes to the Project Hub',async()=>{
-  const fullCharter={
-    projectSummary:'Summary',targetDate:'2026-01-01',businessCase:'Case',problemStatement:'Problem',goalStatement:'Goal',
-    scopeIn:'In',scopeOut:'Out',team:[{id:'t1',name:'A',role:'Lead'}],stakeholders:[{id:'s1',name:'B'}],
-    timeline:[{id:'m1',date:'2026-02-01'}],financialImpact:'Impact',risks:[{id:'r1',risk:'Risk',mitigation:'Mitigate'}],
-    assumptions:'Assume',constraints:'Constrain',approvals:[{id:'a1',name:'C',status:'Approved'}],
-  };
-  const{host,root}=await renderCharter({id:'oe-project-4',name:'OE Project',methodology:'lean-six-sigma',charter:fullCharter,documents:{},sharedFields:{}},{guided:true});
-  const banner=host.querySelector('.pc-guided-banner');
-  expect(banner).toBeTruthy();
-  expect(banner.classList.contains('pc-guided-complete')).toBe(true);
-  expect(banner.textContent).toContain("Your project is started. Now let's set up your planning documents.");
-  await act(async()=>{[...banner.querySelectorAll('button')].find(button=>button.textContent==='Go to Project Hub').click()});
-  expect(host.querySelector('[data-testid="location"]').textContent).toBe('/projects/oe-project-4');
+const fullCharterFixture={
+  projectSummary:'Summary',targetDate:'2026-01-01',businessCase:'Case',problemStatement:'Problem',goalStatement:'Goal',
+  scopeIn:'In',scopeOut:'Out',team:[{id:'t1',name:'A',role:'Lead'}],stakeholders:[{id:'s1',name:'B'}],
+  timeline:[{id:'m1',date:'2026-02-01'}],financialImpact:'Impact',risks:[{id:'r1',risk:'Risk',mitigation:'Mitigate'}],
+  assumptions:'Assume',constraints:'Constrain',approvals:[{id:'a1',name:'C',status:'Approved'}],
+};
+
+// Regression coverage for QA Issue 4 (navigation broke at section 11 of 12): drive goToNext through
+// every one of the Charter's 12 sections and confirm isLastSection only flips true at the final
+// section, and that a further goToNext past the end is a harmless no-op rather than breaking.
+test('with a fully complete charter, onGuidedState reports allRequiredFieldsFilled and reaches isLastSection only at the final section across all 12 sections (Issue 4 regression)',async()=>{
+  const onGuidedState=jest.fn();
+  const{host,root}=await renderCharter({id:'oe-project-4',name:'OE Project',methodology:'lean-six-sigma',charter:fullCharterFixture,documents:{},sharedFields:{}},{guided:true},onGuidedState);
+  const latest=()=>onGuidedState.mock.calls[onGuidedState.mock.calls.length-1][0];
+  expect(latest().allRequiredFieldsFilled).toBe(true);
+  for(let step=0;step<11;step++){
+    expect(latest().isLastSection).toBe(false);
+    await act(async()=>{await latest().goToNext();});
+  }
+  expect(latest().sectionIndex).toBe(11);
+  expect(latest().isLastSection).toBe(true);
+  expect(latest().totalSections).toBe(12);
+  expect(host.querySelector('.gw-section-only').textContent).toContain('Approval');
+  await act(async()=>{await latest().goToNext();});
+  expect(latest().sectionIndex).toBe(11);
+  expect(latest().isLastSection).toBe(true);
   await act(async()=>root.unmount());host.remove();
 });

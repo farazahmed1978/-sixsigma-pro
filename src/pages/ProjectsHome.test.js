@@ -8,6 +8,7 @@ const mockCreateProject=jest.fn(()=>'new-project-id');
 jest.mock('../context/ProjectsContext',()=>({useProjects:()=>({projects:[],createProject:mockCreateProject,deleteProject:jest.fn(),deletingProjectId:''})}));
 jest.mock('../context/InteractionContext',()=>({useInteractions:()=>({confirm:jest.fn(),toast:jest.fn()})}));
 jest.mock('../context/AuthContext',()=>({useAuth:()=>({user:{id:'user-1'},profile:{default_organization_id:'org-1',full_name:'Jamie Rivera'}})}));
+jest.mock('../context/EntitlementContext',()=>({useEntitlements:()=>({canAccess:()=>true})}));
 
 const render=async()=>{
   const host=document.createElement('div');document.body.append(host);const root=createRoot(host);

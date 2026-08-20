@@ -385,3 +385,51 @@ describe('Overall health score', () => {
     expect(overall.label).toBe('No data yet');
   });
 });
+
+// Phase 5C fix: a document that has been opened but has zero rows entered is an absence of
+// evidence, not evidence of good health — it must contribute Yellow (60), not Green (100), to the
+// weighted average. Approvals/Decisions is explicitly excluded (zero pending is genuinely good).
+describe('Empty-but-opened documents score Yellow, not Green (health score fix)', () => {
+  test('Schedule Health is Yellow when milestone-report exists with zero rows', () => {
+    const proj = project(doc('milestone-report', {milestoneStatusRows: []}));
+    expect(computeProjectHealth(proj).cards.schedule.status).toBe('Yellow');
+  });
+
+  test('Risk Exposure is Yellow when risk-register exists with zero rows', () => {
+    const proj = project(doc('risk-register', {riskRows: []}));
+    expect(computeProjectHealth(proj).cards.risk.status).toBe('Yellow');
+  });
+
+  test('Actions and Issues is Yellow when both logs exist with zero rows', () => {
+    const proj = project({...doc('action-item-log', {actionItemRows: []}), ...doc('issue-log', {issueRows: []})});
+    expect(computeProjectHealth(proj).cards.actionsIssues.status).toBe('Yellow');
+  });
+
+  test('Risk Exposure stays Green when the register has rows but all are genuinely closed (real evidence, not absence of it)', () => {
+    const proj = project(doc('risk-register', {riskRows: [{status: 'Closed', exposure: 20}]}));
+    expect(computeProjectHealth(proj).cards.risk.status).toBe('Green');
+  });
+
+  test('a freshly created project with all four affected documents opened but empty scores well below 80% (Yellow or Red), not 100% Green', () => {
+    const proj = project({
+      ...doc('milestone-report', {milestoneStatusRows: []}),
+      ...doc('risk-register', {riskRows: []}),
+      ...doc('action-item-log', {actionItemRows: []}),
+      ...doc('issue-log', {issueRows: []}),
+    });
+    const overall = computeProjectHealth(proj).overall;
+    expect(overall.score).toBeLessThan(80);
+    expect(['Yellow', 'Red']).toContain(overall.label);
+  });
+
+  test('a project with literally no documents opened at all still reports "No data yet" (hasData:false cards stay excluded, unaffected by this fix)', () => {
+    const overall = computeProjectHealth(project()).overall;
+    expect(overall.score).toBeNull();
+    expect(overall.label).toBe('No data yet');
+  });
+
+  test('Approvals and Decisions is unaffected — still Green with zero pending approvals (explicitly excluded from this fix)', () => {
+    const proj = project({}, {approvals: []});
+    expect(computeProjectHealth(proj).cards.approvalsDecisions.status).toBe('Green');
+  });
+});

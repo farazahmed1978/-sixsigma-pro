@@ -23,6 +23,11 @@ import {
   lifecycleForProject,
   lifecycleStageLabels,
 } from "../foundation/lifecycle";
+import { projectHubRoute } from "../utils/projectResume";
+import { documentIdFor } from "../utils/documentModel";
+import { TEMPLATES } from "./Templates";
+import GuidedWorkspace from "../components/GuidedWorkspace";
+import GuidedDocumentSelection from "../components/GuidedDocumentSelection";
 import HelpButton from "../components/HelpButton";
 import ProjectHealthDashboard from "../components/ProjectHealthDashboard";
 import ProjectAssets from "../components/ProjectAssets";
@@ -373,6 +378,18 @@ export default function ProjectDetail() {
         </Link>
       </div>
     );
+
+  // Phase 5C — guided mode completely replaces the hub for the duration of the mandatory document
+  // sequence (and, once that's done for a PM project, the document card-selection screen) — no tab
+  // row, no sidebar, nothing below this point ever mounts. GuidedDocumentSelection owns the moment
+  // right after the last mandatory doc is complete but selectedDocuments hasn't been chosen yet;
+  // GuidedWorkspace owns every step before that.
+  if (location.state?.guided) {
+    if (project.guidedFlowState?.mandatoryComplete && !project.selectedDocuments) {
+      return <GuidedDocumentSelection project={project} />;
+    }
+    return <GuidedWorkspace project={project} />;
+  }
 
   const saveAnalysis = (analysis) => {
     const dataset = projectDatasets.find((item) =>
@@ -880,28 +897,52 @@ export default function ProjectDetail() {
           </div>
         </>
       );
-    if (tab === "Documents")
+    if (tab === "Documents") {
+      // Phase 5C: project.selectedDocuments (set by GuidedDocumentSelection) is the single source
+      // of truth for which of the ~51 templates are relevant to this project — surfaced here as
+      // "Suggested documents" (not-yet-created ones from that list) alongside "Browse all
+      // documents" for everything else. Absent entirely for pre-Phase-5C projects (falls back to
+      // today's behavior: only already-created documents, nothing suggested).
+      const suggested = (project.selectedDocuments || [])
+        .map((templateId) => TEMPLATES.find((template) => template.id === templateId))
+        .filter((template) => template && !project.documents?.[documentIdFor(template.id)]);
       return documents.length || project.charter ? (
-        <div className="ph-grid">
-          {project.charter && (
-            <Link className="ph-card" to={`/projects/${id}/charter`}>
-              <span>DEFINE</span>
-              <h3>Project Charter</h3>
-              <p>Updated {formatDate(project.charter.updatedAt)}</p>
-            </Link>
+        <>
+          <div className="ph-grid">
+            {project.charter && (
+              <Link className="ph-card" to={`/projects/${id}/charter`}>
+                <span>DEFINE</span>
+                <h3>Project Charter</h3>
+                <p>Updated {formatDate(project.charter.updatedAt)}</p>
+              </Link>
+            )}
+            {documents.map((document) => (
+              <Link
+                className="ph-card"
+                key={document.id}
+                to={`/projects/${id}/documents/${document.templateId}`}
+              >
+                <span>{document.status || "Draft"}</span>
+                <h3>{document.title}</h3>
+                <p>Updated {formatDate(document.updatedAt)}</p>
+              </Link>
+            ))}
+          </div>
+          {suggested.length > 0 && (
+            <div className="ph-suggested-documents">
+              <h3>Suggested documents</h3>
+              <div className="ph-grid">
+                {suggested.map((template) => (
+                  <Link className="ph-card" key={template.id} to={`/projects/${id}/documents/${template.id}`}>
+                    <span>Suggested</span>
+                    <h3>{template.name}</h3>
+                  </Link>
+                ))}
+              </div>
+            </div>
           )}
-          {documents.map((document) => (
-            <Link
-              className="ph-card"
-              key={document.id}
-              to={`/projects/${id}/documents/${document.templateId}`}
-            >
-              <span>{document.status || "Draft"}</span>
-              <h3>{document.title}</h3>
-              <p>Updated {formatDate(document.updatedAt)}</p>
-            </Link>
-          ))}
-        </div>
+          <Link className="ph-browse-all-documents" to="/templates">Browse all documents →</Link>
+        </>
       ) : (
         <Empty
           title="No project documents yet"
@@ -913,6 +954,7 @@ export default function ProjectDetail() {
           }
         />
       );
+    }
     if (tab === "Datasets")
       return projectDatasets.length ? (
         <div className="ph-manager">
@@ -1741,6 +1783,20 @@ export default function ProjectDetail() {
         </div>
       </header>
       <main>
+        {/* Phase 5C: this component only reaches here when location.state.guided is falsy (the
+            guided branch above already short-circuited to GuidedWorkspace/GuidedDocumentSelection
+            otherwise) — so a resume banner is exactly the right thing to offer: the user navigated
+            back to the plain hub mid-flow. Re-entering guided mode from here always targets the hub
+            itself (no document-specific route) — GuidedWorkspace resolves the current document
+            from project.guidedFlowState on its own. */}
+        {tab === "Project Home" && project.guidedFlowState?.mandatoryComplete === false && (
+          <div className="ph-guided-notice">
+            <p>You were setting up {project.name}. Want to pick up where you left off?</p>
+            <button type="button" className="btn-primary" onClick={() => navigate(projectHubRoute(id), {state: {guided: true}})}>
+              Continue Guided Setup
+            </button>
+          </div>
+        )}
         <div className="ph-hub-actions">
           <Link to={`/projects/${id}/charter`}>Open Charter</Link>
           <Link to="/worksheet" state={{ projectId: id }}>Add Dataset</Link>

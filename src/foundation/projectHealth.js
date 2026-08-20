@@ -1,5 +1,7 @@
 import {documentIdFor} from '../utils/documentModel';
 import {projectDocumentRoute} from '../utils/defineSequence';
+import {resolveProjectSuiteId} from './lifecycle';
+import {getGuidedProgress} from '../config/guidedFlow';
 
 // Phase 3, Part 3 (+ dashboard follow-up) — a pure, side-effect-free read of a project's existing
 // document records into a structured health snapshot. No new data storage: every number here is
@@ -49,9 +51,13 @@ const scheduleHealth = project => {
   const fromBaseline = dated((scheduleBaseline?.scheduleRows || []).filter(row => row.status !== 'Complete').map(row => ({name: row.milestone, date: row.finish || row.start})))[0];
   const next = fromMilestoneReport || fromBaseline || null;
 
+  // A newly-opened Schedule/Milestone document with zero rows entered is not evidence of a
+  // healthy schedule — it's an absence of evidence, which should read as Yellow (uncertain), not
+  // Green (on track). Gated on hasData so a project with neither document open at all (excluded
+  // from the overall average entirely, see overallHealth()) is unaffected.
   let status = 'Green';
   if (delayedCount > 0 || (spi !== null && spi < 0.9)) status = 'Red';
-  else if (atRiskCount > 0) status = 'Yellow';
+  else if (atRiskCount > 0 || (hasData && !hasMilestoneData)) status = 'Yellow';
 
   return {
     id: 'schedule', title: 'Schedule Health', hasData, hasMilestoneData, status,
@@ -140,9 +146,14 @@ const riskExposure = project => {
   const ranked = scored.filter(row => row.exposureNumber !== null).sort((a, b) => b.exposureNumber - a.exposureNumber);
   const top = ranked[0] || null;
 
+  // A Risk Register that's been opened but has zero rows entered is not evidence of a risk-free
+  // project — it's an absence of evidence, which should read as Yellow (uncertain), not Green (on
+  // track). Uses the register's total row count, not openRows — a register with rows that are all
+  // genuinely closed is real, positive evidence and correctly stays Green.
+  const totalRiskRows = (riskRegister?.riskRows || []).length;
   let status = 'Green';
   if (counts.Critical > 0 || counts.High >= 3) status = 'Red';
-  else if (counts.High >= 1) status = 'Yellow';
+  else if (counts.High >= 1 || (hasData && !totalRiskRows)) status = 'Yellow';
 
   return {
     id: 'risk', title: 'Risk Exposure', hasData, status,
@@ -173,9 +184,12 @@ const actionsAndIssuesHealth = project => {
   const openIssues = issueRows.filter(row => !['Resolved', 'Closed'].includes(row.status));
   const escalatedIssues = issueRows.filter(row => row.status === 'Escalated');
 
+  // Action/Issue logs opened but with zero rows entered are an absence of evidence, not evidence
+  // of "nothing to track" — Yellow, not Green. A log with rows that are all genuinely closed/
+  // resolved is real, positive evidence and correctly stays Green.
   let status = 'Green';
   if (overdueActions.length >= 3 || escalatedIssues.length > 0) status = 'Red';
-  else if (overdueActions.length >= 1) status = 'Yellow';
+  else if (overdueActions.length >= 1 || (hasData && !actionRows.length && !issueRows.length)) status = 'Yellow';
 
   const countBy = (rows, key, values) => values.reduce((totals, value) => ({...totals, [value]: rows.filter(row => row[key] === value).length}), {});
   const actionsByStatus = countBy(actionRows, 'status', ['Complete', 'In Progress', 'Blocked', 'Not Started']);
@@ -328,6 +342,7 @@ export const computeProjectHealth = project => {
     overall: overallHealth(Object.values(cards)),
     cards,
     secondary: secondaryIndicators(project),
+    guidedProgress: project.guidedFlowState ? getGuidedProgress(resolveProjectSuiteId(project), project.guidedFlowState.completedMandatoryDocs || []) : null,
   };
 };
 
