@@ -14,6 +14,14 @@
 .workspace-mode-maximized { position: fixed; z-index: 80; inset: 60px 0 0; overflow: hidden; }
 .workspace-mode-maximized .workspace-shell-bar { padding-block: .35rem; }
 .workspace-mode-maximized .workspace-shell-content { height: calc(100vh - 104px); overflow: hidden; }
+@media (max-width:1200px) {
+  .workspace-shell-bar { flex-wrap:wrap; }
+  .workspace-shell-back { margin-right:0; }
+  .workspace-shell-breadcrumb { flex:1 1 14rem; max-width:none; }
+  .workspace-shell-actions { margin-left:auto; }
+  .workspace-mode-maximized { display:flex; flex-direction:column; }
+  .workspace-mode-maximized .workspace-shell-content { flex:1; min-height:0; height:auto; }
+}
 @media (max-width:768px) {
   .workspace-mode-maximized { inset: 56px 0 0; }
   .workspace-shell-bar { min-height: 42px; padding: .35rem .55rem; gap: .35rem; overflow-x: auto; }

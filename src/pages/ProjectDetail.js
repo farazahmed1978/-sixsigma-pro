@@ -10,6 +10,8 @@ import ProjectRisks from "../components/ProjectRisks";
 import ProjectActions from "../components/ProjectActions";
 import ProjectCorrectiveActions from "../components/ProjectCorrectiveActions";
 import { correctiveActionRepository } from "../repositories/correctiveActionRepository";
+import ProjectTollgates from "../components/ProjectTollgates";
+import { tollgateRepository } from "../repositories/tollgateRepository";
 import ProjectIssues from "../components/ProjectIssues";
 import ProjectDecisions from "../components/ProjectDecisions";
 import ProjectApprovals from "../components/ProjectApprovals";
@@ -32,6 +34,7 @@ import GuidedWorkspace from "../components/GuidedWorkspace";
 import GuidedDocumentSelection from "../components/GuidedDocumentSelection";
 import HelpButton from "../components/HelpButton";
 import ProjectHealthDashboard from "../components/ProjectHealthDashboard";
+import OEProjectHealthDashboard from "../components/OEProjectHealthDashboard";
 import ProjectAssets from "../components/ProjectAssets";
 import AssetUploadModal from "../components/AssetUploadModal";
 import "./ProjectDetail.css";
@@ -49,6 +52,7 @@ export const TAB_DEFINITIONS = [
   { id: "analyses", label: "Analyses", suites: ["operational-excellence"] },
   { id: "placements", label: "Placements", suites: ["operational-excellence"] },
   { id: "corrective-actions", label: "Corrective Actions", suites: ["operational-excellence"] },
+  { id: "tollgates", label: "Tollgates", suites: ["operational-excellence"] },
   { id: "risks", label: "Risks", suites: ["project-management"] },
   { id: "issues", label: "Issues", suites: ["project-management"] },
   { id: "actions", label: "Actions", suites: ["project-management"] },
@@ -114,7 +118,7 @@ export default function ProjectDetail() {
   const placement = useProjectPlacement();
   const { confirm, requestForm, toast } = useInteractions();
   const [tab, setTab] = useState(
-    () => location.state?.returnTab || (new URLSearchParams(location.search).get("tab") === "corrective-actions" ? "Corrective Actions" : "Project Home"),
+    () => location.state?.returnTab || ({"corrective-actions":"Corrective Actions",tollgates:"Tollgates","project-settings":"Project Settings","project-binder":"Project Binder","evidence-library":"Evidence Library",datasets:"Datasets"}[new URLSearchParams(location.search).get("tab")] || "Project Home"),
   );
   const [analysisQuery, setAnalysisQuery] = useState("");
   const [analysisFilter, setAnalysisFilter] = useState("All");
@@ -124,6 +128,7 @@ export default function ProjectDetail() {
   const [evidenceUploadOpen, setEvidenceUploadOpen] = useState(false);
   const [openResult, setOpenResult] = useState(null);
   const [correctiveActions, setCorrectiveActions] = useState([]);
+  const [tollgateReviews, setTollgateReviews] = useState([]);
   const artifactInput = useRef(null);
   const project = getProject(id);
   // While project is still loading (undefined), suite context must stay null rather than fall back
@@ -160,7 +165,7 @@ export default function ProjectDetail() {
   useEffect(() => {
     let active = true;
     if (!project || lifecycleForProject(project).id !== "operational-excellence") return () => { active = false; };
-    correctiveActionRepository.list(project.id).then((rows) => { if (active) setCorrectiveActions(rows); }).catch(() => { if (active) setCorrectiveActions([]); });
+    Promise.all([correctiveActionRepository.list(project.id), tollgateRepository.list(project.id)]).then(([actions, reviews]) => { if (active) { setCorrectiveActions(actions); setTollgateReviews(reviews); } }).catch(() => { if (active) { setCorrectiveActions([]); setTollgateReviews([]); } });
     return () => { active = false; };
   }, [project]);
   const recentActivity = useMemo(
@@ -528,6 +533,7 @@ export default function ProjectDetail() {
     if (tab === "Risks") return <ProjectRisks project={project} />;
     if (tab === "Actions") return <ProjectActions project={project} />;
     if (tab === "Corrective Actions") return <ProjectCorrectiveActions project={project} documents={documents} analyses={projectAnalyses} records={correctiveActions} onRecordsChange={setCorrectiveActions} requestedId={new URLSearchParams(location.search).get("correctiveAction") || ""} />;
+    if (tab === "Tollgates") return <ProjectTollgates project={project} documents={documents} analyses={projectAnalyses} evidence={evidence} datasets={projectDatasets} correctiveActions={correctiveActions} reviews={tollgateReviews} onReviewsChange={setTollgateReviews} updateProject={updateProject} onOpenBinder={()=>setTab("Project Binder")} requestedPhase={new URLSearchParams(location.search).get("phase") || ""} />;
     if (tab === "Issues") return <ProjectIssues project={project} />;
     if (tab === "Decisions") return <ProjectDecisions project={project} />;
     if (tab === "Approvals") return <ProjectApprovals project={project} />;
@@ -771,6 +777,7 @@ export default function ProjectDetail() {
           artifacts={artifacts}
           datasets={projectDatasets}
           correctiveActions={correctiveActions}
+          tollgateReviews={tollgateReviews}
           updateProject={updateProject}
         />
       );
@@ -788,6 +795,7 @@ export default function ProjectDetail() {
             />
           ) : (
             <>
+              <OEProjectHealthDashboard project={project} documents={documents} datasets={projectDatasets} analyses={projectAnalyses} evidence={evidence} artifacts={artifacts} correctiveActions={correctiveActions} tollgateReviews={tollgateReviews}/>
               <div className="ph-intelligence">
                 <div>
                   <span>Documents Completed</span>

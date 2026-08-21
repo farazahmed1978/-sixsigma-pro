@@ -11,9 +11,9 @@ let mockProjects=[];
 jest.mock('../context/ProjectsContext',()=>({useProjects:()=>({getProject:id=>mockProjects.find(project=>project.id===id)||null,projects:mockProjects})}));
 jest.mock('../context/WorksheetContext',()=>({useWorksheet:()=>({activeDataset:null,datasets:[],switchDataset:jest.fn()})}));
 
-const render=async projectId=>{
+const render=async(projectId,search='')=>{
   const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
-  await act(async()=>root.render(<MemoryRouter initialEntries={[{pathname:'/analysis',state:{projectId}}]}><AnalysisLauncher/></MemoryRouter>));
+  await act(async()=>root.render(<MemoryRouter initialEntries={[{pathname:'/analysis',search,state:projectId?{projectId}:undefined}]}><AnalysisLauncher/></MemoryRouter>));
   return {host,root};
 };
 
@@ -35,6 +35,13 @@ test('an OE project context shows the full OE tool catalog (regression)',async()
   const {host,root}=await render('oe-1');
   expect(host.textContent).toContain('1-Sample t-Test');
   expect(host.textContent).toContain('Analysis Catalog');
+  expect(host.querySelector('a[href="/projects/oe-1"]')).toBeTruthy();
+  await act(async()=>root.unmount());host.remove();
+});
+
+test('an actionable Tollgate query deep-link preserves OE project context',async()=>{
+  const {host,root}=await render('','?project=oe-1');
+  expect(host.textContent).toContain('1-Sample t-Test');
   expect(host.querySelector('a[href="/projects/oe-1"]')).toBeTruthy();
   await act(async()=>root.unmount());host.remove();
 });

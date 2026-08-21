@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link as RouterLink, useLocation, useNavigate, useParams } from 'react-router-dom';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -11,7 +11,7 @@ import {artifactResume,documentRoute,projectHubRoute,PROJECT_HUB_BACK_LABEL} fro
 import {lifecycleForProject} from '../foundation/lifecycle';
 import {nextDmaicArtifact} from '../utils/defineSequence';
 import '../components/GuidedWorkspace.css';
-import {PROJECT_CHARTER_SCHEMA_VERSION,PROJECT_CHARTER_EMPTY,CHARTER_TABLE_COLUMNS} from '../config/charterTemplate';
+import {PROJECT_CHARTER_SCHEMA_VERSION,PROJECT_CHARTER_EMPTY,CHARTER_TABLE_COLUMNS,charterCompletionState,charterFieldComplete,charterQualityState} from '../config/charterTemplate';
 import './ProjectCharter.css';
 
 export const projectCharterLinkTarget=(projectId,to)=>to==='/templates'?documentRoute(projectId,'sipoc'):to;
@@ -33,6 +33,7 @@ export const PROJECT_CHARTER_SECTIONS = [
   { id: 'constraints', label: 'Constraints', icon: '11', fields: ['constraints'], tip: 'Record fixed limits involving policy, technology, budget, capacity, or timing.', next: 'Escalate constraints that threaten the target outcome.' },
   { id: 'approval', label: 'Approval', icon: '12', fields: ['approvals'], tip: 'Approval confirms the mandate, resources, scope, and expected business value.', next: 'Schedule the Define gate review and capture sponsor approval.' },
 ];
+export const charterRecordForSave=(charter,updatedAt=new Date().toISOString())=>({...charter,schemaVersion:PROJECT_CHARTER_SCHEMA_VERSION,updatedAt});
 const SECTIONS = PROJECT_CHARTER_SECTIONS;
 
 const plain = value => String(value || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
@@ -98,20 +99,21 @@ export default function ProjectCharter({onGuidedState} = {}) {
   const [progressionWarning, setProgressionWarning] = useState(false);
   const previewRef = useRef(null);
   const hydrated = useRef(id);
+  const charterRef = useRef(charter);charterRef.current=charter;
 
   useEffect(() => { if (hydrated.current !== id) { setCharter({ ...PROJECT_CHARTER_EMPTY, ...(project?.charter || {}) });setActiveIndex(Math.max(0,SECTIONS.findIndex(section=>section.id===(project?.resumeTarget?.artifactId==='charter'?project.resumeTarget.sectionId:'overview')))); hydrated.current = id; } }, [id, project]);
   useEffect(()=>{if(!project)return;const sectionId=SECTIONS[activeIndex]?.id,currentResume=project.resumeTarget;if(currentResume?.artifactId==='charter'&&currentResume.sectionId===sectionId)return;updateProject(id,{resumeTarget:artifactResume({projectId:id,artifactId:'charter',artifactName:'Project Charter',sectionId})}).catch(()=>{})},[activeIndex,id,project,updateProject]);
   useEffect(()=>{if(!project)return;setCharter(current=>{const next=mergeCharterSharedFields(current,project.sharedFields);return next.targetDate===current.targetDate&&next.businessCase===current.businessCase&&next.goalStatement===current.goalStatement&&next.scopeIn===current.scopeIn?current:next})},[project]);
-  useEffect(() => { if (!exists) return undefined; setSaveState('saving'); const timer = window.setTimeout(async () => { try { await updateProject(id, { charter: { ...charter, updatedAt: new Date().toISOString() } }); setSaveState('saved'); } catch { setSaveState('unsaved'); } }, 700); return () => window.clearTimeout(timer); }, [charter, exists, id, updateProject]);
+  useEffect(() => { if (!exists) return undefined; setSaveState('saving'); const timer = window.setTimeout(async () => { try { await updateProject(id, { charter: charterRecordForSave(charter) }); setSaveState('saved'); } catch { setSaveState('unsaved'); } }, 700); return () => window.clearTimeout(timer); }, [charter, exists, id, updateProject]);
+  useEffect(()=>()=>{if(exists)updateProject(id,{charter:charterRecordForSave(charterRef.current)}).catch(()=>{})},[exists,id,updateProject]);
 
   const update = (field, value) => {setSaveState('unsaved');const sharedKey={targetDate:'targetDate',businessCase:'businessCaseSummary',goalStatement:'goalSummary',scopeIn:'scopeSummary'}[field];if(sharedKey)updateProject(id,{sharedFields:{...(project.sharedFields||{}),[sharedKey]:value},...(field==='targetDate'?{targetDate:value}:{})});setCharter(current => ({ ...current, [field]: value }));};
-  const complete = field => Array.isArray(charter[field]) ? charter[field].some(row => Object.entries(row).some(([key, value]) => key !== 'id' && plain(value))) : Boolean(plain(charter[field]));
+  const complete = field => charterFieldComplete(charter,field);
   const completedSections = SECTIONS.filter(section => section.fields.every(complete)).length;
-  const completion = Math.round((SECTIONS.reduce((sum, section) => sum + section.fields.filter(complete).length, 0) / SECTIONS.reduce((sum, section) => sum + section.fields.length, 0)) * 100);
+  const completion = charterCompletionState(charter).completion;
   const missingSections=SECTIONS.filter(section=>!section.fields.every(complete));
   const missingRequiredCount=SECTIONS.reduce((sum,section)=>sum+section.fields.filter(field=>!complete(field)).length,0);
-  const qualityChecks = useMemo(() => [plain(charter.projectSummary).length >= 40, Boolean(charter.targetDate), plain(charter.businessCase).length >= 80, plain(charter.problemStatement).length >= 50 && /\d/.test(plain(charter.problemStatement)), /\d/.test(plain(charter.goalStatement)), plain(charter.scopeIn) && plain(charter.scopeOut), charter.team.some(r => r.name && r.role), charter.stakeholders.length > 0, charter.timeline.some(r => r.date), /\d/.test(plain(charter.financialImpact)), charter.risks.some(r => r.risk && r.mitigation), charter.approvals.some(r => r.name && r.status)], [charter]);
-  const quality = Math.round((qualityChecks.filter(Boolean).length / qualityChecks.length) * 100);
+  const quality = charterQualityState(charter).score;
   const current = SECTIONS[activeIndex];
   // Charter is shared by both suites (OE and PM). Its next-document target must follow whichever
   // suite this project belongs to, via the same suite-aware sequenceForProject() mechanism
@@ -121,7 +123,7 @@ export default function ProjectCharter({onGuidedState} = {}) {
   const currentStageLabel = lifecycle.stages[0]?.label || 'Define';
   const currentStageId = lifecycle.stages[0]?.id || 'define';
   const nextDoc = nextDmaicArtifact('charter', project);
-  const saveNow = async () => { setSaveState('saving');try { await updateProject(id, { charter: { ...charter, schemaVersion: PROJECT_CHARTER_SCHEMA_VERSION, updatedAt: new Date().toISOString() },resumeTarget:artifactResume({projectId:id,artifactId:'charter',artifactName:'Project Charter',sectionId:current.id}) }); setSaveState('saved');return true; } catch { setSaveState('unsaved');return false; } };
+  const saveNow = async () => { setSaveState('saving');try { await updateProject(id, { charter: charterRecordForSave(charter),resumeTarget:artifactResume({projectId:id,artifactId:'charter',artifactName:'Project Charter',sectionId:current.id}) }); setSaveState('saved');return true; } catch { setSaveState('unsaved');return false; } };
   const advanceSection=async()=>{if(await saveNow())setActiveIndex(index=>Math.min(index+1,SECTIONS.length-1));};
   const continueToNextDocument=async()=>{if(!nextDoc||!await saveNow())return;await updateProject(id,{resumeTarget:artifactResume({projectId:id,artifactId:nextDoc.id,artifactName:nextDoc.name,sectionId:project.documents?.[`document-${nextDoc.id}`]?.sectionState?.activeSectionId||''})});navigate(documentRoute(id,nextDoc.id))};
   const requestNextDocument=()=>{if(missingRequiredCount){setProgressionWarning(true);return;}continueToNextDocument()};

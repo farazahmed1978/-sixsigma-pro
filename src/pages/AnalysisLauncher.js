@@ -13,7 +13,7 @@ export default function AnalysisLauncher(){
  const location=useLocation(),{activeDataset,datasets}=useWorksheet(),{getProject}=useProjects(),[query,setQuery]=useState(''),[family,setFamily]=useState('All');
  const families=['All',...new Set(ANALYTICS_CATALOG.map(item=>item.family))];
  const methods=useMemo(()=>ANALYTICS_CATALOG.filter(item=>(family==='All'||item.family===family)&&`${item.name} ${item.family} ${item.aliases.join(' ')}`.toLowerCase().includes(query.toLowerCase())),[family,query]);
- const projectId=location.state?.projectId||activeDataset?.projectId||'',owned=datasets.filter(item=>item.projectId===projectId&&!item.archivedAt),datasetId=location.state?.datasetId||(location.state?.projectId?(owned.length===1?owned[0].id:''):(activeDataset?.projectId===projectId?activeDataset.id:'')),context={projectId,datasetId};
+ const linkedProjectId=new URLSearchParams(location.search).get('project')||'',projectId=location.state?.projectId||linkedProjectId||activeDataset?.projectId||'',owned=datasets.filter(item=>item.projectId===projectId&&!item.archivedAt),datasetId=location.state?.datasetId||((location.state?.projectId||linkedProjectId)?(owned.length===1?owned[0].id:''):(activeDataset?.projectId===projectId?activeDataset.id:'')),context={projectId,datasetId};
  // Suite isolation guard: the OE statistical Analysis Catalog must never render for a PM project's
  // context, even if the route itself is reachable (e.g. a dual-suite org, a stale link, or direct
  // URL entry) — no PM-specific analysis tools exist yet, so a PM project gets a clear explanation

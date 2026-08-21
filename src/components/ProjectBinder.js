@@ -112,6 +112,8 @@ export const routeFor = (projectId, item) =>
       ? `/tool/lean-enterprise?openLean=${encodeURIComponent(item.sourceId || item.id)}`
       : item.kind === "corrective-action"
         ? `/projects/${projectId}?tab=corrective-actions&correctiveAction=${encodeURIComponent(item.sourceId)}`
+        : item.kind === "tollgate"
+          ? `/projects/${projectId}?tab=tollgates&phase=${encodeURIComponent(item.phase)}`
         : "";
 export const reportItemForAnalysis = (analysis) => ({
   toolId: analysis.toolId || analysis.toolType || "analysis",
@@ -149,7 +151,7 @@ export const placementDraftForAnalysis = (
 });
 export const analysesWithProjectPlacements=(analyses,placements,projectId)=>analyses.map((analysis)=>{const canonicalPlacement=placements.find((item)=>item.artifactId===analysis.id&&item.projectId===projectId&&item.isPrimary);return canonicalPlacement?{...analysis,phase:canonicalPlacement.phase||analysis.phase,workflowCluster:canonicalPlacement.workflowCluster||analysis.workflowCluster}:analysis});
 const itemStage = (item) =>
-  item.kind === "corrective-action"
+  ["corrective-action", "tollgate"].includes(item.kind)
     ? "Decisions / Actions"
     : item.kind === "document"
     ? "Documents"
@@ -227,6 +229,7 @@ export function buildProjectReviewModel(
     artifacts = [],
     datasets = [],
     correctiveActions = [],
+    tollgateReviews = [],
   } = {},
 ) {
   const lifecycle = lifecycleForProject(project),
@@ -247,8 +250,13 @@ export function buildProjectReviewModel(
           ? "DOCUMENTED_DECISION"
           : kind === "document"
             ? "USER_PROVIDED_FACT"
-            : "MISSING_EVIDENCE",
+      : "MISSING_EVIDENCE",
   });
+  const latestTollgates = Object.values(tollgateReviews.reduce((latest, item) => {
+    const phase = item.lifecycle_phase || item.content?.phase;
+    if (!phase || (latest[phase]?.content?.attempt || 0) >= (item.content?.attempt || 0)) return latest;
+    return {...latest, [phase]: item};
+  }, {}));
   const items = [
     ...(project.charter
       ? [
@@ -288,6 +296,13 @@ export function buildProjectReviewModel(
         effectiveness: item.content?.effectivenessResult,
       },
     }, "corrective-action")),
+    ...latestTollgates.map((item) => decorate({
+      ...item,
+      ...item.content,
+      title: `${item.lifecycle_phase || item.content?.phase} Gate — ${item.status}`,
+      phase: item.lifecycle_phase || item.content?.phase,
+      values: {decision:item.content?.decision||item.status,reviewer:item.content?.decisionByName||item.content?.assignedReviewerName,date:item.content?.decisionAt||item.content?.submittedAt},
+    }, "tollgate")),
   ];
   const phaseItems = (phase) => items.filter((item) => item.phase === phase);
   const oeSummaries = {
@@ -672,6 +687,7 @@ export default function ProjectBinder({
   artifacts,
   datasets,
   correctiveActions = [],
+  tollgateReviews = [],
   updateProject,
 }) {
   const placement = useProjectPlacement(),
@@ -719,8 +735,9 @@ export default function ProjectBinder({
         ],
         datasets,
         correctiveActions,
+        tollgateReviews,
       }),
-    [project, documents, placedAnalyses, evidence, artifacts, datasets, correctiveActions, placedLean],
+    [project, documents, placedAnalyses, evidence, artifacts, datasets, correctiveActions, tollgateReviews, placedLean],
   );
   const configuredStages = lifecycleStageLabels(model.lifecycle);
   const PHASES = [

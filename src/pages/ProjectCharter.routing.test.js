@@ -142,3 +142,16 @@ test('with a fully complete charter, onGuidedState reports allRequiredFieldsFill
   expect(latest().isLastSection).toBe(true);
   await act(async()=>root.unmount());host.remove();
 });
+
+test('leaving the Charter workspace flushes the current flat Charter record through updateProject',async()=>{
+  const project={id:'oe-project-charter-flush',name:'OE Project',methodology:'lean-six-sigma',charter:fullCharterFixture,documents:{},sharedFields:{}};
+  const{host,root}=await renderCharter(project);
+  mockUpdateProject.mockClear();
+  await act(async()=>root.unmount());host.remove();
+  const charterWrite=mockUpdateProject.mock.calls.find(([,updates])=>updates.charter);
+  expect(charterWrite).toBeTruthy();
+  expect(charterWrite[0]).toBe(project.id);
+  expect(charterWrite[1].charter).toEqual(expect.objectContaining(fullCharterFixture));
+  expect(charterWrite[1].charter).toEqual(expect.objectContaining({schemaVersion:expect.any(Number),updatedAt:expect.any(String)}));
+  expect(charterWrite[1].charter).not.toHaveProperty('values');
+});

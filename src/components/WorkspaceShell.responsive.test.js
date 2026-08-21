@@ -1,0 +1,2 @@
+import{readFileSync}from'fs';
+test('workspace controls wrap before the mobile breakpoint and maximized content remains flex-safe',()=>{const css=readFileSync(require.resolve('./WorkspaceShell.css'),'utf8');expect(css).toContain('@media (max-width:1200px)');expect(css).toContain('.workspace-shell-bar { flex-wrap:wrap; }');expect(css).toContain('.workspace-mode-maximized { display:flex; flex-direction:column; }');expect(css).toContain('.workspace-mode-maximized .workspace-shell-content { flex:1; min-height:0; height:auto; }')});

@@ -9,6 +9,13 @@ export const PROJECT_CHARTER_SCHEMA_VERSION = 2;
 
 export const PROJECT_CHARTER_EMPTY = { schemaVersion: PROJECT_CHARTER_SCHEMA_VERSION, projectSummary: '', targetDate: '', businessCase: '', problemStatement: '', goalStatement: '', scopeIn: '', scopeOut: '', team: [], stakeholders: [], timeline: [], financialImpact: '', risks: [], assumptions: '', constraints: '', approvals: [] };
 
+export const PROJECT_CHARTER_REQUIRED_FIELDS = ['projectSummary','targetDate','businessCase','problemStatement','goalStatement','scopeIn','scopeOut','team','stakeholders','timeline','financialImpact','risks','assumptions','constraints','approvals'];
+export const PROJECT_CHARTER_REVIEW_READY_SCORE = 80;
+const charterText=value=>String(value||'').replace(/<[^>]*>/g,'').replace(/&nbsp;/g,' ').trim();
+export const charterFieldComplete=(charter,field)=>Array.isArray(charter?.[field])?charter[field].some(row=>Object.entries(row).some(([key,value])=>key!=='id'&&charterText(value))):Boolean(charterText(charter?.[field]));
+export const charterCompletionState=charter=>{const completedFields=PROJECT_CHARTER_REQUIRED_FIELDS.filter(field=>charterFieldComplete(charter,field));return{complete:completedFields.length===PROJECT_CHARTER_REQUIRED_FIELDS.length,completion:Math.round(completedFields.length/PROJECT_CHARTER_REQUIRED_FIELDS.length*100),completedFields,missingFields:PROJECT_CHARTER_REQUIRED_FIELDS.filter(field=>!completedFields.includes(field))}};
+export const charterQualityState=charter=>{const checks=[charterText(charter?.projectSummary).length>=40,Boolean(charter?.targetDate),charterText(charter?.businessCase).length>=80,charterText(charter?.problemStatement).length>=50&&/\d/.test(charterText(charter?.problemStatement)),/\d/.test(charterText(charter?.goalStatement)),charterText(charter?.scopeIn)&&charterText(charter?.scopeOut),charter?.team?.some(row=>row.name&&row.role),charter?.stakeholders?.length>0,charter?.timeline?.some(row=>row.date),/\d/.test(charterText(charter?.financialImpact)),charter?.risks?.some(row=>row.risk&&row.mitigation),charter?.approvals?.some(row=>row.name&&row.status)];const score=Math.round(checks.filter(Boolean).length/checks.length*100);return{score,reviewReady:score>=PROJECT_CHARTER_REVIEW_READY_SCORE,threshold:PROJECT_CHARTER_REVIEW_READY_SCORE,checks}};
+
 // Column definitions for the charter's five editable tables, used both by the live editor's
 // EditableTable instances and by CHARTER_REPORT_TEMPLATE's table fields below.
 export const CHARTER_TABLE_COLUMNS = {
