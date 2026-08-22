@@ -15,8 +15,8 @@ test('the hub short-circuits to GuidedWorkspace/GuidedDocumentSelection whenever
   expect(source).toContain('project.guidedFlowState?.mandatoryComplete && !project.selectedDocuments');
 });
 
-test('the resume banner is gated on Project Home + guidedFlowState.mandatoryComplete === false, and re-enters guided mode at the hub (not a document-specific route)', () => {
-  expect(source).toContain('tab === "Project Home" && project.guidedFlowState?.mandatoryComplete === false');
+test('the resume banner is limited to the supported PM flow and is absent from Professional OE', () => {
+  expect(source).toContain('tab === "Project Home" && suiteId === "project-management" && project.guidedFlowState?.mandatoryComplete === false');
   expect(source).toContain('You were setting up');
   expect(source).toContain('Continue Guided Setup');
   expect(source).toContain('navigate(projectHubRoute(id), {state: {guided: true}})');

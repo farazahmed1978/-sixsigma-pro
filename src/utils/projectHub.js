@@ -8,3 +8,6 @@ export function documentActivityRoute(projectId,activity,documents={}){
 export const worksheetDatasetLocation=(projectId,datasetId='')=>({pathname:'/worksheet',state:{projectId,datasetId}});
 export const newDatasetLocation=projectId=>({pathname:'/worksheet',state:{projectId,newDataset:true}});
 export const projectDatasetInventory=(datasets,projectId)=>datasets.filter(dataset=>dataset.projectId===projectId);
+export const PROJECT_HUB_TAB_LABELS={"corrective-actions":"Corrective Actions",tollgates:"Tollgates","project-settings":"Project Settings","project-binder":"Project Binder","evidence-library":"Evidence Library",datasets:"Datasets",team:"Team"};
+export const projectHubTabFromSearch=search=>PROJECT_HUB_TAB_LABELS[new URLSearchParams(search||'').get('tab')]||'';
+export const projectHubDeepLink=(projectId,tab,params={})=>{const query=new URLSearchParams({tab,...params});return`/projects/${projectId}?${query.toString()}`};

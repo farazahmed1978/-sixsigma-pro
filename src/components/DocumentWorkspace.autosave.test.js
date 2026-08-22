@@ -24,7 +24,7 @@ test('autosave keeps the SIPOC workspace mounted, navigation stable, and editor 
   await act(async()=>root.unmount());host.remove();jest.useRealTimers();
 });
 
-const Location=()=>{const location=useLocation();return <div data-testid="location">{location.pathname}</div>};
+const Location=()=>{const location=useLocation();return <div data-testid="location">{location.pathname}{location.search}</div>};
 const artifact=id=>DEFINE_TEMPLATES.find(item=>item.id===id);
 const filledValues=template=>Object.fromEntries(template.sections.flatMap(section=>section.fields).filter(field=>field.required!==false).map(field=>[field.id,field.type==='table'?[{id:'row'}]:'complete value']));
 
@@ -58,7 +58,7 @@ test('fully complete artifact advances directly without a warning',async()=>{
   await act(async()=>root.unmount());host.remove();
 });
 
-test('VOC incomplete warning continues directly to the project Data Collection Plan route',async()=>{
+test('VOC incomplete warning continues to Define Tollgate without crossing into Measure',async()=>{
   localStorage.setItem('axentra_document_autosave','off');
   const template=artifact('voc'),record={id:'document-voc',templateId:'voc',projectId:'project-1',values:{},references:{},sectionState:{activeSectionId:template.sections.at(-1).id}},project={id:'project-1',name:'Test',documents:{'document-voc':record},activityLog:[],sharedFields:{},artifacts:[],evidenceLibrary:[]},updateProject=jest.fn(async()=>({}));
   const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
@@ -66,19 +66,19 @@ test('VOC incomplete warning continues directly to the project Data Collection P
   await act(async()=>host.querySelector('[data-testid="sequence-next"]').click());
   expect(host.textContent).toContain('This document is incomplete.');
   await act(async()=>{[...host.querySelectorAll('button')].find(button=>button.textContent==='Continue anyway').click();await Promise.resolve();await Promise.resolve()});
-  expect(host.querySelector('[data-testid="location"]').textContent).toBe('/projects/project-1/documents/data-collection-plan');
+  expect(host.querySelector('[data-testid="location"]').textContent).toBe('/projects/project-1?tab=tollgates&phase=Define');
   expect(updateProject).toHaveBeenCalled();
   await act(async()=>root.unmount());host.remove();
 });
 
-test('Sequence Previous from Measure preserves project context and saves first',async()=>{
+test('first Measure document cannot navigate backward across the Define boundary',async()=>{
   localStorage.setItem('axentra_document_autosave','off');
   const template=MEASURE_TEMPLATES.find(item=>item.id==='data-collection-plan'),record={id:'document-data-collection-plan',templateId:template.id,projectId:'project-1',values:{},references:{}},project={id:'project-1',name:'Test',documents:{[record.id]:record},activityLog:[],sharedFields:{},artifacts:[],evidenceLibrary:[]},updateProject=jest.fn(async()=>({}));
   const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
   await act(async()=>root.render(<MemoryRouter initialEntries={['/projects/project-1/documents/data-collection-plan']}><Routes><Route path="/projects/project-1/documents/data-collection-plan" element={<DocumentWorkspace template={template} project={project} updateProject={updateProject}/>}/><Route path="*" element={<Location/>}/></Routes></MemoryRouter>));
-  await act(async()=>{host.querySelector('[data-testid="sequence-previous"]').click();await Promise.resolve();await Promise.resolve()});
-  expect(host.querySelector('[data-testid="location"]').textContent).toBe('/projects/project-1/documents/voc');
-  expect(updateProject).toHaveBeenCalled();
+  expect(host.querySelector('[data-testid="sequence-previous"]').disabled).toBe(true);
+  expect(host.querySelector('[data-testid="location"]')).toBeNull();
+  expect(updateProject).not.toHaveBeenCalled();
   await act(async()=>root.unmount());host.remove();
 });
 

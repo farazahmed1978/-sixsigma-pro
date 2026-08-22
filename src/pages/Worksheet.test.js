@@ -38,11 +38,11 @@ test('back link reads "Back to Project Hub" and routes to the specific project\'
   await act(async()=>root.unmount());host.remove();
 });
 
-test('back link falls back to the top-level projects list only when opened without project context',async()=>{
+test('back link preserves the active project when opened without explicit workflow context',async()=>{
   const {host,root}=await render();
   const backLink=host.querySelector('.workspace-shell-back');
-  expect(backLink.getAttribute('href')).toBe('/projects');
-  expect(backLink.textContent).toContain('Back to Projects');
+  expect(backLink.getAttribute('href')).toBe('/projects/pm-1');
+  expect(backLink.textContent).toContain('Back to Project Hub');
   await act(async()=>root.unmount());host.remove();
 });
 

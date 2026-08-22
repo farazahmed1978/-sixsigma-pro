@@ -8,4 +8,4 @@ export function resolveAnalysisDataset({datasets,projectId,requestedDatasetId,cu
  return '';
 }
 
-export const analysisRoute=(route,{projectId='',datasetId='',methodId=''}={})=>({pathname:route,search:methodId&&route==='/hypothesis'?`?method=${encodeURIComponent(methodId)}`:'',state:{projectId,datasetId}});
+export const analysisRoute=(route,{projectId='',datasetId='',methodId='',workflow=null}={})=>{const query=new URLSearchParams();if(methodId&&route==='/hypothesis')query.set('method',methodId);if(workflow?.projectId||projectId)query.set('project',workflow?.projectId||projectId);if(workflow?.phase)query.set('phase',workflow.phase);['workflowStep','origin','returnTo','completionTarget'].forEach(key=>{if(workflow?.[key])query.set(key,workflow[key])});return{pathname:route,search:query.toString()?`?${query}`:'',state:{projectId:workflow?.projectId||projectId,datasetId,...(workflow?{oeWorkflow:workflow}:{})}}};

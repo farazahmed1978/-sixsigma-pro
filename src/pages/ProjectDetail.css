@@ -31,3 +31,4 @@
 .ph-settings-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.8rem;margin-bottom:1rem}.ph-settings-grid label{display:grid;gap:.35rem;color:var(--text-secondary);font-size:.72rem}.ph-settings-grid label:nth-child(2){grid-column:span 2}.ph-settings-grid input,.ph-settings-grid textarea,.ph-settings-grid select{width:100%}
 @media(max-width:600px){.ph-settings-grid{grid-template-columns:1fr}.ph-settings-grid label:nth-child(2){grid-column:auto}}
 .ph-card-button{width:100%;font:inherit;text-align:left;color:inherit;cursor:pointer}
+.ph-reviewer-eligibility{display:grid;gap:.2rem;min-width:180px;font-size:.68rem}.ph-reviewer-eligibility small{color:var(--text-muted)}.ph-reviewer-eligibility.eligible b{color:var(--green)}.ph-reviewer-eligibility.ineligible b{color:var(--orange)}

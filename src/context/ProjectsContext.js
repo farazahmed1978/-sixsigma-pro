@@ -3,6 +3,7 @@ import {useAuth} from './AuthContext';
 import {projectRepository} from '../repositories/projectRepository';
 import {HYDRATION,nextGeneration,isCurrentGeneration} from '../services/persistenceSafety';
 import {OE_LIFECYCLE,initializeLifecycleStages,lifecycleForProject,lifecycleStageLabels,resolveLifecycleStage} from '../foundation/lifecycle';
+import {tollgateRepository} from '../repositories/tollgateRepository';
 
 const ProjectsContext = createContext();
 const STORAGE_KEY = 'sixsigmapro_projects';
@@ -36,23 +37,27 @@ export const projectToRow = project => ({ id: project.id, organization_id: proje
 
 export function ProjectsProvider({ children }) {
   const {user,profile,configured}=useAuth();
+  const userId=user?.id,userEmail=user?.email||'';
   const [projects, setProjects] = useState(() => configured ? [] : loadProjects());
+  const [reviewProjects,setReviewProjects]=useState([]);
+  const [assignedTollgates,setAssignedTollgates]=useState([]);
   const [hydrationStatus,setHydrationStatus]=useState(configured?HYDRATION.HYDRATING:HYDRATION.READY);
   const [persistenceError,setPersistenceError]=useState('');
   const [deletingProjectId,setDeletingProjectId]=useState('');
   const hydrated = useRef(!configured);
   const generation=useRef(0);
   const projectsRef=useRef(projects);projectsRef.current=projects;
+  const reviewProjectsRef=useRef(reviewProjects);reviewProjectsRef.current=reviewProjects;
 
   useEffect(() => {
     let active = true;
     if (!configured) { hydrated.current = true; return undefined; }
     const request=nextGeneration(generation.current);generation.current=request;setProjects([]);setHydrationStatus(HYDRATION.HYDRATING);setPersistenceError('');
     hydrated.current = false;
-    if (!user || !profile?.default_organization_id) { setProjects([]); return () => { active = false; }; }
-    projectRepository.listCloud(profile.default_organization_id).then(rows => { if (active&&isCurrentGeneration(request,generation.current)) { setProjects(rows.map(projectFromRow)); hydrated.current = true;setHydrationStatus(HYDRATION.READY); } }).catch(error => {if(active&&isCurrentGeneration(request,generation.current)){setHydrationStatus(HYDRATION.ERROR);setPersistenceError(error.message||'Projects could not be loaded from Aureqin.');}});
+    if (!userId) { setProjects([]);setReviewProjects([]);setAssignedTollgates([]); return () => { active = false; }; }
+    Promise.all([profile?.default_organization_id?projectRepository.listCloud(profile.default_organization_id):Promise.resolve([]),tollgateRepository.listAssigned({id:userId,email:userEmail})]).then(async([ownedRows,reviews])=>{const ownedIds=new Set(ownedRows.map(row=>row.id)),reviewRows=await projectRepository.listByIds(reviews.map(row=>row.project_id));if(active&&isCurrentGeneration(request,generation.current)){setProjects(ownedRows.map(projectFromRow));setReviewProjects(reviewRows.filter(row=>!ownedIds.has(row.id)).map(row=>({...projectFromRow(row),accessMode:'tollgate-review'})));setAssignedTollgates(reviews);hydrated.current=true;setHydrationStatus(HYDRATION.READY);}}).catch(error => {if(active&&isCurrentGeneration(request,generation.current)){setHydrationStatus(HYDRATION.ERROR);setPersistenceError(error.message||'Projects and assigned reviews could not be loaded from Aureqin.');}});
     return () => { active = false; };
-  }, [configured, profile?.default_organization_id, user]);
+  }, [configured, profile?.default_organization_id,userId,userEmail]);
 
   useEffect(() => {
     if (configured || !hydrated.current) return;
@@ -95,7 +100,7 @@ export function ProjectsProvider({ children }) {
   }, [profile,user]);
 
   const updateProject = useCallback((id, updates) => {
-    const current=projectsRef.current.find(project=>project.id===id);if(!current)return Promise.reject(new Error('The target project is no longer available.'));
+    const current=projectsRef.current.find(project=>project.id===id),reviewProject=reviewProjectsRef.current.find(project=>project.id===id);if(!current&&reviewProject){const next={...reviewProject,...updates,updatedAt:new Date().toISOString()};setReviewProjects(previous=>previous.map(project=>project.id===id?next:project));return Promise.resolve(next);}if(!current)return Promise.reject(new Error('The target project is no longer available.'));
       const shared = { ...(current.sharedFields || {}) };
       const mappings = { name:'projectName', champion:'sponsor', owner:'owner', processOwner:'processOwner', startDate:'startDate', targetDate:'targetDate', status:'status', budget:'budget', goal:'goalSummary', scopeSummary:'scopeSummary', businessCaseSummary:'businessCaseSummary' };
       Object.entries(mappings).forEach(([source,target]) => { if (Object.prototype.hasOwnProperty.call(updates,source)) shared[target]=updates[source]; });
@@ -142,7 +147,7 @@ export function ProjectsProvider({ children }) {
     )));
   }, []);
 
-  const getProject = useCallback((id) => projects.find(p => p.id === id), [projects]);
+  const getProject = useCallback((id) => projects.find(p => p.id === id)||reviewProjects.find(p=>p.id===id), [projects,reviewProjects]);
 
   const addEvidence = useCallback((projectId, evidence) => {
     const id = evidence.id || `evidence-${Date.now()}`;
@@ -164,6 +169,8 @@ export function ProjectsProvider({ children }) {
   return (
     <ProjectsContext.Provider value={{
       projects,
+      reviewProjects,
+      assignedTollgates,
       createProject,
       updateProject,
       deleteProject,

@@ -1,4 +1,163 @@
-import React from'react';import{Link}from'react-router-dom';import{computeOEProjectHealth}from'../foundation/oeProjectHealth';import'./OEProjectHealthDashboard.css';
-const tone=status=>status==='Complete'||status==='Ready'||status==='On track'?'green':status==='At risk'?'red':'yellow';
-const Action=({value})=>value?.destination?<Link className="oe-health-action" to={value.destination}>{value.actionLabel} →</Link>:null;
-export default function OEProjectHealthDashboard({project,documents=[],datasets=[],analyses=[],evidence=[],artifacts=[],correctiveActions=[],tollgateReviews=[]}){const health=computeOEProjectHealth(project,{documents,datasets,analyses,evidence,artifacts,correctiveActions,tollgateReviews});return <section className="oe-health" aria-label="Operational Excellence project health"><header><div><span>OPERATIONAL EXCELLENCE GUIDANCE</span><h2>{health.currentPhase} project health</h2><p>Authoritative DMAIC readiness, evidence, and governance status.</p></div><strong className={`oe-health-overall ${tone(health.overall.status)}`}>{health.overall.status} · {health.overall.score}%</strong></header><section className="oe-health-next"><div><span>NEXT RECOMMENDED ACTION</span><h3>{health.recommendedNextAction.label}</h3><p>Resolve the highest-priority requirement in the current DMAIC phase.</p></div><Action value={health.recommendedNextAction}/></section><ol className="oe-health-progress" aria-label="DMAIC progress">{health.phases.map(item=><li className={`${tone(item.status)} ${item.isCurrent?'current':''}`} key={item.phase}><Link to={item.destination}><b>{item.phase}</b><span>{item.gateStatus}</span><small>{item.status} · {item.score}%</small></Link></li>)}</ol><div className="oe-health-grid">{health.areas.map(area=><article className={tone(area.status)} key={area.phase}><header><div><span>{area.phase.toUpperCase()}</span><h3>{area.title}</h3></div><strong>{area.status}</strong></header><p>{area.complete.length} requirement{area.complete.length===1?'':'s'} complete · {area.blockers.length} blocker{area.blockers.length===1?'':'s'} · {area.warnings.length} warning{area.warnings.length===1?'':'s'}</p>{area.complete.length>0&&<details><summary>What is complete</summary><ul>{area.complete.map(item=><li key={item.code}>{item.label}</li>)}</ul></details>}{(area.blockers.length>0||area.warnings.length>0)&&<div className="oe-health-attention"><b>Needs attention</b><ul>{[...area.blockers,...area.warnings].slice(0,3).map(item=><li key={item.code}><span>{item.label}</span><Action value={item}/></li>)}</ul></div>}<footer><b>Most important next action</b><Action value={area.nextAction}/></footer></article>)}</div></section>}
+import React from "react";
+import { Link } from "react-router-dom";
+import { computeOEProjectHealth } from "../foundation/oeProjectHealth";
+import "./OEProjectHealthDashboard.css";
+const tone = (status) =>
+  status === "Complete" || status === "On track"
+    ? "green"
+    : status === "At risk"
+      ? "red"
+      : "yellow";
+const Action = ({ value }) =>
+  value?.destination ? (
+    <Link className="oe-health-action" to={value.destination}>
+      {value.actionLabel} →
+    </Link>
+  ) : null;
+export default function OEProjectHealthDashboard({
+  project,
+  documents = [],
+  datasets = [],
+  analyses = [],
+  evidence = [],
+  artifacts = [],
+  correctiveActions = [],
+  tollgateReviews = [],
+}) {
+  const health = computeOEProjectHealth(project, {
+    documents,
+    datasets,
+    analyses,
+    evidence,
+    artifacts,
+    correctiveActions,
+    tollgateReviews,
+  });
+  return (
+    <section
+      className="oe-health"
+      aria-label="Operational Excellence project health"
+    >
+      <header>
+        <div>
+          <span>OPERATIONAL EXCELLENCE GUIDANCE</span>
+          <h2>{health.currentPhase} project health</h2>
+          <p>Authoritative DMAIC readiness, evidence, and governance status.</p>
+        </div>
+        <strong className={`oe-health-overall ${tone(health.overall.status)}`}>
+          {health.overall.status} · {health.overall.score}%
+        </strong>
+      </header>
+      <section className="oe-health-next">
+        <div>
+          <span>NEXT RECOMMENDED ACTION</span>
+          <h3>{health.recommendedNextAction.label}</h3>
+          <p>
+            {health.recommendedNextAction.code.startsWith("tollgate")
+              ? "Governance status is synchronized with the latest Tollgate attempt."
+              : "Resolve the highest-priority requirement in the current DMAIC phase."}
+          </p>
+        </div>
+        <Action value={health.recommendedNextAction} />
+      </section>
+      <ol className="oe-health-progress" aria-label="DMAIC progress">
+        {health.phases.map((item) => (
+          <li
+            className={`${tone(item.status)} ${item.isCurrent ? "current" : ""}`}
+            key={item.phase}
+          >
+            <Link to={item.destination}>
+              <b>{item.phase}</b>
+              <span>{item.gateStatus}</span>
+              <small>
+                {item.status} · {item.score}%
+              </small>
+            </Link>
+          </li>
+        ))}
+      </ol>
+      <div className="oe-health-grid">
+        {health.areas.map((area) => (
+          <article className={tone(area.status)} key={area.phase}>
+            <header>
+              <div>
+                <span>{area.phase.toUpperCase()}</span>
+                <h3>{area.title}</h3>
+              </div>
+              <strong>{area.status}</strong>
+            </header>
+            <p>
+              {area.complete.length} requirement
+              {area.complete.length === 1 ? "" : "s"} complete ·{" "}
+              {area.blockers.length} blocker
+              {area.blockers.length === 1 ? "" : "s"} · {area.warnings.length}{" "}
+              warning{area.warnings.length === 1 ? "" : "s"}
+            </p>
+            {area.phase === "Measure" && (
+              <div className="oe-health-classification">
+                <span>
+                  <b>Mandatory</b> Planning, definitions, project data, process
+                  understanding, and baseline.
+                </span>
+                <span>
+                  <b>Conditional</b> MSA and capability when applicable;
+                  document justification otherwise.
+                </span>
+                <span>
+                  <b>Optional</b> Additional analysis remains
+                  practitioner-selected.
+                </span>
+              </div>
+            )}
+            {area.complete.length > 0 && (
+              <details>
+                <summary>What is complete</summary>
+                <ul>
+                  {area.complete.map((item) => (
+                    <li key={item.code}>{item.label}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
+            {(area.blockers.length > 0 || area.warnings.length > 0) && (
+              <div className="oe-health-attention">
+                <b>Needs attention</b>
+                <ul>
+                  {[...area.blockers, ...area.warnings]
+                    .slice(0, 3)
+                    .map((item) => (
+                      <li key={item.code}>
+                        <span>
+                          {item.label}
+                          {area.phase === "Measure" && (
+                            <em>
+                              {item.severity === "blocker"
+                                ? "Mandatory"
+                                : "Conditional"}
+                            </em>
+                          )}
+                        </span>
+                        <Action value={item} />
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            )}
+            <footer>
+              <b>Most important next action</b>
+              <Action value={area.nextAction} />
+              {area.phase === "Measure" && (
+                <Link
+                  className="oe-health-action"
+                  to={`/analysis?project=${encodeURIComponent(project.id)}`}
+                >
+                  Browse optional Measure analyses
+                </Link>
+              )}
+            </footer>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}

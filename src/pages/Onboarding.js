@@ -1,25 +1,585 @@
-import React,{useEffect,useState} from 'react';
-import {Link,useNavigate} from 'react-router-dom';
-import logo from '../assets/axentra-logo-dark.svg';
-import {ONBOARDING_CONFIG} from '../config/onboarding';
-import {createAccount,signIn,resetPassword} from '../services/authService';
-import './Onboarding.css';
+import React, { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import logo from "../assets/axentra-logo-dark.svg";
+import { ONBOARDING_CONFIG } from "../config/onboarding";
+import { createAccount, signIn, resetPassword } from "../services/authService";
+import "./Onboarding.css";
 
-const STORAGE='axentra_onboarding_progress_v1';
-const steps=['Account','Profile','Plan','Workspace','Welcome'];
-const initial={firstName:'',lastName:'',email:'',role:'',company:'',industry:'',companySize:'',country:'',useCase:'',planId:'founding-operational-excellence',workspaceChoice:'create',projectName:'',projectType:'Combined',methodology:'Hybrid',terms:false,privacy:false};
-const roles=['Quality Engineer','Lean Six Sigma Professional','Project Manager','Operations Leader','Continuous Improvement Leader','Consultant','Other'];
-const uses=['Statistical Analysis','Lean Six Sigma Projects','PMP / Project Management','Operational Excellence','Reporting','Team Collaboration','All of the Above'];
+const STORAGE = "axentra_onboarding_progress_v1";
+const steps = ["Account", "Profile", "Plan", "Workspace", "Welcome"];
+export const ONBOARDING_INITIAL = {
+  firstName: "",
+  lastName: "",
+  email: "",
+  role: "",
+  company: "",
+  industry: "",
+  companySize: "",
+  country: "",
+  useCase: "",
+  planId: "founding-operational-excellence",
+  workspaceChoice: "later",
+  projectName: "",
+  projectType: "Combined",
+  methodology: "Hybrid",
+  terms: false,
+  privacy: false,
+};
+const roles = [
+  "Quality Engineer",
+  "Lean Six Sigma Professional",
+  "Project Manager",
+  "Operations Leader",
+  "Continuous Improvement Leader",
+  "Consultant",
+  "Other",
+];
+const uses = [
+  "Statistical Analysis",
+  "Lean Six Sigma Projects",
+  "PMP / Project Management",
+  "Operational Excellence",
+  "Reporting",
+  "Team Collaboration",
+  "All of the Above",
+];
 
-function validate(step,data,password,confirm){const errors={};if(step===0){if(!data.firstName.trim())errors.firstName='First name is required.';if(!data.lastName.trim())errors.lastName='Last name is required.';if(!/^\S+@\S+\.\S+$/.test(data.email))errors.email='Enter a valid work email.';if(password.length<10||!/[A-Z]/.test(password)||!/[0-9]/.test(password))errors.password='Use 10+ characters with an uppercase letter and number.';if(password!==confirm)errors.confirm='Passwords do not match.';if(!data.terms)errors.terms='Accept the Terms to continue.';if(!data.privacy)errors.privacy='Acknowledge the Privacy Policy to continue.';}if(step===1){['role','company','industry','companySize','country','useCase'].forEach(key=>{if(!data[key])errors[key]='Required.'})}if(step===3&&data.workspaceChoice==='create'&&!data.projectName.trim())errors.projectName='Enter a project name.';return errors;}
+export function validateOnboarding(step, data, password, confirm) {
+  const errors = {};
+  if (step === 0) {
+    if (!data.firstName.trim()) errors.firstName = "First name is required.";
+    if (!data.lastName.trim()) errors.lastName = "Last name is required.";
+    if (!/^\S+@\S+\.\S+$/.test(data.email))
+      errors.email = "Enter a valid email address.";
+    if (
+      password.length < 10 ||
+      !/[A-Z]/.test(password) ||
+      !/[0-9]/.test(password)
+    )
+      errors.password =
+        "Use 10+ characters with an uppercase letter and number.";
+    if (password !== confirm) errors.confirm = "Passwords do not match.";
+    if (!data.terms) errors.terms = "Accept the Terms to continue.";
+    if (!data.privacy)
+      errors.privacy = "Acknowledge the Privacy Policy to continue.";
+  }
+  if (
+    step === 3 &&
+    data.workspaceChoice === "create" &&
+    !data.projectName.trim()
+  )
+    errors.projectName = "Enter a project name.";
+  return errors;
+}
 
-function ProductPreview({step}){const labels=['Portfolio','Data Worksheet','Analysis','Evidence Library','Documents','Reports','AI Preview'];return <div className="ob-preview"><header><span/><b>Aureqin workspace</b><small>Product preview</small></header><div className="ob-preview-body"><aside>{labels.map((x,i)=><i className={i===step%labels.length?'active':''} key={x}>{x}</i>)}</aside><section><span>PROJECT PORTFOLIO</span><h3>Operational Excellence</h3><div className="ob-preview-metrics"><b>12<small>Projects</small></b><b>38<small>Datasets</small></b><b>146<small>Analyses</small></b></div><div className="ob-preview-chart">{[38,55,47,68,62,82,91].map((height,i)=><i key={i} style={{height:`${height}%`}}/>)}</div><p><strong>Northstar Quality Improvement</strong><span>Analyze · 74% complete</span></p></section></div></div>}
+function ProductPreview({ step }) {
+  const labels = [
+    "Portfolio",
+    "Data Worksheet",
+    "Analysis",
+    "Evidence Library",
+    "Documents",
+    "Reports",
+    "AI Preview",
+  ];
+  return (
+    <div className="ob-preview">
+      <header>
+        <span />
+        <b>Aureqin workspace</b>
+        <small>Product preview</small>
+      </header>
+      <div className="ob-preview-body">
+        <aside>
+          {labels.map((x, i) => (
+            <i className={i === step % labels.length ? "active" : ""} key={x}>
+              {x}
+            </i>
+          ))}
+        </aside>
+        <section>
+          <span>PROJECT PORTFOLIO</span>
+          <h3>Operational Excellence</h3>
+          <div className="ob-preview-metrics">
+            <b>
+              12<small>Projects</small>
+            </b>
+            <b>
+              38<small>Datasets</small>
+            </b>
+            <b>
+              146<small>Analyses</small>
+            </b>
+          </div>
+          <div className="ob-preview-chart">
+            {[38, 55, 47, 68, 62, 82, 91].map((height, i) => (
+              <i key={i} style={{ height: `${height}%` }} />
+            ))}
+          </div>
+          <p>
+            <strong>Northstar Quality Improvement</strong>
+            <span>Analyze · 74% complete</span>
+          </p>
+        </section>
+      </div>
+    </div>
+  );
+}
 
-export default function Onboarding(){const navigate=useNavigate();const saved=()=>{try{return JSON.parse(localStorage.getItem(STORAGE))||{}}catch{return{}}};const restored=saved();const[step,setStep]=useState(restored.step||0);const[data,setData]=useState({...initial,...restored.data});const[password,setPassword]=useState('');const[confirm,setConfirm]=useState('');const[show,setShow]=useState(false);const[errors,setErrors]=useState({});const[mode,setMode]=useState('signup');const[busy,setBusy]=useState(false);const[notice,setNotice]=useState('');useEffect(()=>{localStorage.setItem(STORAGE,JSON.stringify({step,data}))},[step,data]);const field=(key,value)=>{setData(current=>({...current,[key]:value}));setErrors(current=>({...current,[key]:undefined}))};const next=async()=>{const found=validate(step,data,password,confirm);if(Object.keys(found).length){setErrors(found);return}setBusy(true);try{const nextStep=Math.min(4,step+1);if(step===3){await createAccount({...data,password,full_name:`${data.firstName} ${data.lastName}`.trim()});localStorage.setItem(STORAGE,JSON.stringify({step:nextStep,data}))}setStep(nextStep);setNotice('');setErrors({})}catch(error){setNotice(error.message)}finally{setBusy(false)}};const doSignIn=async event=>{event.preventDefault();if(!/^\S+@\S+\.\S+$/.test(data.email)||!password){setErrors({email:'Enter your email and password.'});return}await signIn({email:data.email,password});navigate('/projects')};if(mode==='signin')return <div className="ob-page"><main className="ob-signin"><Link to="/"><img src={logo} alt="AUREQIN"/></Link><span>WELCOME BACK</span><h1>Sign in to Aureqin</h1><p>Continue to your connected project workspace.</p><form onSubmit={doSignIn}><label>Work email<input autoFocus type="email" value={data.email} onChange={e=>field('email',e.target.value)}/></label><label>Password<div className="ob-password"><input type={show?'text':'password'} value={password} onChange={e=>setPassword(e.target.value)}/><button type="button" onClick={()=>setShow(v=>!v)}>{show?'Hide':'Show'}</button></div></label>{errors.email&&<div className="ob-error">{errors.email}</div>}<button className="btn-primary">Sign in</button><button type="button" className="ob-link" onClick={async()=>{await resetPassword(data.email);setNotice('Password reset instructions will be sent to your email.')}}>Forgot password?</button>{notice&&<p className="ob-notice">{notice}</p>}</form><p>New to Aureqin? <button className="ob-link" onClick={()=>setMode('signup')}>Create account</button></p><Link to="/">← Return to homepage</Link></main></div>;
-return <div className="ob-page"><div className="ob-shell"><main className="ob-main"><header className="ob-brand"><Link to="/"><img src={logo} alt="AUREQIN"/></Link><button onClick={()=>setMode('signin')}>Already have an account? <b>Sign in</b></button></header><nav className="ob-steps" aria-label="Onboarding progress">{steps.map((name,index)=><div className={index===step?'active':index<step?'done':''} key={name}><i>{index<step?'✓':index+1}</i><span>{name}</span></div>)}</nav><section className="ob-form"><span>STEP {step+1} OF 5</span><h1>{['Create your account','Tell us about your work','Choose your starting plan','Set up your workspace','Welcome to Aureqin'][step]}</h1><p>{['Choose secure credentials; your account is created after you select a suite and workspace.','Shape the workspace around the work you lead.','Select the professional suite for your initial 14-day trial.','Confirm how you want to enter the platform, then create your account.','Your Aureqin workspace is ready.'][step]}</p>{notice&&<div className="ob-notice">{notice}</div>}
-{step===0&&<div className="ob-grid"><label>First name *<input autoFocus value={data.firstName} onChange={e=>field('firstName',e.target.value)}/>{errors.firstName&&<em>{errors.firstName}</em>}</label><label>Last name *<input value={data.lastName} onChange={e=>field('lastName',e.target.value)}/>{errors.lastName&&<em>{errors.lastName}</em>}</label><label className="wide">Work email *<input type="email" value={data.email} onChange={e=>field('email',e.target.value)}/>{errors.email&&<em>{errors.email}</em>}</label><label>Password *<div className="ob-password"><input type={show?'text':'password'} value={password} onChange={e=>setPassword(e.target.value)}/><button type="button" onClick={()=>setShow(v=>!v)}>{show?'Hide':'Show'}</button></div>{errors.password&&<em>{errors.password}</em>}</label><label>Confirm password *<input type={show?'text':'password'} value={confirm} onChange={e=>setConfirm(e.target.value)}/>{errors.confirm&&<em>{errors.confirm}</em>}</label><small className="wide">Use at least 10 characters, one uppercase letter, and one number.</small><label className="ob-check wide"><input type="checkbox" checked={data.terms} onChange={e=>field('terms',e.target.checked)}/><span>I accept the <Link target="_blank" to="/terms">Terms of Service</Link>.</span>{errors.terms&&<em>{errors.terms}</em>}</label><label className="ob-check wide"><input type="checkbox" checked={data.privacy} onChange={e=>field('privacy',e.target.checked)}/><span>I acknowledge the <Link target="_blank" to="/privacy">Privacy Policy</Link>.</span>{errors.privacy&&<em>{errors.privacy}</em>}</label></div>}
-{step===1&&<div className="ob-grid">{[['role','Job role',roles],['company','Company'],['industry','Industry'],['companySize','Company size',['1–10','11–50','51–250','251–1,000','1,001+']],['country','Country'],['useCase','Primary use case',uses]].map(([key,label,options])=><label className={key==='useCase'?'wide':''} key={key}>{label} *{options?<select value={data[key]} onChange={e=>field(key,e.target.value)}><option value="">Select</option>{options.map(x=><option key={x}>{x}</option>)}</select>:<input value={data[key]} onChange={e=>field(key,e.target.value)}/>} {errors[key]&&<em>{errors[key]}</em>}</label>)}</div>}
-{step===2&&<div className="ob-plans">{ONBOARDING_CONFIG.plans.map(plan=><button className={data.planId===plan.id?'selected':''} onClick={()=>field('planId',plan.id)} key={plan.id}><span>{plan.status}</span><h3>{plan.name}</h3><strong>{plan.priceMonthly==null?'Pricing to be confirmed':`$${plan.priceMonthly}/month`}</strong><small>{ONBOARDING_CONFIG.trial.days}-day trial · One selected professional suite · No card collected today</small><ul>{plan.features.map(x=><li key={x}>✓ {x}</li>)}</ul></button>)}</div>}
-{step===3&&<div><div className="ob-choices">{[['create','Create first project'],['later','Import data later'],['sample','Explore sample workspace']].map(([id,label])=><button className={data.workspaceChoice===id?'selected':''} onClick={()=>field('workspaceChoice',id)} key={id}>{label}</button>)}</div>{data.workspaceChoice==='create'&&<div className="ob-grid"><label className="wide">Project name *<input value={data.projectName} onChange={e=>field('projectName',e.target.value)}/>{errors.projectName&&<em>{errors.projectName}</em>}</label><label>Project type<select value={data.projectType} onChange={e=>field('projectType',e.target.value)}>{['Lean Six Sigma','Project Management','Combined'].map(x=><option key={x}>{x}</option>)}</select></label><label>Preferred methodology<select value={data.methodology} onChange={e=>field('methodology',e.target.value)}>{['DMAIC','PMP lifecycle','Hybrid'].map(x=><option key={x}>{x}</option>)}</select></label></div>}</div>}
-{step===4&&<div className="ob-success"><i>✓</i><h2>Welcome, {data.firstName || 'change leader'}.</h2><p><b>Account status:</b> Created</p><p><b>Selected trial:</b> {ONBOARDING_CONFIG.plans.find(x=>x.id===data.planId)?.name}</p><p><b>Workspace:</b> {data.workspaceChoice==='create'?(data.projectName||'First project'):'Ready to configure'}</p><small>Your selected suite receives a 14-day entitlement. Confirm your email if required, then sign in to continue.</small><div><Link className="btn-primary" to="/signin" onClick={()=>localStorage.removeItem(STORAGE)}>Continue to Sign In</Link><Link className="btn-secondary" to="/">Return Home</Link></div></div>}
-{step<4&&<footer><button disabled={step===0} onClick={()=>setStep(s=>s-1)}>Back</button><button className="btn-primary" disabled={busy} onClick={next}>{busy?'Saving…':'Continue'} →</button></footer>}</section></main><aside className="ob-side"><div><span>ONE CONNECTED PLATFORM</span><h2>Move from project signal to stronger results.</h2><ul><li>Browser-based platform with no installation</li><li>Projects, data, analyses, evidence, and reports together</li><li>Built for Lean Six Sigma and project management</li><li>Account security architecture planned for launch</li></ul></div><ProductPreview step={step}/><small>Product interface shown with illustrative data.</small></aside></div></div>}
+export default function Onboarding() {
+  const navigate = useNavigate();
+  const saved = () => {
+    try {
+      return JSON.parse(localStorage.getItem(STORAGE)) || {};
+    } catch {
+      return {};
+    }
+  };
+  const restored = saved();
+  const [step, setStep] = useState(restored.step || 0);
+  const [data, setData] = useState({
+    ...ONBOARDING_INITIAL,
+    ...restored.data,
+  });
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [show, setShow] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [mode, setMode] = useState("signup");
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
+  useEffect(() => {
+    localStorage.setItem(STORAGE, JSON.stringify({ step, data }));
+  }, [step, data]);
+  const field = (key, value) => {
+    setData((current) => ({ ...current, [key]: value }));
+    setErrors((current) => ({ ...current, [key]: undefined }));
+  };
+  const next = async () => {
+    const found = validateOnboarding(step, data, password, confirm);
+    if (Object.keys(found).length) {
+      setErrors(found);
+      return;
+    }
+    setBusy(true);
+    try {
+      const nextStep = Math.min(4, step + 1);
+      if (step === 3) {
+        await createAccount({
+          ...data,
+          password,
+          full_name: `${data.firstName} ${data.lastName}`.trim(),
+        });
+        localStorage.setItem(STORAGE, JSON.stringify({ step: nextStep, data }));
+      }
+      setStep(nextStep);
+      setNotice("");
+      setErrors({});
+    } catch (error) {
+      setNotice(error.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const doSignIn = async (event) => {
+    event.preventDefault();
+    if (!/^\S+@\S+\.\S+$/.test(data.email) || !password) {
+      setErrors({ email: "Enter your email and password." });
+      return;
+    }
+    await signIn({ email: data.email, password });
+    navigate("/projects");
+  };
+  if (mode === "signin")
+    return (
+      <div className="ob-page">
+        <main className="ob-signin">
+          <Link to="/">
+            <img src={logo} alt="AUREQIN" />
+          </Link>
+          <span>WELCOME BACK</span>
+          <h1>Sign in to Aureqin</h1>
+          <p>Continue to your connected project workspace.</p>
+          <form onSubmit={doSignIn}>
+            <label>
+              Email address
+              <input
+                autoFocus
+                type="email"
+                value={data.email}
+                onChange={(e) => field("email", e.target.value)}
+              />
+            </label>
+            <label>
+              Password
+              <div className="ob-password">
+                <input
+                  type={show ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                <button type="button" onClick={() => setShow((v) => !v)}>
+                  {show ? "Hide" : "Show"}
+                </button>
+              </div>
+            </label>
+            {errors.email && <div className="ob-error">{errors.email}</div>}
+            <button className="btn-primary">Sign in</button>
+            <button
+              type="button"
+              className="ob-link"
+              onClick={async () => {
+                await resetPassword(data.email);
+                setNotice(
+                  "Password reset instructions will be sent to your email.",
+                );
+              }}
+            >
+              Forgot password?
+            </button>
+            {notice && <p className="ob-notice">{notice}</p>}
+          </form>
+          <p>
+            New to Aureqin?{" "}
+            <button className="ob-link" onClick={() => setMode("signup")}>
+              Create account
+            </button>
+          </p>
+          <Link to="/">← Return to homepage</Link>
+        </main>
+      </div>
+    );
+  return (
+    <div className="ob-page">
+      <div className="ob-shell">
+        <main className="ob-main">
+          <header className="ob-brand">
+            <Link to="/">
+              <img src={logo} alt="AUREQIN" />
+            </Link>
+            <button onClick={() => setMode("signin")}>
+              Already have an account? <b>Sign in</b>
+            </button>
+          </header>
+          <nav className="ob-steps" aria-label="Onboarding progress">
+            {steps.map((name, index) => (
+              <div
+                className={
+                  index === step ? "active" : index < step ? "done" : ""
+                }
+                key={name}
+              >
+                <i>{index < step ? "✓" : index + 1}</i>
+                <span>{name}</span>
+              </div>
+            ))}
+          </nav>
+          <section className="ob-form">
+            <span>STEP {step + 1} OF 5</span>
+            <h1>
+              {
+                [
+                  "Create your account",
+                  "Tell us about your work",
+                  "Choose your starting plan",
+                  "Set up your workspace",
+                  "Welcome to Aureqin",
+                ][step]
+              }
+            </h1>
+            <p>
+              {
+                [
+                  "Choose secure credentials; your account is created after you select a suite and workspace.",
+                  "Shape the workspace around the work you lead.",
+                  "Select the professional suite for your initial 14-day trial.",
+                  "Confirm how you want to enter the platform, then create your account.",
+                  "Your Aureqin workspace is ready.",
+                ][step]
+              }
+            </p>
+            {notice && <div className="ob-notice">{notice}</div>}
+            {step === 0 && (
+              <div className="ob-grid">
+                <label>
+                  First name *
+                  <input
+                    autoFocus
+                    value={data.firstName}
+                    onChange={(e) => field("firstName", e.target.value)}
+                  />
+                  {errors.firstName && <em>{errors.firstName}</em>}
+                </label>
+                <label>
+                  Last name *
+                  <input
+                    value={data.lastName}
+                    onChange={(e) => field("lastName", e.target.value)}
+                  />
+                  {errors.lastName && <em>{errors.lastName}</em>}
+                </label>
+                <label className="wide">
+                  Email address *
+                  <input
+                    type="email"
+                    value={data.email}
+                    onChange={(e) => field("email", e.target.value)}
+                  />
+                  {errors.email && <em>{errors.email}</em>}
+                </label>
+                <label>
+                  Password *
+                  <div className="ob-password">
+                    <input
+                      type={show ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                    />
+                    <button type="button" onClick={() => setShow((v) => !v)}>
+                      {show ? "Hide" : "Show"}
+                    </button>
+                  </div>
+                  {errors.password && <em>{errors.password}</em>}
+                </label>
+                <label>
+                  Confirm password *
+                  <input
+                    type={show ? "text" : "password"}
+                    value={confirm}
+                    onChange={(e) => setConfirm(e.target.value)}
+                  />
+                  {errors.confirm && <em>{errors.confirm}</em>}
+                </label>
+                <small className="wide">
+                  Use at least 10 characters, one uppercase letter, and one
+                  number.
+                </small>
+                <label className="ob-check wide">
+                  <input
+                    type="checkbox"
+                    checked={data.terms}
+                    onChange={(e) => field("terms", e.target.checked)}
+                  />
+                  <span>
+                    I accept the{" "}
+                    <Link target="_blank" to="/terms">
+                      Terms of Service
+                    </Link>
+                    .
+                  </span>
+                  {errors.terms && <em>{errors.terms}</em>}
+                </label>
+                <label className="ob-check wide">
+                  <input
+                    type="checkbox"
+                    checked={data.privacy}
+                    onChange={(e) => field("privacy", e.target.checked)}
+                  />
+                  <span>
+                    I acknowledge the{" "}
+                    <Link target="_blank" to="/privacy">
+                      Privacy Policy
+                    </Link>
+                    .
+                  </span>
+                  {errors.privacy && <em>{errors.privacy}</em>}
+                </label>
+              </div>
+            )}
+            {step === 1 && (
+              <div className="ob-grid">
+                <p className="ob-profile-note wide">
+                  These details personalize your workspace. You can skip this
+                  step and add them later from your profile.
+                </p>
+                {[
+                  ["role", "Job role", roles],
+                  ["company", "Company"],
+                  ["industry", "Industry"],
+                  [
+                    "companySize",
+                    "Company size",
+                    ["1–10", "11–50", "51–250", "251–1,000", "1,001+"],
+                  ],
+                  ["country", "Country"],
+                  ["useCase", "Primary use case", uses],
+                ].map(([key, label, options]) => (
+                  <label className={key === "useCase" ? "wide" : ""} key={key}>
+                    {label} <span className="ob-optional">Optional</span>
+                    {options ? (
+                      <select
+                        value={data[key]}
+                        onChange={(e) => field(key, e.target.value)}
+                      >
+                        <option value="">Select</option>
+                        {options.map((x) => (
+                          <option key={x}>{x}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        value={data[key]}
+                        onChange={(e) => field(key, e.target.value)}
+                      />
+                    )}{" "}
+                    {errors[key] && <em>{errors[key]}</em>}
+                  </label>
+                ))}
+              </div>
+            )}
+            {step === 2 && (
+              <div className="ob-plans">
+                {ONBOARDING_CONFIG.plans.map((plan) => (
+                  <button
+                    className={data.planId === plan.id ? "selected" : ""}
+                    onClick={() => field("planId", plan.id)}
+                    key={plan.id}
+                  >
+                    <span>{plan.status}</span>
+                    <h3>{plan.name}</h3>
+                    <strong>
+                      {plan.priceMonthly == null
+                        ? "Pricing to be confirmed"
+                        : `$${plan.priceMonthly}/month`}
+                    </strong>
+                    <small>
+                      {ONBOARDING_CONFIG.trial.days}-day trial · One selected
+                      professional suite · No card collected today
+                    </small>
+                    <ul>
+                      {plan.features.map((x) => (
+                        <li key={x}>✓ {x}</li>
+                      ))}
+                    </ul>
+                  </button>
+                ))}
+              </div>
+            )}
+            {step === 3 && (
+              <div>
+                <div className="ob-choices">
+                  {[
+                    ["create", "Create first project"],
+                    ["later", "Import data later"],
+                    ["sample", "Explore sample workspace"],
+                  ].map(([id, label]) => (
+                    <button
+                      className={data.workspaceChoice === id ? "selected" : ""}
+                      onClick={() => field("workspaceChoice", id)}
+                      key={id}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {data.workspaceChoice === "create" && (
+                  <div className="ob-grid">
+                    <label className="wide">
+                      Project name *
+                      <input
+                        value={data.projectName}
+                        onChange={(e) => field("projectName", e.target.value)}
+                      />
+                      {errors.projectName && <em>{errors.projectName}</em>}
+                    </label>
+                    <label>
+                      Project type
+                      <select
+                        value={data.projectType}
+                        onChange={(e) => field("projectType", e.target.value)}
+                      >
+                        {[
+                          "Lean Six Sigma",
+                          "Project Management",
+                          "Combined",
+                        ].map((x) => (
+                          <option key={x}>{x}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Preferred methodology
+                      <select
+                        value={data.methodology}
+                        onChange={(e) => field("methodology", e.target.value)}
+                      >
+                        {["DMAIC", "PMP lifecycle", "Hybrid"].map((x) => (
+                          <option key={x}>{x}</option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                )}
+              </div>
+            )}
+            {step === 4 && (
+              <div className="ob-success">
+                <i>✓</i>
+                <h2>Welcome, {data.firstName || "change leader"}.</h2>
+                <p>
+                  <b>Account status:</b> Created
+                </p>
+                <p>
+                  <b>Selected trial:</b>{" "}
+                  {
+                    ONBOARDING_CONFIG.plans.find((x) => x.id === data.planId)
+                      ?.name
+                  }
+                </p>
+                <p>
+                  <b>Workspace:</b>{" "}
+                  {data.workspaceChoice === "create"
+                    ? data.projectName || "First project"
+                    : "Ready to configure"}
+                </p>
+                <small>
+                  Your selected suite receives a 14-day entitlement. Confirm
+                  your email if required, then sign in to continue.
+                </small>
+                <div>
+                  <Link
+                    className="btn-primary"
+                    to="/signin"
+                    onClick={() => localStorage.removeItem(STORAGE)}
+                  >
+                    Continue to Sign In
+                  </Link>
+                  <Link className="btn-secondary" to="/">
+                    Return Home
+                  </Link>
+                </div>
+              </div>
+            )}
+            {step < 4 && (
+              <footer>
+                <button
+                  disabled={step === 0}
+                  onClick={() => setStep((s) => s - 1)}
+                >
+                  Back
+                </button>
+                <button className="btn-primary" disabled={busy} onClick={next}>
+                  {busy ? "Saving…" : "Continue"} →
+                </button>
+              </footer>
+            )}
+          </section>
+        </main>
+        <aside className="ob-side">
+          <div>
+            <span>ONE CONNECTED PLATFORM</span>
+            <h2>Move from project signal to stronger results.</h2>
+            <ul>
+              <li>Browser-based platform with no installation</li>
+              <li>Projects, data, analyses, evidence, and reports together</li>
+              <li>Built for Lean Six Sigma and project management</li>
+              <li>Account security architecture planned for launch</li>
+            </ul>
+          </div>
+          <ProductPreview step={step} />
+          <small>Product interface shown with illustrative data.</small>
+        </aside>
+      </div>
+    </div>
+  );
+}

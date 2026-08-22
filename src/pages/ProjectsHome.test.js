@@ -5,7 +5,10 @@ import {MemoryRouter} from 'react-router-dom';
 import ProjectsHome from './ProjectsHome';
 
 const mockCreateProject=jest.fn(()=>'new-project-id');
-jest.mock('../context/ProjectsContext',()=>({useProjects:()=>({projects:[],createProject:mockCreateProject,deleteProject:jest.fn(),deletingProjectId:''})}));
+let mockProjects=[];
+let mockReviewProjects=[];
+let mockAssignedTollgates=[];
+jest.mock('../context/ProjectsContext',()=>({useProjects:()=>({projects:mockProjects,reviewProjects:mockReviewProjects,assignedTollgates:mockAssignedTollgates,createProject:mockCreateProject,deleteProject:jest.fn(),deletingProjectId:''})}));
 jest.mock('../context/InteractionContext',()=>({useInteractions:()=>({confirm:jest.fn(),toast:jest.fn()})}));
 jest.mock('../context/AuthContext',()=>({useAuth:()=>({user:{id:'user-1'},profile:{default_organization_id:'org-1',full_name:'Jamie Rivera'}})}));
 jest.mock('../context/EntitlementContext',()=>({useEntitlements:()=>({canAccess:()=>true})}));
@@ -20,7 +23,7 @@ const change=(control,value)=>act(()=>Simulate.change(control,{target:{value}}))
 // CRA's Jest config runs with resetMocks:true, which wipes a mock's implementation (not just its
 // call history) before every test — jest.fn(()=>'new-project-id')'s initial implementation does
 // not survive past the first test, so it must be re-established here every time.
-beforeEach(()=>{mockCreateProject.mockImplementation(()=>'new-project-id')});
+beforeEach(()=>{mockCreateProject.mockImplementation(()=>'new-project-id');mockProjects=[];mockReviewProjects=[];mockAssignedTollgates=[]});
 
 // "+ New Project" now opens the guided NewProjectEntry overlay (Phase 5A) instead of the inline
 // form directly — these tests reach the original inline form via its "Switch to advanced setup"
@@ -63,5 +66,17 @@ test('"+ New Project" opens the guided entry card with all three paths',async()=
   await act(async()=>[...host.querySelectorAll('button')].find(button=>button.textContent==='+ New Project').click());
   expect(host.textContent).toContain('what are we building today?');
   expect(host.querySelectorAll('.npe-path-card')).toHaveLength(3);
+  await act(async()=>root.unmount());host.remove();
+});
+
+test('assigned cross-org reviewer with zero owned projects still discovers the canonical pending Define attempt',async()=>{
+  mockReviewProjects=[{id:'project-1',name:'Test55',suiteId:'operational-excellence',phases:{},documents:{}}];
+  mockAssignedTollgates=[{id:'gate-1',project_id:'project-1',status:'Submitted',lifecycle_phase:'Define',content:{phase:'Define',attempt:2,submittedBy:'faraz',submittedByName:'Faraz Ahmed',submittedAt:'2026-08-21T10:00:00Z',assignedReviewerId:'user-1'}}];
+  const{host,root}=await render();
+  await act(async()=>{await Promise.resolve();await Promise.resolve()});
+  expect(host.textContent).toContain('Test55 — Define Tollgate');
+  expect(host.textContent).toContain('Submitted by Faraz Ahmed');
+  expect(host.textContent).toContain('No Projects Yet');
+  expect(host.querySelector('.pw-review-queue a').getAttribute('href')).toBe('/projects/project-1?tab=tollgates&phase=Define&attempt=2');
   await act(async()=>root.unmount());host.remove();
 });

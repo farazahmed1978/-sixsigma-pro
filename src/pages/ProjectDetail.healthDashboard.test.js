@@ -5,7 +5,7 @@ const source = readFileSync(path.join(__dirname, 'ProjectDetail.js'), 'utf8');
 
 test('ProjectDetail imports and renders ProjectHealthDashboard for PM projects on Project Home', () => {
   expect(source).toContain(`import ProjectHealthDashboard from "../components/ProjectHealthDashboard";`);
-  expect(source).toContain('suiteId === "project-management" ? (\n            <ProjectHealthDashboard');
+  expect(source).toMatch(/suiteId === "project-management" \? \(\s*<ProjectHealthDashboard/);
 });
 
 test('the OE fallback dashboard (ph-intelligence + Phase workspaces) is preserved exactly once, not duplicated', () => {
@@ -15,7 +15,7 @@ test('the OE fallback dashboard (ph-intelligence + Phase workspaces) is preserve
 
 test('ph-dashboard-grid (Recent Activity / Upcoming Tasks) renders for both suites, outside the suite-conditional block', () => {
   const dashboardGridIndex = source.indexOf('className="ph-dashboard-grid"');
-  const conditionalCloseIndex = source.indexOf(')}\n          <div className="ph-dashboard-grid"');
+  const conditionalCloseIndex = source.search(/\)\}\s*<div className="ph-dashboard-grid"/);
   expect(dashboardGridIndex).toBeGreaterThan(-1);
   expect(conditionalCloseIndex).toBeGreaterThan(-1);
 });

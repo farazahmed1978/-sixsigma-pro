@@ -22,7 +22,7 @@ test('analysis navigation preserves an active dataset owned by the originating p
 });
 
 test('catalog route carries project, dataset, and canonical hypothesis method',()=>{
- expect(analysisRoute('/hypothesis',{projectId:'project-1',datasetId:'dataset-2',methodId:'one-sample-t'})).toEqual({pathname:'/hypothesis',search:'?method=one-sample-t',state:{projectId:'project-1',datasetId:'dataset-2'}});
+ expect(analysisRoute('/hypothesis',{projectId:'project-1',datasetId:'dataset-2',methodId:'one-sample-t'})).toEqual({pathname:'/hypothesis',search:'?method=one-sample-t&project=project-1',state:{projectId:'project-1',datasetId:'dataset-2'}});
 });
 
 test('switching is identity-only and never mutates either canonical dataset',()=>{

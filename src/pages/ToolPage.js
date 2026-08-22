@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link,useLocation } from 'react-router-dom';
 import { BOOK_EXCERPTS } from '../utils/bookExcerpts';
 import { useAnalysis } from '../context/AnalysisContext';
 import AnalysisContextSelector from '../components/AnalysisContextSelector';
+import {resolveOEWorkflowContext,phaseRoute} from '../utils/oeWorkflowNavigation';
 import './ToolPage.css';
 
 const toolMeta = {
@@ -208,6 +209,7 @@ const toolMeta = {
 export default function ToolPage({ tool, children }) {
   const [showInfo, setShowInfo] = useState(false);
   const analysis = useAnalysis();
+  const location=useLocation(),workflow=resolveOEWorkflowContext(location,analysis.project),workflowBack=workflow?.projectId?(workflow.returnTo||phaseRoute(workflow.projectId,workflow.phase)):'/';
   const meta = toolMeta[tool] || {};
   const bookExcerpt = BOOK_EXCERPTS[tool];
 
@@ -217,7 +219,7 @@ export default function ToolPage({ tool, children }) {
       {/* Tool Header */}
       <div className="tool-header">
         <div className="tool-header-left">
-          <Link to="/" className="breadcrumb" style={{
+          <Link to={workflowBack} className="breadcrumb" style={{
             display: 'inline-flex',alignItems: 'center',
             gap: '0.4rem',
             padding: '0.4rem 0.85rem',
@@ -229,7 +231,7 @@ export default function ToolPage({ tool, children }) {
             fontSize: '0.85rem',
             fontWeight: 600,
             textDecoration: 'none',
-          }}>← Back to Dashboard</Link>
+          }}>← Back to {workflow?.projectId?workflow.phase:'Dashboard'}</Link>
           <div className="tool-header-title">
             <span className="tool-header-icon">{meta.icon}</span>
             <div>

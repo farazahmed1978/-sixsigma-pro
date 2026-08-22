@@ -10,6 +10,7 @@ import { SHARED_LEAD_IN_IDS } from "../utils/defineSequence";
 import { NAVIGATION } from "../config/navigation";
 import { navigationItems } from "../utils/navigationTools";
 import { useProjectPlacement } from "../context/ProjectPlacementContext";
+import { evaluateTollgateReadiness } from "../foundation/tollgate";
 import SavedAnalysisResult from "./SavedAnalysisResult";
 import HelpButton from "./HelpButton";
 import "./ProjectBinder.css";
@@ -41,6 +42,7 @@ const analysisPhase = {
   doe: "Improve",
   fmea: "Analyze",
   capability: "Measure",
+  "capability-analysis": "Measure",
   "control-chart": "Control",
   "attribute-chart": "Control",
   "run-chart": "Control",
@@ -331,7 +333,31 @@ export function buildProjectReviewModel(
     ],
     Measure: [
       [
-        "Baseline established",
+        "What are we measuring?",
+        firstValue(phaseItems("Measure"), [
+          "definitionRows",
+          "characteristic",
+          "metric",
+        ]),
+      ],
+      [
+        "How will we measure it?",
+        firstValue(phaseItems("Measure"), [
+          "collectionRows",
+          "measurementRows",
+          "objective",
+        ]),
+      ],
+      [
+        "Can we trust the measurement?",
+        firstValue(phaseItems("Measure"), [
+          "acceptanceDecision",
+          "resultsSummary",
+          "measurementSystem",
+        ]),
+      ],
+      [
+        "What is the baseline?",
         firstValue(phaseItems("Measure"), [
           "baselineNotes",
           "baselineRows",
@@ -340,18 +366,10 @@ export function buildProjectReviewModel(
         ]),
       ],
       [
-        "Data collected",
+        "How is the process performing?",
         datasets.length
           ? `${datasets.length} project dataset${datasets.length === 1 ? "" : "s"}`
           : "Not yet established",
-      ],
-      [
-        "Measurement system",
-        firstValue(phaseItems("Measure"), [
-          "acceptanceDecision",
-          "resultsSummary",
-          "measurementSystem",
-        ]),
       ],
     ],
     Analyze: [
@@ -578,6 +596,7 @@ export function buildProjectReviewModel(
       // choice of alternatives — a stage with two required documents needs both, not either. A
       // stage with no requiredDocs entry (none currently, but future suites may add stages before
       // populating this map) is trivially satisfied rather than blocked.
+      const measureReadiness=lifecycle.id==="operational-excellence"&&phase==="Measure"?evaluateTollgateReadiness(project,"Measure",{documents,analyses,evidence,artifacts,datasets,correctiveActions}):null;
       const expected = requiredDocs[phase] || [],
         missing = expected.filter(
           (id) =>
@@ -585,9 +604,9 @@ export function buildProjectReviewModel(
               (item) => item.kind === "document" && item.templateId === id,
             ),
         ),
-        present = !missing.length;
+        present = measureReadiness?measureReadiness.blockers.length===0:!missing.length;
       const phaseAssets = phaseItems(phase);
-      const low = phaseAssets.some(
+      const low = Boolean(measureReadiness?.warnings.length)||phaseAssets.some(
         (item) => item.quality !== null && item.quality < 70,
       );
       return {
@@ -595,9 +614,9 @@ export function buildProjectReviewModel(
         label: `${phase} stage readiness`,
         status: !present ? "missing" : low ? "attention" : "complete",
         action: !present
-          ? `Add ${missing.map(humanize).join(" and ")}.`
+          ? measureReadiness?.blockers[0]?.label||`Add ${missing.map(humanize).join(" and ")}.`
           : low
-            ? "Improve the flagged record quality."
+            ? measureReadiness?.warnings[0]?.label||"Improve the flagged record quality."
             : "Stage evidence is present.",
       };
     }),
@@ -701,6 +720,7 @@ export default function ProjectBinder({
       if (saved) setOpenResult(saved);
     }
   }, [placedAnalyses, searchParams]);
+  useEffect(()=>{const requested=searchParams.get("phase");if(requested)window.setTimeout(()=>document.getElementById(`binder-phase-${requested.toLowerCase().replace(/[^a-z0-9]+/g,"-")}`)?.scrollIntoView({block:"start"}),0)},[searchParams]);
   const placedLean = useMemo(
     () =>
       placement.placements
@@ -844,7 +864,7 @@ export default function ProjectBinder({
                 ↓
               </div>
             )}
-            <section className="binder-phase">
+            <section className="binder-phase" id={`binder-phase-${phase.toLowerCase().replace(/[^a-z0-9]+/g,"-")}`}>
               <header>
                 <div>
                   <span>{phase.toUpperCase()} STAGE</span>

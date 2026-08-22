@@ -1,4 +1,4 @@
-import {documentActivityRoute,newDatasetLocation,projectDatasetInventory,worksheetDatasetLocation} from './projectHub';
+import {documentActivityRoute,newDatasetLocation,projectDatasetInventory,worksheetDatasetLocation,projectHubDeepLink,projectHubTabFromSearch} from './projectHub';
 
 test('saved and updated document activity opens the canonical project document',()=>{
   const documents={'document-voc':{id:'document-voc',templateId:'voc',values:{researchOwner:'Saved owner'}}};
@@ -28,4 +28,11 @@ test('archive or delete selection affects only the selected canonical dataset',(
   const archived=datasets.map(item=>item.id==='dataset-2'?{...item,status:'archived',archivedAt:'now'}:item);
   expect(archived.find(item=>item.id==='dataset-1')).toBe(datasets[0]);
   expect(archived.filter(item=>item.id!=='dataset-2').map(item=>item.id)).toEqual(['dataset-1']);
+});
+
+test('project hub deep links resolve on initial load and subsequent URL changes',()=>{
+  expect(projectHubTabFromSearch('?tab=project-settings&focus=owner')).toBe('Project Settings');
+  expect(projectHubTabFromSearch('?tab=tollgates&phase=Define')).toBe('Tollgates');
+  expect(projectHubTabFromSearch('?tab=project-binder&phase=Define')).toBe('Project Binder');
+  expect(projectHubDeepLink('project-1','project-settings',{focus:'sponsor'})).toBe('/projects/project-1?tab=project-settings&focus=sponsor');
 });

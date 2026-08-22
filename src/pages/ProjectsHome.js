@@ -8,6 +8,8 @@ import {projectResumeCta} from '../utils/projectResume';
 import {printProjectReport,exportProjectReportToFile} from '../utils/projectReport';
 import HelpButton from '../components/HelpButton';
 import NewProjectEntry from '../components/NewProjectEntry';
+import {pendingAssignedTollgates} from '../foundation/tollgate';
+import {useAuth} from '../context/AuthContext';
 
 function projectProgress(project) {
   const stages=lifecycleStageLabels(lifecycleForProject(project));
@@ -63,13 +65,15 @@ function ProjectCard({ project, resume, progress, phase, deletingProjectId, onDe
 }
 
 export default function ProjectsHome() {
-  const { projects, createProject, deleteProject, deletingProjectId } = useProjects();
+  const { projects,reviewProjects=[],assignedTollgates=[], createProject, deleteProject, deletingProjectId } = useProjects();
+  const {user}=useAuth();
   const {confirm,toast}=useInteractions();
   const location = useLocation();
   const [showForm, setShowForm] = useState(false);
   const [entryOpen, setEntryOpen] = useState(false);
   const emptyForm = { name: '', goal: '', owner: '', champion: '', suiteId: 'operational-excellence' };
   const [form, setForm] = useState(emptyForm);
+  const pendingReviews=pendingAssignedTollgates(reviewProjects,Object.fromEntries(reviewProjects.map(project=>[project.id,assignedTollgates.filter(review=>review.project_id===project.id)])),user);
 
   // Supports the Project Hub's "Start a new project" link, which navigates here with
   // state.openEntry rather than duplicating the entry-card's mount/lifecycle in ProjectDetail.js.
@@ -100,6 +104,8 @@ export default function ProjectsHome() {
           onAdvanced={() => { setEntryOpen(false); setShowForm(true); }}
         />
       )}
+
+      {pendingReviews.length>0&&<section className="pw-review-queue" aria-labelledby="pending-tollgate-reviews"><header><div><span>ACTIONABLE REVIEWS</span><h2 id="pending-tollgate-reviews">Tollgates awaiting your review</h2></div><strong>{pendingReviews.length}</strong></header>{pendingReviews.map(review=><article key={review.id}><div><h3>{review.projectName} — {review.phase} Tollgate</h3><p>Submitted by {review.submittedBy}</p><small>{review.status} · Attempt {review.attempt}{review.submittedAt?` · ${new Date(review.submittedAt).toLocaleString()}`:''}</small></div><Link className="btn-primary" to={review.destination}>Review Tollgate →</Link></article>)}</section>}
 
       {showForm && (
         <div className="card pw-new-form">

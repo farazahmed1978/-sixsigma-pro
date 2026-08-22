@@ -3,6 +3,8 @@ import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-r
 import { useProjects } from '../context/ProjectsContext';
 import DocumentWorkspace from '../components/DocumentWorkspace';
 import StandaloneDocumentWorkspace from '../components/StandaloneDocumentWorkspace';
+import {tollgateRepository} from '../repositories/tollgateRepository';
+import {TOLLGATE_STATUSES,tollgateDetail,tollgateDestination} from '../foundation/tollgate';
 import ArtifactContextGate from '../components/ArtifactContextGate';
 import {artifactContextDecision,artifactDefinition,existingProjectArtifact,matchingSharedFields} from '../config/artifactContext';
 import {createDocument} from '../utils/documentModel';
@@ -334,7 +336,15 @@ const TEMPLATE_SUITE_IDS = (() => {
 const suiteIdsForTemplate = template => [...(TEMPLATE_SUITE_IDS[template.id] || [])];
 export const UNMAPPED_SUITE_TEMPLATE_IDS = TEMPLATES.filter(template => !suiteIdsForTemplate(template).length).map(template => template.id);
 
-function ProjectDocumentEntry({template,project,updateProject}){
+function ControlClosureEntry({template,project,updateProject}){
+ const [approved,setApproved]=useState(null);
+ useEffect(()=>{let active=true;tollgateRepository.list(project.id).then(rows=>active&&setApproved(rows.some(row=>{const gate=tollgateDetail(row);return gate.phase==='Control'&&gate.status===TOLLGATE_STATUSES.APPROVED}))).catch(()=>active&&setApproved(false));return()=>{active=false}},[project.id]);
+ if(approved===null)return <div className="templates-not-found"><h1>Checking Control governance…</h1><p>Project Closure opens after the approved Control Tollgate.</p></div>;
+ if(!approved)return <div className="templates-not-found"><h1>Control approval required</h1><p>Complete Control work and obtain reviewer approval before opening Project Closure.</p><Link className="btn-primary" to={tollgateDestination(project.id,'Control')}>Open Control Tollgate</Link></div>;
+ return <ProjectDocumentWorkspaceEntry template={template} project={project} updateProject={updateProject}/>;
+}
+
+function ProjectDocumentWorkspaceEntry({template,project,updateProject}){
   const existing=existingProjectArtifact({definition:artifactDefinition({kind:'document',template}),project});
   const [record,setRecord]=useState(existing);
   const [error,setError]=useState('');
@@ -356,6 +366,8 @@ function ProjectDocumentEntry({template,project,updateProject}){
   const workspaceProject={...project,documents:{...(project.documents||{}),[record.id]:project.documents?.[record.id]||record}};
   return <DocumentWorkspace key={`${project.id}:${template.id}`} template={template} project={workspaceProject} updateProject={updateProject}/>;
 }
+
+function ProjectDocumentEntry(props){return props.template.id==='project-closure'?<ControlClosureEntry {...props}/>:<ProjectDocumentWorkspaceEntry {...props}/>}
 
 const phaseColor = {
   Define: '#1a56a0', Measure: '#00875a', Analyze: '#c05500',

@@ -1,96 +1,83 @@
 import {DEFINE_TEMPLATES} from '../config/defineTemplates';
-import {createDocument,documentIdFor} from './documentModel';
-import {defineAdvanceState,dmaicSequence,nextDefineArtifact,previousDmaicArtifact,projectDocumentRoute} from './defineSequence';
+import {defineAdvanceState,defineTollgateRoute,dmaicSequence,nextDefineArtifact,phaseTollgateRoute,previousDmaicArtifact,projectDocumentRoute} from './defineSequence';
 
 const template=id=>DEFINE_TEMPLATES.find(item=>item.id===id);
 const completeValues=artifact=>Object.fromEntries(artifact.sections.flatMap(section=>section.fields).filter(field=>field.required!==false).map(field=>[field.id,field.type==='table'?[{id:'row'}]:'complete value']));
 
-test('Charter names SIPOC as its next configured artifact',()=>{
-  expect(nextDefineArtifact('charter').name).toBe('SIPOC');
+test('Professional Define preserves the established governed sequence',()=>{
+  expect(nextDefineArtifact('charter')).toEqual(expect.objectContaining({id:'sipoc',phase:'Define'}));
+  expect(nextDefineArtifact('sipoc')).toEqual(expect.objectContaining({id:'stakeholder-register',phase:'Define'}));
+  expect(nextDefineArtifact('stakeholder-register')).toEqual(expect.objectContaining({id:'business-case',phase:'Define'}));
+  expect(nextDefineArtifact('business-case')).toEqual(expect.objectContaining({id:'voc',phase:'Define'}));
 });
 
-test('SIPOC names and routes directly to Stakeholder Register',()=>{
-  const artifact=template('sipoc');
+test('Professional Define ends at its Tollgate and never advances directly to Measure',()=>{
+  const artifact=template('voc');
   const state=defineAdvanceState({template:artifact,activeIndex:artifact.sections.length-1,values:completeValues(artifact)});
-  expect(state.label).toBe('Stakeholder Register');
-  expect(projectDocumentRoute('project-1',state.next.id)).toBe('/projects/project-1/documents/stakeholder-register');
+  expect(state.next).toBeNull();
+  expect(nextDefineArtifact('voc')).toBeNull();
+  expect(defineTollgateRoute('project-1')).toBe('/projects/project-1?tab=tollgates&phase=Define');
 });
 
-test('completed Stakeholder Register advances directly to Business Case',()=>{
-  const artifact=template('stakeholder-register');
-  const state=defineAdvanceState({template:artifact,activeIndex:artifact.sections.length-1,values:completeValues(artifact)});
-  expect(state.missing).toEqual([]);
-  expect(state.next.name).toBe('Business Case');
-  expect(projectDocumentRoute('project-1',state.next.id)).toBe('/projects/project-1/documents/business-case');
+test('Define routes are project-qualified professional workspaces',()=>{
+  ['sipoc','voc','ctq-tree'].forEach(id=>expect(projectDocumentRoute('project-1',id)).toBe(`/projects/project-1/documents/${id}`));
+  expect(projectDocumentRoute('project-1','voc')).not.toContain('guided');
 });
 
-test('successor route is stable so an existing saved document is reopened',()=>{
-  const successor=nextDefineArtifact('sipoc');
-  const existing={id:documentIdFor(successor.id),projectId:'project-1',templateId:successor.id,values:{processName:'Saved SIPOC successor'}};
-  expect(projectDocumentRoute('project-1',successor.id)).toBe('/projects/project-1/documents/stakeholder-register');
-  expect(createDocument(successor,'project-1',existing).id).toBe(existing.id);
-  expect(createDocument(successor,'project-1',existing).values.processName).toBe('Saved SIPOC successor');
-});
-
-test('incomplete artifact reports the exact required blockers',()=>{
-  const artifact=template('stakeholder-register');
+test('incomplete Define artifact reports exact required blockers',()=>{
+  const artifact=template('voc');
   const state=defineAdvanceState({template:artifact,activeIndex:artifact.sections.length-1,values:{}});
-  expect(state.missing.length).toBeGreaterThan(0);
   expect(state.missing).toEqual(expect.arrayContaining(artifact.sections.flatMap(section=>section.fields).filter(field=>field.required!==false).map(field=>field.label)));
 });
 
-test('end of the configured Define cadence advances to the canonical first Measure artifact',()=>{
-  const artifact=template('voc');
-  const state=defineAdvanceState({template:artifact,activeIndex:artifact.sections.length-1,values:completeValues(artifact)});
-  expect(state.next).toEqual(expect.objectContaining({id:'data-collection-plan',name:'Data Collection Plan',phase:'Measure'}));
-  expect(state.label).toBe('Data Collection Plan');
-  expect(state.label).not.toBe('Next document');
+test('Measure uses its core cadence and ends at its Tollgate',()=>{
+  expect(nextDefineArtifact('data-collection-plan')).toEqual(expect.objectContaining({id:'operational-definitions'}));
+  expect(nextDefineArtifact('measurement-plan')).toBeNull();
+  expect(nextDefineArtifact('operational-definitions')).toEqual(expect.objectContaining({id:'project-dataset',kind:'action'}));
+  expect(nextDefineArtifact('baseline-metrics')).toBeNull();
+  expect(phaseTollgateRoute('p1','Measure')).toBe('/projects/p1?tab=tollgates&phase=Measure');
 });
 
-test('Business Case routes to the registered VOC workspace and reuses its canonical identity',()=>{
-  const successor=nextDefineArtifact('business-case');
-  const existing={id:documentIdFor('voc'),projectId:'project-1',templateId:'voc',values:{researchOwner:'Saved owner'}};
-  expect(successor.id).toBe('voc');
-  expect(successor.sequenceLabel).toBe('Voice of Customer');
-  expect(projectDocumentRoute('project-1',successor.id)).toBe('/projects/project-1/documents/voc');
-  expect(createDocument(successor,'project-1',existing)).toEqual(expect.objectContaining({id:'document-voc',templateId:'voc',values:{researchOwner:'Saved owner'}}));
+test('every remaining phase is bounded and reverse navigation stays within its cadence',()=>{
+  expect(nextDefineArtifact('statistical-analysis-summary')).toBeNull();
+  expect(nextDefineArtifact('action-plan')).toBeNull();
+  expect(previousDmaicArtifact('operational-definitions')).toEqual(expect.objectContaining({id:'data-collection-plan'}));
+  expect(nextDefineArtifact('lessons-learned')).toBeNull();
+  expect(dmaicSequence().at(-1).id).toBe('lessons-learned');
 });
 
-test('Business Case sequence navigation is bounded by Project Charter and Voice of Customer',()=>{
-  expect(previousDmaicArtifact('business-case')).toEqual(expect.objectContaining({id:'charter',name:'Project Charter'}));
-  expect(nextDefineArtifact('business-case')).toEqual(expect.objectContaining({id:'voc'}));
+test('SIPOC successor route opens the canonical Stakeholder Register record',()=>{
+  expect(projectDocumentRoute('project-1',nextDefineArtifact('sipoc').id)).toBe('/projects/project-1/documents/stakeholder-register');
+});
+
+test('Business Case successor exposes the professional Voice of Customer label',()=>{
+  expect(nextDefineArtifact('business-case').sequenceLabel).toBe('Voice of Customer');
+});
+
+test('CTQ remains available without changing the governed Define boundary',()=>{
+  expect(previousDmaicArtifact('ctq-tree')).toBeNull();
+  expect(nextDefineArtifact('ctq-tree')).toBeNull();
+});
+
+test('Project Charter has no preceding professional Define document',()=>{
   expect(previousDmaicArtifact('charter')).toBeNull();
-  expect(nextDefineArtifact('project-closure')).toBeNull();
 });
 
-test('VOC crosses directly into the Measure cadence with project-qualified routing',()=>{
-  const voc=template('voc');
-  const vocState=defineAdvanceState({template:voc,activeIndex:voc.sections.length-1,values:completeValues(voc)});
-  expect(vocState.label).toBe('Data Collection Plan');
-  expect(projectDocumentRoute('project-1',vocState.next.id)).toBe('/projects/project-1/documents/data-collection-plan');
-  expect(previousDmaicArtifact('data-collection-plan')).toEqual(expect.objectContaining({id:'voc'}));
+test('Define Tollgate routing preserves the active project identifier',()=>{
+  expect(defineTollgateRoute('project-with-spaces')).toContain('/projects/project-with-spaces');
 });
 
-test('guided progression describes incomplete status without changing document values',()=>{
-  const artifact=template('business-case'),values={executiveSummary:'Work in progress'};
-  const state=defineAdvanceState({template:artifact,activeIndex:artifact.sections.length-1,values});
-  expect(state.completion).toBeLessThan(100);
-  expect(state.missingDetails.length).toBe(state.missing.length);
-  expect(state.missingDetails[0]).toEqual(expect.objectContaining({section:expect.any(String),field:expect.any(String)}));
-  expect(values).toEqual({executiveSummary:'Work in progress'});
+test('the first Measure document does not provide a previous cross-phase shortcut',()=>{
+  expect(previousDmaicArtifact('data-collection-plan')).toBeNull();
+  expect(nextDefineArtifact('voc')).toBeNull();
 });
 
-test('all DMAIC phase boundaries resolve through the configured template registries',()=>{
-  expect(nextDefineArtifact('measurement-plan')).toEqual(expect.objectContaining({id:'hypothesis-plan',phase:'Analyze'}));
-  expect(nextDefineArtifact('statistical-analysis-summary')).toEqual(expect.objectContaining({id:'factorial-plan',phase:'Improve'}));
-  expect(nextDefineArtifact('action-plan')).toEqual(expect.objectContaining({id:'control-plan',phase:'Control'}));
-  expect(nextDefineArtifact('project-closure')).toBeNull();
-  expect(dmaicSequence().at(-1).id).toBe('project-closure');
+test('Business Case remains in Define without becoming a Measure shortcut',()=>{
+  expect(template('business-case')).toEqual(expect.objectContaining({phase:'Define'}));
+  expect(nextDefineArtifact('business-case')).toEqual(expect.objectContaining({id:'voc'}));
 });
 
-test('project routes remain qualified in both directions across representative DMAIC boundaries',()=>{
-  [['measurement-plan','hypothesis-plan'],['statistical-analysis-summary','factorial-plan'],['action-plan','control-plan']].forEach(([from,to])=>{
-    expect(projectDocumentRoute('project-1',nextDefineArtifact(from).id)).toBe(`/projects/project-1/documents/${to}`);
-    expect(previousDmaicArtifact(to)).toEqual(expect.objectContaining({id:from}));
-  });
+test('Stakeholder Register remains in Define without becoming a Measure shortcut',()=>{
+  expect(template('stakeholder-register')).toEqual(expect.objectContaining({phase:'Define'}));
+  expect(nextDefineArtifact('stakeholder-register')).toEqual(expect.objectContaining({id:'business-case'}));
 });

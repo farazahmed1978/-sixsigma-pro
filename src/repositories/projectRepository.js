@@ -5,6 +5,7 @@ const LOCAL_KEY='sixsigmapro_projects';
 export const projectRepository={
  listLocal(){try{return JSON.parse(localStorage.getItem(LOCAL_KEY)||'[]')}catch{return[]}},
  async listCloud(organizationId){return cloudRepository.list('projects',{organization_id:organizationId})},
+ async listByIds(projectIds){if(!projectIds?.length)return[];const{data,error}=await supabase.from('projects').select('*').in('id',[...new Set(projectIds)]);if(error)throw error;return data||[]},
  async save(project){return cloudRepository.upsert('projects',project,{onConflict:'id'})},
  async remove(id){await cloudRepository.remove('projects',id);const childTables=['datasets','analyses','reports','artifacts','documents','evidence'];await boundedVerify(async()=>{const checks=await Promise.all([supabase.from('projects').select('id').eq('id',id).maybeSingle(),...childTables.map(table=>supabase.from(table).select('id').eq('project_id',id).limit(1))]);if(checks.some(result=>result.error))throw checks.find(result=>result.error).error;return !checks[0].data&&checks.slice(1).every(result=>(result.data||[]).length===0)});return true},
  async importLocal({organizationId,userId,projects}){

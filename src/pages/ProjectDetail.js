@@ -17,10 +17,14 @@ import ProjectDecisions from "../components/ProjectDecisions";
 import ProjectApprovals from "../components/ProjectApprovals";
 import SavedAnalysisResult from "../components/SavedAnalysisResult";
 import { useInteractions } from "../context/InteractionContext";
+import { useAuth } from "../context/AuthContext";
+import { tollgateReviewerEligibility } from "../foundation/tollgate";
 import {
   documentActivityRoute,
   newDatasetLocation,
   projectDatasetInventory,
+  projectHubTabFromSearch,
+  projectHubDeepLink,
   worksheetDatasetLocation,
 } from "../utils/projectHub";
 import {
@@ -35,9 +39,12 @@ import GuidedDocumentSelection from "../components/GuidedDocumentSelection";
 import HelpButton from "../components/HelpButton";
 import ProjectHealthDashboard from "../components/ProjectHealthDashboard";
 import OEProjectHealthDashboard from "../components/OEProjectHealthDashboard";
+import OEProfessionalPhaseWorkspace from "../components/OEProfessionalPhaseWorkspace";
+import OEWorkflowNavigation from "../components/OEWorkflowNavigation";
 import ProjectAssets from "../components/ProjectAssets";
 import AssetUploadModal from "../components/AssetUploadModal";
 import "./ProjectDetail.css";
+import {datasetWorkflowContext,workflowLocation} from "../utils/oeWorkflowNavigation";
 
 // Central, queryable tab membership: which suite(s) a Project Hub tab applies to. Analyses and
 // Placements are OE-only (statistical analyses and their DMAIC workflow-cluster placement don't
@@ -96,6 +103,7 @@ export default function ProjectDetail() {
   const { id } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const {
     getProject,
     updateProject,
@@ -118,7 +126,7 @@ export default function ProjectDetail() {
   const placement = useProjectPlacement();
   const { confirm, requestForm, toast } = useInteractions();
   const [tab, setTab] = useState(
-    () => location.state?.returnTab || ({"corrective-actions":"Corrective Actions",tollgates:"Tollgates","project-settings":"Project Settings","project-binder":"Project Binder","evidence-library":"Evidence Library",datasets:"Datasets"}[new URLSearchParams(location.search).get("tab")] || "Project Home"),
+    () => location.state?.returnTab || projectHubTabFromSearch(location.search) || "Project Home",
   );
   const [analysisQuery, setAnalysisQuery] = useState("");
   const [analysisFilter, setAnalysisFilter] = useState("All");
@@ -130,6 +138,8 @@ export default function ProjectDetail() {
   const [correctiveActions, setCorrectiveActions] = useState([]);
   const [tollgateReviews, setTollgateReviews] = useState([]);
   const artifactInput = useRef(null);
+  const ownerInput = useRef(null);
+  const sponsorInput = useRef(null);
   const project = getProject(id);
   // While project is still loading (undefined), suite context must stay null rather than fall back
   // to lifecycleForProject's own OE default — that default is correct for a loaded project that
@@ -262,6 +272,8 @@ export default function ProjectDetail() {
         0,
       );
   }, [location.state]);
+  useEffect(()=>{const requestedTab=projectHubTabFromSearch(location.search);if(requestedTab)setTab(requestedTab)},[location.search]);
+  useEffect(()=>{if(tab!=="Project Settings")return;const focus=new URLSearchParams(location.search).get("focus"),target=focus==="owner"?ownerInput.current:focus==="sponsor"?sponsorInput.current:null;if(target){target.focus();target.scrollIntoView({block:"center"})}},[location.search,tab]);
   // Suite isolation guard: a tab the current suite doesn't define (e.g. "Analyses" reached via
   // stale returnTab navigation state on a PM project, or by switching projects mid-session) must
   // never render that tab's content — TAB_DEFINITIONS' suites list is the single source of truth
@@ -533,7 +545,7 @@ export default function ProjectDetail() {
     if (tab === "Risks") return <ProjectRisks project={project} />;
     if (tab === "Actions") return <ProjectActions project={project} />;
     if (tab === "Corrective Actions") return <ProjectCorrectiveActions project={project} documents={documents} analyses={projectAnalyses} records={correctiveActions} onRecordsChange={setCorrectiveActions} requestedId={new URLSearchParams(location.search).get("correctiveAction") || ""} />;
-    if (tab === "Tollgates") return <ProjectTollgates project={project} documents={documents} analyses={projectAnalyses} evidence={evidence} datasets={projectDatasets} correctiveActions={correctiveActions} reviews={tollgateReviews} onReviewsChange={setTollgateReviews} updateProject={updateProject} onOpenBinder={()=>setTab("Project Binder")} requestedPhase={new URLSearchParams(location.search).get("phase") || ""} />;
+    if (tab === "Tollgates") return <ProjectTollgates project={project} documents={documents} analyses={projectAnalyses} evidence={evidence} datasets={projectDatasets} correctiveActions={correctiveActions} reviews={tollgateReviews} onReviewsChange={setTollgateReviews} updateProject={updateProject} onOpenBinder={()=>navigate(projectHubDeepLink(id,"project-binder",{phase:new URLSearchParams(location.search).get("phase")||project.currentPhase||"Define"}))} requestedPhase={new URLSearchParams(location.search).get("phase") || ""} requestedAttempt={new URLSearchParams(location.search).get("attempt") || ""} />;
     if (tab === "Issues") return <ProjectIssues project={project} />;
     if (tab === "Decisions") return <ProjectDecisions project={project} />;
     if (tab === "Approvals") return <ProjectApprovals project={project} />;
@@ -599,6 +611,8 @@ export default function ProjectDetail() {
             <label>
               Owner
               <input
+                ref={ownerInput}
+                id="project-owner"
                 value={settings.owner}
                 onChange={(event) =>
                   setSettings((value) => ({
@@ -611,6 +625,8 @@ export default function ProjectDetail() {
             <label>
               Sponsor
               <input
+                ref={sponsorInput}
+                id="project-sponsor"
                 value={settings.champion}
                 onChange={(event) =>
                   setSettings((value) => ({
@@ -796,6 +812,7 @@ export default function ProjectDetail() {
           ) : (
             <>
               <OEProjectHealthDashboard project={project} documents={documents} datasets={projectDatasets} analyses={projectAnalyses} evidence={evidence} artifacts={artifacts} correctiveActions={correctiveActions} tollgateReviews={tollgateReviews}/>
+              <OEProfessionalPhaseWorkspace project={project} documents={documents} datasets={projectDatasets} analyses={projectAnalyses}/>
               <div className="ph-intelligence">
                 <div>
                   <span>Documents Completed</span>
@@ -983,7 +1000,7 @@ export default function ProjectDetail() {
               <span>DATASET MANAGER</span>
               <h2>Project datasets</h2>
             </div>
-            <Link className="btn-primary" to="/worksheet">
+            <Link className="btn-primary" to={suiteId === "operational-excellence" ? workflowLocation('/worksheet',datasetWorkflowContext(project),{projectId:id,newDataset:true}) : newDatasetLocation(id)}>
               + Add Dataset
             </Link>
           </header>
@@ -1004,6 +1021,7 @@ export default function ProjectDetail() {
                   rows · Updated {formatDate(dataset.updatedAt)}
                 </p>
                 <div className="ph-card-actions">
+                  <Link to={suiteId === "operational-excellence" ? workflowLocation('/worksheet',datasetWorkflowContext(project),{projectId:id,datasetId:dataset.id}) : worksheetDatasetLocation(id,dataset.id)}>Open</Link>
                   <button
                     onClick={() =>
                       renameItem("Rename dataset", dataset.name, (name) =>
@@ -1088,7 +1106,7 @@ export default function ProjectDetail() {
           title="No project datasets"
           body="Assign or create a dataset from the Data Worksheet."
           action={
-            <Link className="btn-primary" to="/worksheet">
+            <Link className="btn-primary" to={suiteId === "operational-excellence" ? workflowLocation('/worksheet',datasetWorkflowContext(project),{projectId:id,newDataset:true}) : newDatasetLocation(id)}>
               Open Worksheet
             </Link>
           }
@@ -1396,7 +1414,14 @@ export default function ProjectDetail() {
                     <th>Name</th>
                     <th>Role</th>
                     <th>Department</th>
-                    <th>Email</th>
+                    {suiteId === "operational-excellence" ? (
+                      <>
+                        <th>Account email *</th>
+                        <th>Tollgate reviewer</th>
+                      </>
+                    ) : (
+                      <th>Email</th>
+                    )}
                     <th />
                   </tr>
                 </thead>
@@ -1405,6 +1430,8 @@ export default function ProjectDetail() {
                     <tr key={member.id}>
                       <td>
                         <input
+                          type="email"
+                          aria-label={`${member.name || "Team member"} account email required for Tollgate review`}
                           value={member.name || ""}
                           onChange={(event) =>
                             updateCollection(
@@ -1418,6 +1445,14 @@ export default function ProjectDetail() {
                           }
                         />
                       </td>
+                      {suiteId === "operational-excellence" && (
+                        <td>
+                          {(() => {
+                            const eligibility=tollgateReviewerEligibility(member,user);
+                            return <span className={`ph-reviewer-eligibility ${eligibility.eligible?"eligible":"ineligible"}`}><b>{eligibility.eligible?"Eligible":"Not eligible for Tollgate review"}</b><small>{eligibility.reason}</small></span>;
+                          })()}
+                        </td>
+                      )}
                       <td>
                         <input
                           value={member.role || ""}
@@ -1784,7 +1819,7 @@ export default function ProjectDetail() {
               <button
                 key={item}
                 className={tab === item ? "active" : ""}
-                onClick={() => setTab(item)}
+                onClick={() => suiteId==='operational-excellence'?navigate(item==='Project Home'?`/projects/${id}`:projectHubDeepLink(id,tabDefinitions.find(definition=>definition.label===item)?.id||'project-home',{phase:project.currentPhase||'Define'})):setTab(item)}
               >
                 {item === "Project Home" ? "Dashboard" : item}
                 {item === "Evidence Library" && evidence.length > 0 ? (
@@ -1809,7 +1844,7 @@ export default function ProjectDetail() {
             back to the plain hub mid-flow. Re-entering guided mode from here always targets the hub
             itself (no document-specific route) — GuidedWorkspace resolves the current document
             from project.guidedFlowState on its own. */}
-        {tab === "Project Home" && project.guidedFlowState?.mandatoryComplete === false && (
+        {tab === "Project Home" && suiteId === "project-management" && project.guidedFlowState?.mandatoryComplete === false && (
           <div className="ph-guided-notice">
             <p>You were setting up {project.name}. Want to pick up where you left off?</p>
             <button type="button" className="btn-primary" onClick={() => navigate(projectHubRoute(id), {state: {guided: true}})}>
@@ -1836,10 +1871,11 @@ export default function ProjectDetail() {
             AnalysisLauncher, ReportBuilder) uses. One conditional here covers every tab, rather
             than adding this to each tab's own render branch individually. */}
         {tab !== "Project Home" && (
-          <button type="button" className="ph-back-to-hub" onClick={() => setTab("Project Home")}>
+          <button type="button" className="ph-back-to-hub" onClick={() => suiteId==='operational-excellence'?navigate(`/projects/${id}`):setTab("Project Home")}>
             &larr; Back to Project Hub
           </button>
         )}
+        {tab !== "Project Home" && suiteId === "operational-excellence" && <OEWorkflowNavigation project={project} activity={tab} showContinue={tab==='Datasets'&&projectDatasets.some(dataset=>!dataset.archivedAt)} fallback/>}
         {renderTab()}
         {tab === "Project Home" && (
           <section className="ph-section">
